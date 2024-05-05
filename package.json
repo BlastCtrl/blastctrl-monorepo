@@ -1,0 +1,21 @@
+{
+  "name": "blastctrl-monorepo",
+  "private": true,
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "dev": "pnpm run --parallel dev",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "prettier": "^3.2.5",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "@blastctrl/prettier-config": "workspace:^"
+  }
+}

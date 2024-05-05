@@ -1,0 +1,45 @@
+{
+  "name": "@blastctrl/ui",
+  "private": true,
+  "version": "0.1.0",
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.tsx"
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false"
+  },
+  "dependencies": {
+    "@floating-ui/react": "^0.26.13",
+    "@headlessui/react": "2.0.0-alpha.4",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.3.0"
+  },
+  "devDependencies": {
+    "@blastctrl/eslint-config": "workspace:*",
+    "@blastctrl/prettier-config": "workspace:*",
+    "@blastctrl/tailwind-config": "workspace:*",
+    "@blastctrl/tsconfig": "workspace:*",
+    "@types/react": "^18.2.69",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5",
+    "tailwindcss": "^3.4.3",
+    "typescript": "^5.4.3"
+  },
+  "peerDependencies": {
+    "next": "14.2.3",
+    "react": "18.3.1"
+  },
+  "eslintConfig": {
+    "extends": [
+      "@blastctrl/eslint-config/base",
+      "@blastctrl/eslint-config/react"
+    ]
+  },
+  "prettier": "@blastctrl/prettier-config"
+}
