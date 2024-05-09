@@ -4,11 +4,13 @@ import {
   Fieldset as HeadlessFieldset,
   Label as HeadlessLabel,
   Legend as HeadlessLegend,
-  type DescriptionProps as HeadlessDescriptionProps,
-  type FieldProps as HeadlessFieldProps,
-  type FieldsetProps as HeadlessFieldsetProps,
-  type LabelProps as HeadlessLabelProps,
-  type LegendProps as HeadlessLegendProps,
+} from "@headlessui/react";
+import type {
+  DescriptionProps as HeadlessDescriptionProps,
+  FieldProps as HeadlessFieldProps,
+  FieldsetProps as HeadlessFieldsetProps,
+  LabelProps as HeadlessLabelProps,
+  LegendProps as HeadlessLegendProps,
 } from "@headlessui/react";
 import { cn } from ".";
 import type React from "react";
@@ -35,6 +37,7 @@ export function Legend({ ...props }: HeadlessLegendProps) {
       data-slot="legend"
       className={cn(
         "text-base/6 font-semibold text-zinc-950 data-[disabled]:opacity-50 sm:text-sm/6",
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         props.className,
       )}
     />
@@ -89,9 +92,8 @@ export function Label({
 
 export function Description({
   className,
-  disabled,
   ...props
-}: { className?: string; disabled?: boolean } & HeadlessDescriptionProps) {
+}: { className?: string } & HeadlessDescriptionProps) {
   return (
     <HeadlessDescription
       {...props}
@@ -106,9 +108,8 @@ export function Description({
 
 export function ErrorMessage({
   className,
-  disabled,
   ...props
-}: { className?: string; disabled?: boolean } & HeadlessDescriptionProps) {
+}: { className?: string } & HeadlessDescriptionProps) {
   return (
     <HeadlessDescription
       {...props}

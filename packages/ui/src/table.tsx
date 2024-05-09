@@ -72,12 +72,12 @@ export function TableBody(props: React.ComponentPropsWithoutRef<"tbody">) {
 }
 
 export function TableRow({
-  title,
+  // title,
   className,
   children,
   ...props
 }: React.ComponentPropsWithoutRef<"tr">) {
-  let { striped } = useContext(TableContext);
+  const { striped } = useContext(TableContext);
 
   return (
     <tr
@@ -93,7 +93,7 @@ export function TableHeader({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"th">) {
-  let { bleed, grid } = useContext(TableContext);
+  const { bleed, grid } = useContext(TableContext);
 
   return (
     <th
@@ -113,7 +113,7 @@ export function TableCell({
   children,
   ...props
 }: React.ComponentPropsWithoutRef<"td">) {
-  let { bleed, dense, grid, striped } = useContext(TableContext);
+  const { bleed, dense, grid, striped } = useContext(TableContext);
 
   return (
     <td

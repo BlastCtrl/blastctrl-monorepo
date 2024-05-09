@@ -1,5 +1,6 @@
 import { DataInteractive as HeadlessDataInteractive } from "@headlessui/react";
-import NextLink, { type LinkProps } from "next/link";
+import NextLink from "next/link";
+import type { LinkProps } from "next/link";
 import React from "react";
 
 export const Link = React.forwardRef(function Link(
