@@ -29,11 +29,6 @@ export async function POST(req: Request) {
     const connection = new Connection(process.env.NEXT_PUBLIC_RPC_ENDPOINT!);
 
     const { user, sourceMint, amount } = validatedBody.data;
-    console.log("here?");
-    new PublicKey(user);
-    new PublicKey(sourceMint);
-    new BN(amount);
-    console.log("here not error?");
     // Check for TokenFee
     const { messageToken, quote, transaction } = await buildJupiterSwapToSOL(
       connection,

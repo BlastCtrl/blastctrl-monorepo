@@ -82,10 +82,17 @@ export async function buildJupiterSwapToSOL(
 }> {
   // Connection's genesis hash is cached to prevent an extra RPC query to the node on each call.
   const genesisHashKey = `genesis/${connection.rpcEndpoint}`;
-  let genesisHash = await cache.get<string>(genesisHashKey);
+  let genesisHash = await cache
+    .get<string>(genesisHashKey)
+    .catch(() => console.log("Error getting genesis hash from cache"));
   if (!genesisHash) {
-    genesisHash = await connection.getGenesisHash();
-    await cache.set(genesisHashKey, genesisHash);
+    try {
+      genesisHash = await connection.getGenesisHash();
+      await cache.set(genesisHashKey, genesisHash, 60 * 60 * 60 * 1000);
+    } catch (err) {
+      console.log("getGenesisHash fail", err);
+      throw err;
+    }
   }
   if (!isMainnetBetaCluster(genesisHash)) {
     throw new Error(

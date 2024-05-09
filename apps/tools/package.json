@@ -16,7 +16,7 @@
   "dependencies": {
     "@blastctrl/octane-core": "workspace:^",
     "@blastctrl/ui": "workspace:^",
-    "@headlessui/react": "2.0.0-alpha.4",
+    "@headlessui/react": "2.0.3",
     "@heroicons/react": "^2.1.3",
     "@irys/sdk": "^0.0.4",
     "@metaplex-foundation/js": "^0.20.1",

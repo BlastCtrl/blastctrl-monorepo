@@ -11,6 +11,7 @@ import { formatNumber, numberFormatter } from "@/lib/utils";
 import { useJupQuery } from "@/state/queries/use-jup-quote";
 import { useTokenBalance } from "@/state/queries/use-token-balance";
 import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
+import { Button } from "@blastctrl/ui";
 import { ChevronRightIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
 import {
   WalletAdapterNetwork,
@@ -173,7 +174,7 @@ export default function GaslessSwap() {
         >
           <span className="text-xs text-gray-600">Balance </span>
           {balanceQuery.data?.uiAmount ? (
-            <span className="font-medium text-amber-600">
+            <span className="font-medium text-indigo-600">
               {numberFormatter.format(balanceQuery.data.uiAmount)}
             </span>
           ) : (
@@ -186,9 +187,9 @@ export default function GaslessSwap() {
             You will sell:
           </span>
           <div className="mt-2 flex gap-x-2 sm:mt-1">
-            <Popover as="div" className="xs:w-32 relative">
+            <Popover as="div" className="relative xs:w-32">
               <PopoverButton className="inline-flex size-full items-center justify-between rounded-md border border-transparent bg-gray-200 px-3 font-medium text-gray-800">
-                <span className="xs:mr-0 mr-2 block">
+                <span className="mr-2 block xs:mr-0">
                   {selectToken?.symbol ?? "Name"}
                 </span>
                 <ChevronUpDownIcon className="h-4 w-4 text-gray-700" />
@@ -261,22 +262,23 @@ export default function GaslessSwap() {
 
         <div className="mt-6 flex w-full gap-x-2">
           {publicKey ? (
-            <button
+            <Button
+              color="indigo"
               type="submit"
+              className="w-full"
               disabled={isSwapping}
-              className="inline-flex flex-auto items-center justify-center rounded-md bg-amber-500 px-2 py-2 font-medium text-white hover:bg-amber-600 disabled:bg-amber-600"
             >
-              <ChevronRightIcon className="-ml-1 h-5 w-5 text-white" />
+              <ChevronRightIcon className="size-5 text-white" />
               Submit
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
+              color="indigo"
               type="button"
               onClick={() => setVisible(true)}
-              className="inline-flex flex-auto items-center justify-center rounded-md bg-amber-500 px-2 py-2 font-medium text-white hover:bg-amber-600 disabled:bg-amber-600"
             >
-              Connect wallet
-            </button>
+              Connect your wallet
+            </Button>
           )}
         </div>
         <a

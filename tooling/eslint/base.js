@@ -24,6 +24,7 @@ const config = {
     "@typescript-eslint/no-unsafe-assignment": "off",
     "@typescript-eslint/consistent-type-definitions": "off",
     "@typescript-eslint/consistent-indexed-object-style": "off",
+    "@typescript-eslint/no-unsafe-call": "warn",
     "@typescript-eslint/no-misused-promises": [
       "warn",
       {

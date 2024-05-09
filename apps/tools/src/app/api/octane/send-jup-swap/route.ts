@@ -5,24 +5,14 @@ import {
   MESSAGE_TOKEN_KEY,
   signGeneratedTransaction,
 } from "@blastctrl/octane-core";
-import { Connection, VersionedTransaction } from "@solana/web3.js";
+import { Connection, Keypair, VersionedTransaction } from "@solana/web3.js";
 import base58 from "bs58";
 import { z } from "zod";
-import {
-  createKeyPairSignerFromBytes,
-  createRpc,
-  createSolanaRpc,
-  mainnet,
-} from "@solana/web3.js-experimental";
-import { fromVersionedTransaction } from "./_util";
+import { sendSignedTransaction } from "@/lib/solana/send";
 
-const ENV_SECRET_SIGNER = await createKeyPairSignerFromBytes(
+const ENV_SECRET_KEYPAIR = Keypair.fromSecretKey(
   base58.decode(env.OCTANE_SECRET_KEYPAIR),
 );
-
-// const ENV_SECRET_KEYPAIR = Keypair.fromSecretKey(
-//   base58.decode(env.OCTANE_SECRET_KEYPAIR),
-// );
 
 const validator = z.object({
   transaction: z.string(),
@@ -40,23 +30,18 @@ export async function POST(req: Request) {
         validatedBody.error.errors[0]?.message ?? "Invalid request body",
       );
     }
-    const connection = new Connection(process.env.NEXT_PUBLIC_RPC_ENDPOINT!);
+    const connection = new Connection(publicEnv.NEXT_PUBLIC_RPC_ENDPOINT);
     const { transaction: serialized, messageToken } = validatedBody.data;
 
     // Deserialize a base58 wire-encoded transaction from the request
 
-    let legacyTransaction: VersionedTransaction;
+    let transaction: VersionedTransaction;
     try {
-      legacyTransaction = VersionedTransaction.deserialize(
-        base58.decode(serialized),
-      );
+      transaction = VersionedTransaction.deserialize(base58.decode(serialized));
     } catch (e) {
       console.log(e);
       throw Error("can't decode transaction");
     }
-
-    const transaction = fromVersionedTransaction(legacyTransaction);
-    const rpc = createSolanaRpc(mainnet(publicEnv.NEXT_PUBLIC_RPC_ENDPOINT));
 
     try {
       const { signature } = await signGeneratedTransaction(
@@ -73,18 +58,15 @@ export async function POST(req: Request) {
         Buffer.from(base58.decode(signature)),
       );
 
-      // rpc.sendTransaction()
+      const { context, value } =
+        await connection.getLatestBlockhashAndContext();
 
-      const rawTransaction = transaction.serialize();
-      const txid = await connection.sendRawTransaction(rawTransaction, {
-        skipPreflight: true,
-        maxRetries: 2,
-      });
-      const latestBlockHash = await connection.getLatestBlockhash();
-
-      await connection.confirmTransaction({
-        signature: txid,
-        ...latestBlockHash,
+      await sendSignedTransaction({
+        connection,
+        signedTransaction: transaction,
+        slot: context.slot,
+        blockhash: value.blockhash,
+        lastValidBlockHeight: value.lastValidBlockHeight,
       });
 
       // Respond with the confirmed transaction signature
