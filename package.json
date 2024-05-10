@@ -8,7 +8,7 @@
     "dev": "pnpm run --parallel dev",
     "format": "pnpm run --recursive format",
     "lint": "pnpm run --recursive lint",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "pnpm -F tools build"
   },
   "license": "MIT",
   "devDependencies": {
