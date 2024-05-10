@@ -5,29 +5,27 @@ import {
   createCloseAccountInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
-import {
+import type {
   Connection,
   Keypair,
   PublicKey,
   RpcResponseAndContext,
-  SystemProgram,
   TransactionInstruction,
+} from "@solana/web3.js";
+import {
+  SystemProgram,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
 import BN from "bn.js";
 import type { Cache } from "cache-manager";
+import { MessageToken, simulateV0Transaction } from "../core";
 import {
-  MessageToken,
-  isMainnetBetaCluster,
-  simulateV0Transaction,
-} from "../core";
-import {
-  type JupiterQuoteResponseSchema,
   MESSAGE_TOKEN_KEY,
   getAddressLookupTableAccounts,
   getJupiterSwapInstructions,
 } from "../swapProvider";
+import type { JupiterQuoteResponseSchema } from "../swapProvider";
 
 const SAME_MINT_TIMEOUT = 3000;
 const BONK_MINT = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
@@ -55,7 +53,7 @@ export async function buildJupiterSwapToSOL(
   fees: {
     platformSolFeeBps: number;
     bonkBurnFeeBps: number;
-  }
+  },
 ): Promise<{
   transaction: VersionedTransaction;
   quote: JupiterQuoteResponseSchema;
@@ -123,7 +121,7 @@ export async function buildJupiterSwapToSOL(
   // This fn can throw, sends a getMultipleAccounts rpc request
   const addressLookupTableAccounts = await getAddressLookupTableAccounts(
     addressLookupTableAddresses,
-    connection
+    connection,
   );
 
   // ---------------------------------------------------------------------------
@@ -136,7 +134,7 @@ export async function buildJupiterSwapToSOL(
     feePayer.publicKey,
     nativeAta,
     user,
-    NATIVE_MINT
+    NATIVE_MINT,
   );
 
   // Calculate our platform fee as a percentage of the sol amount user will receive
@@ -149,14 +147,14 @@ export async function buildJupiterSwapToSOL(
   // We transfer the fee for one ATA back to us, because we paid for the
   // that native account that will be closed.
   // TODO: can we just modify the close account instruction to send it back to us?
-  let cleanupInstructions: TransactionInstruction[] = [];
+  const cleanupInstructions: TransactionInstruction[] = [];
   cleanupInstructions.push(
     createCloseAccountInstruction(nativeAta, user, user),
     SystemProgram.transfer({
       fromPubkey: user,
       toPubkey: feePayer.publicKey,
       lamports: LAMPORTS_PER_ATA + platformFeeLamports.toNumber(),
-    })
+    }),
   );
 
   // If there's a burn fee (only for BONK), we need to add that to the cleanup
@@ -167,8 +165,8 @@ export async function buildJupiterSwapToSOL(
         sourceTokenAccount,
         sourceMint,
         user,
-        BigInt(burnFee.toString())
-      )
+        BigInt(burnFee.toString()),
+      ),
     );
   }
 
@@ -209,7 +207,7 @@ export async function buildJupiterSwapToSOL(
         LAMPORTS_PER_ATA +
         platformFeeLamports.toNumber() +
         (transactionFee?.value ?? 0),
-    })
+    }),
   );
 
   // Now we have the final transaction
@@ -234,7 +232,7 @@ export async function buildJupiterSwapToSOL(
     messageToken = new MessageToken(
       MESSAGE_TOKEN_KEY,
       transaction.message,
-      feePayer
+      feePayer,
     ).compile();
   } catch (e) {
     console.log("Error creating token");
