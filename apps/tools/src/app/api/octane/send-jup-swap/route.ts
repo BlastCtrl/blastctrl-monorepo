@@ -10,6 +10,9 @@ import base58 from "bs58";
 import { z } from "zod";
 import { sendSignedTransaction } from "@/lib/solana/send";
 
+export const maxDuration = 60;
+export const runtime = "nodejs";
+
 const ENV_SECRET_KEYPAIR = Keypair.fromSecretKey(
   base58.decode(env.OCTANE_SECRET_KEYPAIR),
 );
