@@ -1,10 +1,10 @@
+import type { Connection } from "@solana/web3.js";
 import {
   AddressLookupTableAccount,
-  Connection,
   PublicKey,
   TransactionInstruction,
 } from "@solana/web3.js";
-import {
+import type {
   Instruction,
   JupiterQuoteResponseSchema,
   JupiterSwapInstructionsApiResponse,
@@ -53,6 +53,7 @@ export async function getJupiterSwapInstructions(params: {
     // @ts-expect-error: If the response has an error
     if (quoteResponse.error) {
       // @ts-expect-error error
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       throw Error(quoteResponse.error);
     }
   } catch (err) {
@@ -83,6 +84,7 @@ export async function getJupiterSwapInstructions(params: {
       })
     ).json();
     if ((response as any)?.error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       throw Error((response as any).error);
     }
     instructions = response as JupiterSwapInstructionsApiResponse;
@@ -101,13 +103,13 @@ export async function getJupiterSwapInstructions(params: {
     deserializeInstruction(instructions.tokenLedgerInstruction);
 
   const setupInstruction = instructions.setupInstructions.map(
-    deserializeInstruction
+    deserializeInstruction,
   );
   const computeBudgetInstructions = instructions.computeBudgetInstructions.map(
-    deserializeInstruction
+    deserializeInstruction,
   );
   const otherInstructions = instructions.otherInstructions.map(
-    deserializeInstruction
+    deserializeInstruction,
   );
   const swapInstruction = deserializeInstruction(instructions.swapInstruction);
   const cleanupInstructions =
@@ -124,7 +126,7 @@ export async function getJupiterSwapInstructions(params: {
       swapInstruction,
       cleanupInstructions,
       addressLookupTableAddresses:
-        instructions.addressLookupTableAddresses || [],
+        instructions.addressLookupTableAddresses ?? [],
     },
   };
 }
@@ -137,7 +139,7 @@ export async function getJupiterSwapInstructions(params: {
  * @returns
  */
 export const deserializeInstruction = (
-  instruction: Instruction
+  instruction: Instruction,
 ): TransactionInstruction => {
   try {
     return new TransactionInstruction({
@@ -164,11 +166,11 @@ export const deserializeInstruction = (
  */
 export async function getAddressLookupTableAccounts(
   keys: string[],
-  connection: Connection
+  connection: Connection,
 ): Promise<AddressLookupTableAccount[]> {
   const addressLookupTableAccountInfos =
     await connection.getMultipleAccountsInfo(
-      keys.map((key) => new PublicKey(key))
+      keys.map((key) => new PublicKey(key)),
     );
 
   return addressLookupTableAccountInfos.reduce((acc, accountInfo, index) => {
@@ -187,13 +189,13 @@ export async function getAddressLookupTableAccounts(
 
 export function getCreateNativeAccountInstruction(
   feePayer: PublicKey,
-  owner: PublicKey
+  owner: PublicKey,
 ) {
   const nativeAta = getAssociatedTokenAddressSync(NATIVE_MINT, owner);
   return createAssociatedTokenAccountIdempotentInstruction(
     feePayer,
     nativeAta,
     owner,
-    NATIVE_MINT
+    NATIVE_MINT,
   );
 }

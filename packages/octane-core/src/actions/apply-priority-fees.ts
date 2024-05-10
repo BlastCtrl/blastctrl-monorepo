@@ -1,8 +1,5 @@
-import {
-  ComputeBudgetProgram,
-  Transaction,
-  TransactionInstruction,
-} from "@solana/web3.js";
+import type { Transaction, TransactionInstruction } from "@solana/web3.js";
+import { ComputeBudgetProgram } from "@solana/web3.js";
 
 /**
  * Appends priority fee transactions to an existing transaction

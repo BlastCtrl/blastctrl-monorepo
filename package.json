@@ -2,15 +2,15 @@
   "name": "blastctrl-monorepo",
   "private": true,
   "engines": {
-    "node": ">=20.11.0"
+    "node": ">=20"
   },
   "scripts": {
     "dev": "pnpm run --parallel dev",
+    "format": "pnpm run --recursive format",
+    "lint": "pnpm run --recursive lint",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
     "prettier": "^3.2.5",
     "typescript": "^5.4.5"

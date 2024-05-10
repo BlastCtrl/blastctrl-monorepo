@@ -1,4 +1,8 @@
-import { Connection, Keypair, VersionedTransaction } from "@solana/web3.js";
+import type {
+  Connection,
+  Keypair,
+  VersionedTransaction,
+} from "@solana/web3.js";
 import base58 from "bs58";
 import type { Cache } from "cache-manager";
 import { MessageToken, simulateV0Transaction } from "../core";
@@ -41,7 +45,7 @@ export async function signGeneratedTransaction(
   feePayer: Keypair,
   messageTokenKey: string,
   messageToken: string,
-  cache: Cache
+  cache: Cache,
 ): Promise<{ signature: string }> {
   // Check that we actually produced this transaction previously
   if (
@@ -49,7 +53,7 @@ export async function signGeneratedTransaction(
       messageTokenKey,
       transaction.message,
       messageToken,
-      feePayer.publicKey
+      feePayer.publicKey,
     )
   ) {
     throw new Error("Message token isn't valid");
@@ -68,8 +72,8 @@ export async function signGeneratedTransaction(
   }
 
   const isEmptyUint8Array = (arr: Uint8Array): boolean => {
-    for (let i = 0; i < arr.length; i++) {
-      if (arr[i] !== 0) {
+    for (const element of arr) {
+      if (element !== 0) {
         return false;
       }
     }

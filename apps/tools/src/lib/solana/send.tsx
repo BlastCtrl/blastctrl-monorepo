@@ -93,11 +93,13 @@ export async function sendSignedTransaction({
     try {
       if (signedTransaction instanceof Transaction) {
         simulateResult = (
-          await simulateTransaction(connection, signedTransaction, "single")
+          await connection.simulateTransaction(signedTransaction)
         ).value;
       } else {
         simulateResult = (
-          await connection.simulateTransaction(signedTransaction)
+          await connection.simulateTransaction(signedTransaction, {
+            commitment: "single",
+          })
         ).value;
       }
     } catch (e) {

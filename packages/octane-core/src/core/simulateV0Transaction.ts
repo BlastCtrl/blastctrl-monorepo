@@ -1,14 +1,13 @@
-import {
-  Connection,
-  PublicKey,
+import type {
   SimulatedTransactionResponse,
   VersionedTransaction,
 } from "@solana/web3.js";
+import { Connection } from "@solana/web3.js";
 
 // Simulate a signed, serialized transaction before broadcasting
 export async function simulateV0Transaction(
   connection: Connection,
-  versionedTransaction: VersionedTransaction
+  versionedTransaction: VersionedTransaction,
 ): Promise<SimulatedTransactionResponse> {
   /*
        Simulating a transaction directly can cause the `signatures` property to change.
@@ -30,7 +29,7 @@ export async function simulateV0Transaction(
     versionedTransaction,
     {
       sigVerify: false,
-    }
+    },
   );
   if (simulated.value.err) {
     console.log(simulated);
