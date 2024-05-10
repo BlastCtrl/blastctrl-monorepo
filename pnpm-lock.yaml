@@ -196,9 +196,6 @@ importers:
       '@solana/web3.js':
         specifier: ^1.91.7
         version: 1.91.7
-      '@solana/web3.js-experimental':
-        specifier: npm:@solana/web3.js@2.0.0-preview.3.20240503195717.b3dd690914676a3ffb3749e97edd7b302fd258ad
-        version: /@solana/web3.js@2.0.0-preview.3.20240503195717.b3dd690914676a3ffb3749e97edd7b302fd258ad(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.4.5)(ws@8.16.0)
       '@types/bs58':
         specifier: ^4.0.1
         version: 4.0.4
