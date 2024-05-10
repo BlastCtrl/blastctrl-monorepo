@@ -9,7 +9,10 @@ export function useLocalStorageState<T>(
 ): UseLocalStorageStateHook<T> {
   const [state, setState] = useState<T>(() => {
     try {
-      const item = localStorage.getItem(key);
+      if (typeof window === "undefined") {
+        return initialValue;
+      }
+      const item = window.localStorage.getItem(key);
       return item ? JSON.parse(item) : initialValue;
     } catch (error) {
       console.error(
@@ -22,7 +25,7 @@ export function useLocalStorageState<T>(
 
   useEffect(() => {
     try {
-      localStorage.setItem(key, JSON.stringify(state));
+      window.localStorage.setItem(key, JSON.stringify(state));
     } catch (error) {
       console.error(
         `Unable to set value to localStorage for key "${key}":`,
