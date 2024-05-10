@@ -5,7 +5,7 @@ import { chunk } from "@/lib/utils";
 import { Metadata } from "@metaplex-foundation/mpl-token-metadata";
 import type { Cluster } from "@solana/web3.js";
 import { Connection, PublicKey, Transaction } from "@solana/web3.js";
-import type { NextApiRequest, NextApiResponse } from "next";
+import type { NextRequest } from "next/server";
 
 export type TxUnverifyData = {
   tx: string[];
@@ -20,72 +20,71 @@ export type Input = {
   network: Cluster;
 };
 
-export async function POST(
-  req: NextApiRequest,
-  res: NextApiResponse<TxUnverifyData>,
-) {
-  if (req.method === "POST") {
-    const { authorityAddress, nftMints, network } = req.body as Input;
+export async function POST(req: NextRequest) {
+  const { authorityAddress, nftMints, network } = (await req.json()) as Input;
 
-    const connection = new Connection(Networks[network]);
-    const authority = new PublicKey(authorityAddress);
-    const nfts = nftMints.map((str) => new PublicKey(str));
-    if (!nfts[0]) {
-      return res.status(400).end();
-    }
-    const nftMetadata = await Metadata.fromAccountAddress(
-      connection,
-      getMetadata(nfts[0]),
-    );
-    const collection = nftMetadata.collection?.key;
-    if (!collection) {
-      return res.status(400).end();
-    }
-    const collectionMetadata = await Metadata.fromAccountAddress(
-      connection,
-      getMetadata(collection),
-    );
+  const connection = new Connection(Networks[network]);
+  const authority = new PublicKey(authorityAddress);
+  const nfts = nftMints.map((str) => new PublicKey(str));
+  if (!nfts[0]) {
+    return new Response("Missing nft mints", {
+      status: 400,
+      statusText: "Bad Request",
+    });
+  }
+  const nftMetadata = await Metadata.fromAccountAddress(
+    connection,
+    getMetadata(nfts[0]),
+  );
+  const collection = nftMetadata.collection?.key;
+  if (!collection) {
+    return new Response("NFT missing collection key", {
+      status: 400,
+      statusText: "Bad Request",
+    });
+  }
+  const collectionMetadata = await Metadata.fromAccountAddress(
+    connection,
+    getMetadata(collection),
+  );
 
-    const batchSize = 12;
-    const chunkedInstructions = chunk(
-      nfts.map((nft) =>
-        unverifyCollectionNft(nft, authority, collection, collectionMetadata),
-      ),
-      batchSize,
-    );
+  const batchSize = 12;
+  const chunkedInstructions = chunk(
+    nfts.map((nft) =>
+      unverifyCollectionNft(nft, authority, collection, collectionMetadata),
+    ),
+    batchSize,
+  );
 
-    const {
-      context: { slot: minContextSlot },
-      value: { blockhash, lastValidBlockHeight },
-    } = await connection.getLatestBlockhashAndContext("finalized");
-    const transactions = chunkedInstructions.map((batch) =>
-      new Transaction({
-        feePayer: authority,
-        blockhash,
-        lastValidBlockHeight,
-      }).add(...batch.flat()),
-    );
-
-    // for (const tx of transactions) {
-    //   const result = await connection.simulateTransaction(tx, []);
-    // }
-
-    const serializedTransactionsBase64 = transactions.map((tx) =>
-      tx
-        .serialize({
-          requireAllSignatures: false,
-          verifySignatures: true,
-        })
-        .toString("base64"),
-    );
-
-    res.status(200).json({
-      tx: serializedTransactionsBase64,
+  const {
+    context: { slot: minContextSlot },
+    value: { blockhash, lastValidBlockHeight },
+  } = await connection.getLatestBlockhashAndContext("finalized");
+  const transactions = chunkedInstructions.map((batch) =>
+    new Transaction({
+      feePayer: authority,
       blockhash,
       lastValidBlockHeight,
-      minContextSlot,
-    });
-  } else {
-    res.status(405).end();
-  }
+    }).add(...batch.flat()),
+  );
+
+  // for (const tx of transactions) {
+  //   const result = await connection.simulateTransaction(tx, []);
+  // }
+
+  const serializedTransactionsBase64 = transactions.map((tx) =>
+    tx
+      .serialize({
+        requireAllSignatures: false,
+        verifySignatures: true,
+      })
+      .toString("base64"),
+  );
+
+  return Response.json({
+    tx: serializedTransactionsBase64,
+    blockhash,
+    lastValidBlockHeight,
+    minContextSlot,
+  });
 }

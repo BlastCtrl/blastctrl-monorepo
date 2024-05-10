@@ -33,7 +33,9 @@ export const NftSelector = (
     <>
       <Combobox
         as="div"
+        // @ts-expect-error TODO: bad types
         value={value}
+        // @ts-expect-error TODO: bad types
         onChange={(token: FormToken) => {
           onChange(token);
           props.onSelectCallback(token);

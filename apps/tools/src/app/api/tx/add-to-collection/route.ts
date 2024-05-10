@@ -5,7 +5,8 @@ import { addNftToCollection } from "@/lib/solana/collections";
 import { Metadata } from "@metaplex-foundation/mpl-token-metadata";
 import type { Cluster } from "@solana/web3.js";
 import { Connection, PublicKey, Transaction } from "@solana/web3.js";
-import type { NextApiRequest, NextApiResponse } from "next";
+import type { NextRequest } from "next/server";
+import { z } from "zod";
 
 export type TxSetAndVerifyData = {
   tx: string[];
@@ -21,59 +22,72 @@ export type Input = {
   network: Cluster;
 };
 
-export async function POST(
-  req: NextApiRequest,
-  res: NextApiResponse<TxSetAndVerifyData>,
-) {
-  if (req.method === "POST") {
-    const { authorityAddress, collectionAddress, nftMints, network } =
-      req.body as Input;
+const schema = z.object({
+  network: z.string(),
+  authorityAddress: z.string(),
+  collectionAddress: z.string(),
+  nftMints: z.array(z.string()).min(1),
+});
 
-    const connection = new Connection(Networks[network]);
-    const authority = new PublicKey(authorityAddress);
-    const collection = new PublicKey(collectionAddress);
-    const nfts = nftMints.map((str) => new PublicKey(str));
-    const collectionMetadata = await Metadata.fromAccountAddress(
-      connection,
-      getMetadata(collection),
-    );
+type InputBody = z.infer<typeof schema>;
 
-    const batchSize = 12;
-    const chunkedInstructions = chunk(
-      nfts.map((nft) =>
-        addNftToCollection(authority, nft, collection, collectionMetadata),
-      ),
-      batchSize,
-    );
+export async function POST(req: NextRequest) {
+  let params: InputBody;
+  try {
+    params = schema.parse(await req.json());
+  } catch {
+    return new Response("Invalid parameters", {
+      status: 400,
+      statusText: "Bad Request",
+    });
+  }
 
-    const {
-      context: { slot: minContextSlot },
-      value: { blockhash, lastValidBlockHeight },
-    } = await connection.getLatestBlockhashAndContext("finalized");
-    const transactions = chunkedInstructions.map((batch) =>
-      new Transaction({
-        feePayer: authority,
-        blockhash,
-        lastValidBlockHeight,
-      }).add(...batch.flat()),
-    );
+  const { authorityAddress, collectionAddress, nftMints, network } = params;
 
-    const serializedTransactionsBase64 = transactions.map((tx) =>
-      tx
-        .serialize({
-          requireAllSignatures: false,
-          verifySignatures: true,
-        })
-        .toString("base64"),
-    );
+  // @ts-expect-error TODO: fix the zod schema
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+  const connection = new Connection(Networks[network]);
+  const authority = new PublicKey(authorityAddress);
+  const collection = new PublicKey(collectionAddress);
+  const nfts = nftMints.map((str) => new PublicKey(str));
+  const collectionMetadata = await Metadata.fromAccountAddress(
+    connection,
+    getMetadata(collection),
+  );
 
-    res.status(200).json({
-      tx: serializedTransactionsBase64,
+  const batchSize = 12;
+  const chunkedInstructions = chunk(
+    nfts.map((nft) =>
+      addNftToCollection(authority, nft, collection, collectionMetadata),
+    ),
+    batchSize,
+  );
+
+  const {
+    context: { slot: minContextSlot },
+    value: { blockhash, lastValidBlockHeight },
+  } = await connection.getLatestBlockhashAndContext("finalized");
+  const transactions = chunkedInstructions.map((batch) =>
+    new Transaction({
+      feePayer: authority,
       blockhash,
       lastValidBlockHeight,
-      minContextSlot,
-    });
-  } else {
-    res.status(405).end();
-  }
+    }).add(...batch.flat()),
+  );
+
+  const serializedTransactionsBase64 = transactions.map((tx) =>
+    tx
+      .serialize({
+        requireAllSignatures: false,
+        verifySignatures: true,
+      })
+      .toString("base64"),
+  );
+
+  return Response.json({
+    tx: serializedTransactionsBase64,
+    blockhash,
+    lastValidBlockHeight,
+    minContextSlot,
+  });
 }

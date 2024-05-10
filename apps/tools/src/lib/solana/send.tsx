@@ -5,11 +5,13 @@ import type {
   Connection,
   RpcResponseAndContext,
   SimulatedTransactionResponse,
-  Transaction,
   TransactionSignature,
   VersionedTransaction,
 } from "@solana/web3.js";
-import { TransactionExpiredBlockheightExceededError } from "@solana/web3.js";
+import {
+  Transaction,
+  TransactionExpiredBlockheightExceededError,
+} from "@solana/web3.js";
 
 export const getUnixTs = () => {
   return new Date().getTime() / 1000;
@@ -86,10 +88,18 @@ export async function sendSignedTransaction({
     }
 
     let simulateResult: SimulatedTransactionResponse | null = null;
+
+    // TODO: uhh, something weird here
     try {
-      simulateResult = (
-        await simulateTransaction(connection, signedTransaction, "single")
-      ).value;
+      if (signedTransaction instanceof Transaction) {
+        simulateResult = (
+          await simulateTransaction(connection, signedTransaction, "single")
+        ).value;
+      } else {
+        simulateResult = (
+          await connection.simulateTransaction(signedTransaction)
+        ).value;
+      }
     } catch (e) {
       console.error("Simulation error");
     }
