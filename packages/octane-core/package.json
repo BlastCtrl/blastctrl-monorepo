@@ -11,7 +11,8 @@
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
-    "typecheck": "tsc --noEmit --emitDeclarationOnly false"
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false",
+    "test": "glob -c \"tsx --test --test-reporter spec \" \"./src/__test__/**/*-test.ts\""
   },
   "dependencies": {
     "@blastctrl/eslint-config": "workspace:^",
@@ -26,16 +27,12 @@
   "devDependencies": {
     "@types/bn.js": "^5.1.5",
     "@types/node": "^20.12.7",
-    "cache-manager": "^5.5.2"
+    "cache-manager": "^5.5.2",
+    "glob": "^10.3.14",
+    "tsx": "^4.9.4"
   },
   "peerDependencies": {
     "cache-manager": "^5.5.2"
-  },
-  "eslintConfig": {
-    "root": true,
-    "extends": [
-      "@blastctrl/eslint-config/base"
-    ]
   },
   "prettier": "@blastctrl/prettier-config"
 }
