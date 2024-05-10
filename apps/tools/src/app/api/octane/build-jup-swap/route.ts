@@ -37,9 +37,11 @@ export async function POST(req: Request) {
       new PublicKey(sourceMint),
       new BN(amount),
       cache,
-      3000,
+      {
+        bonkBurnFeeBps: env.BONK_BURN_FEE_BPS,
+        platformSolFeeBps: env.OCTANE_PLATFORM_FEE_BPS,
+      },
     );
-    console.log(messageToken, quote, transaction);
 
     return Response.json({
       status: "ok",

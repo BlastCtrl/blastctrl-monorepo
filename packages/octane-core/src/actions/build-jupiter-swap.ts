@@ -1,16 +1,15 @@
 import {
   NATIVE_MINT,
-  getAssociatedTokenAddress,
   createAssociatedTokenAccountIdempotentInstruction,
-  getAssociatedTokenAddressSync,
-  createCloseAccountInstruction,
   createBurnInstruction,
+  createCloseAccountInstruction,
+  getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import {
-  AddressLookupTableAccount,
   Connection,
   Keypair,
   PublicKey,
+  RpcResponseAndContext,
   SystemProgram,
   TransactionInstruction,
   TransactionMessage,
@@ -18,38 +17,20 @@ import {
 } from "@solana/web3.js";
 import BN from "bn.js";
 import type { Cache } from "cache-manager";
-
 import {
   MessageToken,
   isMainnetBetaCluster,
   simulateV0Transaction,
 } from "../core";
-import { MESSAGE_TOKEN_KEY } from "../swapProvider";
+import {
+  type JupiterQuoteResponseSchema,
+  MESSAGE_TOKEN_KEY,
+  getAddressLookupTableAccounts,
+  getJupiterSwapInstructions,
+} from "../swapProvider";
 
-export type FeeOptions = {
-  amount: number;
-  sourceAccount: PublicKey;
-  destinationAccount: PublicKey;
-  transferFeeBp: number;
-  burnFeeBp: number;
-};
-
-export type QuoteResponse = {
-  inputMint: string;
-  inAmount: string;
-  outputMint: string;
-  outAmount: string;
-  otherAmountThreshold: string;
-  swapMode: "ExactIn" | "ExactOut";
-  slippageBps: number;
-  platformFee?: {
-    amount: string;
-    feeBps: number;
-  };
-  priceImpactPct: string;
-  contextSlot?: number;
-  timeTaken?: number;
-};
+const SAME_MINT_TIMEOUT = 3000;
+const BONK_MINT = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
 
 /**
  * Builds an unsigned transaction that performs a swap to SOL and optionally sends a token fee to Octane
@@ -59,12 +40,10 @@ export type QuoteResponse = {
  * @param user
  * @param sourceMint
  * @param amount
- * @param slippingTolerance
  * @param cache
- * @param sameMintTimeout A required interval for transactions with same source mint and user, ms
- * @param feeOptions?
+ * @param feeOptions
  *
- * @return Transaction
+ * @return { Transaction, quote, messageToken }
  */
 export async function buildJupiterSwapToSOL(
   connection: Connection,
@@ -73,176 +52,124 @@ export async function buildJupiterSwapToSOL(
   sourceMint: PublicKey,
   amount: BN,
   cache: Cache,
-  sameMintTimeout = 3000,
-  feeOptions?: FeeOptions
+  fees: {
+    platformSolFeeBps: number;
+    bonkBurnFeeBps: number;
+  }
 ): Promise<{
   transaction: VersionedTransaction;
-  quote: QuoteResponse;
+  quote: JupiterQuoteResponseSchema;
   messageToken: string;
 }> {
   // Connection's genesis hash is cached to prevent an extra RPC query to the node on each call.
-  const genesisHashKey = `genesis/${connection.rpcEndpoint}`;
-  let genesisHash = await cache
-    .get<string>(genesisHashKey)
-    .catch(() => console.log("Error getting genesis hash from cache"));
-  if (!genesisHash) {
-    try {
-      genesisHash = await connection.getGenesisHash();
-      await cache.set(genesisHashKey, genesisHash, 60 * 60 * 60 * 1000);
-    } catch (err) {
-      console.log("getGenesisHash fail", err);
-      throw err;
-    }
-  }
-  if (!isMainnetBetaCluster(genesisHash)) {
-    throw new Error(
-      "Whirlpools endpoint can only run attached to the mainnet-beta cluster"
-    );
-  }
+  // const genesisHashKey = `genesis/${connection.rpcEndpoint}`;
+  // let genesisHash = await cache
+  //   .get<string>(genesisHashKey)
+  //   .catch(() => console.log("Error getting genesis hash from cache"));
+  // if (!genesisHash) {
+  //   try {
+  //     genesisHash = await connection.getGenesisHash();
+  //     await cache.set(genesisHashKey, genesisHash, 60 * 60 * 60 * 1000);
+  //   } catch (err) {
+  //     console.log("getGenesisHash fail", err);
+  //     throw err;
+  //   }
+  // }
+  // if (!isMainnetBetaCluster(genesisHash)) {
+  //   throw new Error(
+  //     "Whirlpools endpoint can only run attached to the mainnet-beta cluster"
+  //   );
+  // }
 
   if (amount.lte(new BN(0))) {
     throw new Error("Amount can't be zero or less");
   }
 
-  if (feeOptions && feeOptions.amount < 0) {
-    throw new Error("Fee can't be less than zero");
-  }
-
   const key = `swap/${user.toString()}/${sourceMint.toString()}`;
   const lastSignature = await cache.get<number>(key);
-  if (lastSignature && Date.now() - lastSignature < sameMintTimeout) {
+  if (lastSignature && Date.now() - lastSignature < SAME_MINT_TIMEOUT) {
     throw new Error("Too many requests for same user and mint");
   }
-  // cache.set() is in the end of the function
 
-  const associatedSOLAddress = await getAssociatedTokenAddress(
-    NATIVE_MINT,
-    user
-  );
-  if (await connection.getAccountInfo(associatedSOLAddress)) {
-    throw new Error("Associated SOL account exists for user");
+  // Do we need this check for a native token account? Need to review
+  // if (await connection.getAccountInfo(associatedSOLAddress)) {
+  //   throw new Error("Associated SOL account exists for user");
+  // }
+
+  // SPECIAL CASE: if swapping bonk, we need to burn 2.5% of the submitted amount
+  let burnFee = new BN(0);
+  if (sourceMint.toString() === BONK_MINT) {
+    burnFee = amount.muln(fees.bonkBurnFeeBps).divn(10_000);
+    amount = amount.sub(burnFee);
   }
 
-  const burnFee = feeOptions?.burnFeeBp
-    ? amount.muln(feeOptions.burnFeeBp).divn(10000)
-    : new BN(0);
-  const swapAmount = amount.sub(burnFee);
+  // Get the swap instructions
+  // This fn can throw
+  const { swapInstructions, quoteResponse } = await getJupiterSwapInstructions({
+    wallet: user.toString(),
+    inputMint: sourceMint.toString(),
+    amount: amount.toString(),
+    slippageBps: 1000,
+  });
 
-  const outputMint = "So11111111111111111111111111111111111111112";
-  const params = new URLSearchParams();
-  params.append("inputMint", sourceMint.toString());
-  params.append("outputMint", outputMint);
-  params.append("amount", swapAmount.toString()); // Convert number to string
-  params.append("slippageBps", "1000");
-
-  const url = new URL("https://quote-api.jup.ag/v6/quote");
-  url.search = params.toString();
-
-  const quoteResponse = (await (await fetch(url)).json()) as any;
-  const solFeeRatio = 250; // bps
-  const platformFee = Math.round(
-    Number(quoteResponse.outAmount) * (solFeeRatio / 10000)
-  );
-  const instructions = (await (
-    await fetch("https://quote-api.jup.ag/v6/swap-instructions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        quoteResponse,
-        userPublicKey: user.toString(),
-        wrapAndUnwrapSol: true,
-        dynamicComputeUnitLimit: true,
-        prioritizationFeeLamports: "auto",
-      }),
-    })
-  ).json()) as any;
-
-  if (instructions.error) {
-    throw new Error("Failed to get swap instructions: " + instructions.error);
-  }
+  // Here we don't use the given setup and cleanup instructions,
+  // we construct our own
   const {
     computeBudgetInstructions, // The necessary instructions to setup the compute budget.
-    // setupInstructions, // Setup missing ATA for the users.
     swapInstruction: swapInstructionPayload, // The actual swap instruction.
-    // cleanupInstruction, // Unwrap the SOL if `wrapAndUnwrapSol = true`.
     addressLookupTableAddresses,
-  } = instructions;
+  } = swapInstructions;
 
-  const deserializeInstruction = (instruction: any) => {
-    try {
-      return new TransactionInstruction({
-        programId: new PublicKey(instruction.programId),
-        keys: instruction.accounts.map((key: any) => ({
-          pubkey: new PublicKey(key.pubkey),
-          isSigner: key.isSigner,
-          isWritable: key.isWritable,
-        })),
-        data: Buffer.from(instruction.data, "base64"),
-      });
-    } catch (e) {
-      console.log(e);
-      throw e;
-    }
-  };
-
-  const getAddressLookupTableAccounts = async (
-    keys: string[]
-  ): Promise<AddressLookupTableAccount[]> => {
-    const addressLookupTableAccountInfos =
-      await connection.getMultipleAccountsInfo(
-        keys.map((key) => new PublicKey(key))
-      );
-
-    return addressLookupTableAccountInfos.reduce((acc, accountInfo, index) => {
-      const addressLookupTableAddress = keys[index];
-      if (accountInfo) {
-        const addressLookupTableAccount = new AddressLookupTableAccount({
-          key: new PublicKey(addressLookupTableAddress!),
-          state: AddressLookupTableAccount.deserialize(accountInfo.data),
-        });
-        acc.push(addressLookupTableAccount);
-      }
-
-      return acc;
-    }, new Array<AddressLookupTableAccount>());
-  };
-
-  const addressLookupTableAccounts: AddressLookupTableAccount[] = [];
-  addressLookupTableAccounts.push(
-    ...(await getAddressLookupTableAccounts(addressLookupTableAddresses))
+  // This fn can throw, sends a getMultipleAccounts rpc request
+  const addressLookupTableAccounts = await getAddressLookupTableAccounts(
+    addressLookupTableAddresses,
+    connection
   );
 
+  // ---------------------------------------------------------------------------
+  // This setup instruction is still payed by Octane (meaning us, the fee payer)
+  // We need to account for this cost later
+  // ---------------------------------------------------------------------------
   const LAMPORTS_PER_ATA = 2039280;
   const nativeAta = getAssociatedTokenAddressSync(NATIVE_MINT, user);
-  const setupAlternateIx = createAssociatedTokenAccountIdempotentInstruction(
+  const setupInstruction = createAssociatedTokenAccountIdempotentInstruction(
     feePayer.publicKey,
     nativeAta,
     user,
     NATIVE_MINT
   );
-  let feeBurnInstruction: TransactionInstruction | undefined;
 
-  if (feeOptions !== undefined && burnFee.gtn(0)) {
-    feeBurnInstruction = createBurnInstruction(
-      feeOptions.sourceAccount,
-      sourceMint,
-      user,
-      BigInt(burnFee.toString())
-    );
-  }
+  // Calculate our platform fee as a percentage of the sol amount user will receive
+  // This should already be rounded down, so no decimals
+  const platformFeeLamports = new BN(quoteResponse.outAmount)
+    .muln(fees.platformSolFeeBps)
+    .divn(10_000);
 
-  let cleanupAlternateIx = [
+  // Cleanup needs to close the native token account and pay the platform fees
+  // We transfer the fee for one ATA back to us, because we paid for the
+  // that native account that will be closed.
+  // TODO: can we just modify the close account instruction to send it back to us?
+  let cleanupInstructions: TransactionInstruction[] = [];
+  cleanupInstructions.push(
     createCloseAccountInstruction(nativeAta, user, user),
     SystemProgram.transfer({
       fromPubkey: user,
       toPubkey: feePayer.publicKey,
-      lamports: LAMPORTS_PER_ATA + platformFee,
-    }),
-  ];
-  if (feeBurnInstruction) {
-    cleanupAlternateIx.push(feeBurnInstruction);
+      lamports: LAMPORTS_PER_ATA + platformFeeLamports.toNumber(),
+    })
+  );
+
+  // If there's a burn fee (only for BONK), we need to add that to the cleanup
+  if (sourceMint.toString() === BONK_MINT && burnFee.gtn(0)) {
+    const sourceTokenAccount = getAssociatedTokenAddressSync(sourceMint, user);
+    cleanupInstructions.push(
+      createBurnInstruction(
+        sourceTokenAccount,
+        sourceMint,
+        user,
+        BigInt(burnFee.toString())
+      )
+    );
   }
 
   const blockhash = (await connection.getLatestBlockhash()).blockhash;
@@ -250,44 +177,58 @@ export async function buildJupiterSwapToSOL(
     payerKey: feePayer.publicKey,
     recentBlockhash: blockhash,
     instructions: [
-      ...computeBudgetInstructions.map(deserializeInstruction),
-      setupAlternateIx,
-      deserializeInstruction(swapInstructionPayload),
-      ...cleanupAlternateIx,
+      ...computeBudgetInstructions,
+      setupInstruction,
+      swapInstructionPayload,
+      ...cleanupInstructions,
     ],
   }).compileToV0Message(addressLookupTableAccounts);
 
-  const transactionFee = await connection.getFeeForMessage(
-    messageV0,
-    "confirmed"
-  );
+  // Here we get the actual simulated fee that Octane will pay for this transaction
+  // TODO: this might just be 5000 lamports every time, but I'm not sure,
+  // does this take priority fees into account?
+  // The priority fees are determined by the Jupiter Swap API, but we can override that
+  let transactionFee: RpcResponseAndContext<number | null>;
+  try {
+    transactionFee = await connection.getFeeForMessage(messageV0, "confirmed");
+  } catch (err) {
+    if (err instanceof Error) {
+      throw Error(`Failed to calculate transaction fee: ${err.message}`);
+    }
+    throw Error("Failed to get transaction fee");
+  }
 
-  cleanupAlternateIx = [
-    createCloseAccountInstruction(nativeAta, user, user),
+  // Modify our cleanup instruction to add this transaction fee as well
+  cleanupInstructions.splice(
+    1,
+    1,
     SystemProgram.transfer({
       fromPubkey: user,
       toPubkey: feePayer.publicKey,
-      lamports: LAMPORTS_PER_ATA + platformFee + (transactionFee?.value || 0),
-    }),
-  ];
-  if (feeBurnInstruction) {
-    cleanupAlternateIx.push(feeBurnInstruction);
-  }
+      lamports:
+        LAMPORTS_PER_ATA +
+        platformFeeLamports.toNumber() +
+        (transactionFee?.value ?? 0),
+    })
+  );
 
+  // Now we have the final transaction
   messageV0 = new TransactionMessage({
     payerKey: feePayer.publicKey,
     recentBlockhash: blockhash,
     instructions: [
-      ...computeBudgetInstructions.map(deserializeInstruction),
-      setupAlternateIx,
-      deserializeInstruction(swapInstructionPayload),
-      ...cleanupAlternateIx,
+      ...computeBudgetInstructions,
+      setupInstruction,
+      swapInstructionPayload,
+      ...cleanupInstructions,
     ],
   }).compileToV0Message(addressLookupTableAccounts);
 
   const transaction = new VersionedTransaction(messageV0);
 
+  // If the simulation fails we throw
   await simulateV0Transaction(connection, transaction);
+
   let messageToken: string;
   try {
     messageToken = new MessageToken(

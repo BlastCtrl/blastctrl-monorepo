@@ -73,6 +73,7 @@ export async function POST(req: Request) {
       return Response.json({ status: "ok", signature });
     } catch (error) {
       let message = "";
+      console.log(error);
       if (error instanceof Error) {
         message = error.message;
       }
