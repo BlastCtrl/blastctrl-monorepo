@@ -523,9 +523,9 @@ export default function Update() {
                 <Controller
                   control={control}
                   name="isMutable"
-                  render={({ field: { onChange, value, ...rest } }) => (
+                  render={({ field: { onChange, value, name } }) => (
                     <Switch
-                      {...rest}
+                      name={name}
                       checked={value}
                       onChange={(prev) => onChange(prev)}
                     />
@@ -542,9 +542,9 @@ export default function Update() {
                 <Controller
                   control={control}
                   name="primarySaleHappened"
-                  render={({ field: { onChange, value, ...rest } }) => (
+                  render={({ field: { onChange, value, name } }) => (
                     <Switch
-                      {...rest}
+                      name={name}
                       checked={value}
                       onChange={(prev) => onChange(prev)}
                     />
