@@ -1,21 +1,18 @@
 import { cn } from "@blastctrl/ui";
-import { Popover as PopoverPrimitive } from "@headlessui/react";
+import { PopoverPanel, PopoverOverlay } from "@headlessui/react";
 import type { ComponentPropsWithoutRef, ComponentRef } from "react";
 import React from "react";
 
-export const Popover = PopoverPrimitive;
-export const PopoverButton = PopoverPrimitive.Button;
-
-const PopoverPanel = React.forwardRef<
-  ComponentRef<typeof PopoverPrimitive.Panel>,
-  ComponentPropsWithoutRef<typeof PopoverPrimitive.Panel>
+const PopoverInternalPanel = React.forwardRef<
+  ComponentRef<typeof PopoverPanel>,
+  ComponentPropsWithoutRef<typeof PopoverPanel>
 >((props, ref) => {
   const { className, children, ...rest } = props;
 
   return (
     <>
-      <PopoverPrimitive.Overlay className="xs:hidden fixed inset-0 isolate z-10 bg-black/60" />
-      <PopoverPrimitive.Panel
+      <PopoverOverlay className="fixed inset-0 isolate z-10 bg-black/60 xs:hidden" />
+      <PopoverPanel
         className={cn(
           "z-20 overflow-hidden rounded border border-black/5 bg-white p-4 shadow-md",
           "sm:absolute sm:inset-x-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2",
@@ -27,11 +24,12 @@ const PopoverPanel = React.forwardRef<
         {...rest}
       >
         {children}
-      </PopoverPrimitive.Panel>
+      </PopoverPanel>
     </>
   );
 });
 
-PopoverPanel.displayName = "PopoverPanel";
+PopoverInternalPanel.displayName = "PopoverPanel";
 
-export { PopoverPanel };
+export { PopoverInternalPanel as PopoverPanel };
+export { Popover, PopoverButton } from "@headlessui/react";
