@@ -1,7 +1,7 @@
-import { assert } from "@/types";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token-next";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { clusterApiUrl, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import base58 from "bs58";
 
 export const PROGRAM_ADDRESS = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s";
 export const METADATA_PROGRAM_ID = new PublicKey(PROGRAM_ADDRESS);
@@ -33,14 +33,20 @@ export const mergeClusterApiUrl = (network: WalletAdapterNetwork) => {
     : clusterApiUrl(network);
 };
 
-export function isPublicKey(value: any) {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    new PublicKey(value);
-    return true;
-  } catch {
+export function isPublicKey(putativeAddress: string) {
+  // Based on the implementation of assertIsAddress in the new web3.js SDK666
+  // Fast-path; see if the input string is of an acceptable length.
+  if (
+    // Lowest address (32 bytes of zeroes)
+    putativeAddress.length < 32 ||
+    // Highest address (32 bytes of 255)
+    putativeAddress.length > 44
+  ) {
     return false;
   }
+  // Slow-path; actually attempt to decode the input string.
+  const bytes = base58.decode(putativeAddress);
+  return bytes.byteLength === 32;
 }
 
 export function isATA({
@@ -54,10 +60,6 @@ export function isATA({
 }) {
   const ata = getAssociatedTokenAddressSync(mint, owner, true);
   return ata.equals(address);
-}
-
-export function assertPublicKey(value: any): asserts value is PublicKey {
-  assert(isPublicKey(value), "Not valid public key");
 }
 
 export function compress(str: string, chars: number) {

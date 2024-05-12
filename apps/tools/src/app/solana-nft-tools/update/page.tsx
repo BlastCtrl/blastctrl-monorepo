@@ -1,7 +1,6 @@
 "use client";
 
-import { InputGroup, NftSelector, notify } from "@/components";
-import { assetDataQueryKey } from "@/state/queries/use-asset-data";
+import { InputGroup, notify } from "@/components";
 import type { NftAsset } from "@/state/queries/use-owner-nfts";
 import { useOwnerNfts } from "@/state/queries/use-owner-nfts";
 import { isPublicKey } from "@/lib/solana/common";
@@ -9,6 +8,7 @@ import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
 import { Description, Label } from "@blastctrl/ui/fieldset";
 import { Switch, SwitchField, SwitchGroup } from "@blastctrl/ui/switch";
 import { Field } from "@headlessui/react";
+import { NftSelector } from "./nft-selector";
 import {
   ExclamationCircleIcon,
   PlusCircleIcon,
@@ -26,7 +26,6 @@ import {
 } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { PublicKey } from "@solana/web3.js";
-import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 
@@ -42,7 +41,7 @@ export type FormToken = {
 const MAX_CREATORS = 5;
 
 export type FormInputs = {
-  mint: FormToken | null;
+  mint: string;
   name: string;
   symbol: string;
   uri: string;
@@ -57,11 +56,11 @@ export type FormInputs = {
 };
 
 const defaultValues = {
+  mint: "",
   name: "",
   symbol: "",
   uri: "",
   updateAuthority: "",
-  mint: null,
   isMutable: true,
   primarySaleHappened: false,
   creators: [],
@@ -72,10 +71,8 @@ export default function Update() {
   const { connection } = useConnection();
   const wallet = useWallet();
   const { setVisible } = useWalletModal();
-  const queryClient = useQueryClient();
   const { data } = useOwnerNfts(wallet?.publicKey?.toBase58() ?? "");
   const [isConfirming, setIsConfirming] = useState(false);
-  const [current, setCurrent] = useState<NftAsset | null>(null);
 
   const [isShowingCurrentValues, setIsShowingCurrentValues] = useLocalStorage(
     "showCurrentValues",
@@ -89,6 +86,7 @@ export default function Update() {
     formState: { errors, dirtyFields },
     reset,
     setFocus,
+    watch,
     control,
   } = useForm<FormInputs>({
     mode: "onSubmit",
@@ -103,28 +101,8 @@ export default function Update() {
     },
   });
 
+  const mint = watch("mint");
   const isCreatorAddable = fields.length < MAX_CREATORS;
-
-  const onSelectCallback = async (selectedToken: FormToken) => {
-    let nft = data?.find((asset) => asset.id === selectedToken.mint);
-
-    if (!nft) {
-      nft = queryClient.getQueryData(assetDataQueryKey(selectedToken.mint));
-    }
-
-    if (!nft) {
-      notify({
-        type: "info",
-        description: "Couldn't load information on the selected token.",
-      });
-      return;
-    }
-
-    setCurrent(nft);
-    if (isShowingCurrentValues) {
-      setFormValues(nft);
-    }
-  };
 
   const setFormValues = (nft: NftAsset) => {
     if (nft) {
@@ -146,14 +124,13 @@ export default function Update() {
       setVisible(true);
       return;
     }
-    if (!data.mint) return;
 
     setIsConfirming(true);
     const metaplex = Metaplex.make(connection).use(
       walletAdapterIdentity(wallet),
     );
 
-    const mintAddress = new PublicKey(data.mint.mint);
+    const mintAddress = new PublicKey(data.mint);
     const token = await metaplex
       .nfts()
       .findByMint({ mintAddress }, { commitment: "confirmed" });
@@ -269,23 +246,7 @@ export default function Update() {
 
           <div className="mt-4 grid grid-cols-1 items-start gap-x-4 gap-y-4 sm:grid-cols-8">
             <div className="sm:col-span-5">
-              <NftSelector
-                control={control}
-                name="mint"
-                onSelectCallback={onSelectCallback}
-                rules={{
-                  required: {
-                    value: true,
-                    message: "Select a token or enter an address.",
-                  },
-                  validate: {
-                    // @ts-expect-error: TODO fix validation
-                    pubkey: (value: FormToken | null) =>
-                      isPublicKey(value?.mint) ||
-                      `Not a valid pubkey: ${value?.mint}`,
-                  },
-                }}
-              />
+              <NftSelector name="mint" control={control} />
             </div>
 
             <Field className="flex h-full items-center gap-2 sm:col-span-3">
@@ -293,8 +254,18 @@ export default function Update() {
                 checked={isShowingCurrentValues}
                 onChange={(state) => {
                   setIsShowingCurrentValues(state);
-                  if (state && current) {
-                    setFormValues(current);
+                  if (state) {
+                    // Lookup in the query cache for user nfts
+                    const current = data?.find((nft) => nft.id === mint);
+                    if (current) {
+                      setFormValues(current);
+                      return;
+                    }
+
+                    notify({
+                      type: "info",
+                      description: "Failed to load NFT information",
+                    });
                   } else {
                     reset((formValues) => ({
                       ...defaultValues,
