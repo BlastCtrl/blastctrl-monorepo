@@ -1,8 +1,6 @@
 "use client";
 
-import { cn } from "@blastctrl/ui";
-import { Tab } from "@headlessui/react";
-import { Fragment } from "react";
+import { Tab, TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/react";
 import { AutomaticRecover } from "./_components/automatic";
 import { ManualInput } from "./_components/manual-input";
 
@@ -15,48 +13,30 @@ export default function RecoverNested() {
         Recover Nested Token Accounts
       </h1>
 
-      <Tab.Group>
-        <div className="pb-4">
-          <Tab.List
-            className="isolate flex divide-x divide-gray-200 shadow"
-            aria-label="Tabs"
-          >
-            {tabs.map((tab) => (
-              <Tab as={Fragment} key={tab.name}>
-                {({ selected }) => (
-                  <button
-                    className={cn(
-                      selected
-                        ? "bg-indigo-50 text-gray-900"
-                        : "text-gray-500 hover:text-gray-700",
-                      selected ? "hover:bg-indigo-100" : "hover:bg-indigo-50",
-                      "group relative min-w-0 flex-1 overflow-hidden bg-white px-4 py-2 text-center text-sm font-medium focus:z-10",
-                    )}
-                    aria-current={selected ? "page" : undefined}
-                  >
-                    <span className="">{tab.name}</span>
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        selected ? "bg-indigo-500" : "bg-transparent",
-                        "absolute inset-x-0 bottom-0 h-0.5",
-                      )}
-                    />
-                  </button>
-                )}
-              </Tab>
-            ))}
-          </Tab.List>
-        </div>
-        <Tab.Panels>
-          <Tab.Panel>
+      <TabGroup>
+        <TabList className="mb-4 flex divide-x divide-gray-200 shadow">
+          {tabs.map((tab) => (
+            <Tab
+              key={tab.name}
+              className="group relative min-w-0 flex-1 overflow-hidden px-4 py-2 text-center text-sm font-medium text-gray-500 data-[hover]:bg-indigo-50 data-[selected]:bg-indigo-50 data-[selected]:text-gray-900"
+            >
+              {tab.name}
+              <span
+                aria-hidden="true"
+                className="absolute inset-x-0 bottom-0 h-0.5 group-data-[selected]:bg-indigo-500"
+              />
+            </Tab>
+          ))}
+        </TabList>
+        <TabPanels>
+          <TabPanel>
             <AutomaticRecover />
-          </Tab.Panel>
-          <Tab.Panel>
+          </TabPanel>
+          <TabPanel>
             <ManualInput />
-          </Tab.Panel>
-        </Tab.Panels>
-      </Tab.Group>
+          </TabPanel>
+        </TabPanels>
+      </TabGroup>
     </div>
   );
 }

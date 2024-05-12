@@ -1,22 +1,19 @@
-import { Transaction } from "@solana/web3.js";
-import { useState } from "react";
-
-import { ChevronRightIcon } from "@heroicons/react/20/solid";
-
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import type { TxUnverifyData } from "@/app/api/tx/remove-from-collection/route";
 import {
   InputMultiline,
   notify,
   notifyManyPromises,
   notifyPromise,
 } from "@/components";
-import { useWalletConnection } from "@/state/use-wallet-connection";
-import type { TxUnverifyData } from "@/app/api/tx/remove-from-collection/route";
-import { useForm } from "react-hook-form";
-import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
 import { isPublicKey } from "@/lib/solana/common";
 import { fetcher } from "@/lib/utils";
+import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
+import { useWalletConnection } from "@/state/use-wallet-connection";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { Transaction } from "@solana/web3.js";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
 
 type FormData = {
   nftList: string;
@@ -170,10 +167,8 @@ export const RemoveFrom = () => {
         </div>
         <div className="my-4 flex items-center justify-end py-2">
           <Button color="indigo" type="submit" disabled={isConfirming}>
-            {isConfirming ? (
+            {isConfirming && (
               <SpinnerIcon className="-ml-1 mr-1 inline h-5 w-5 animate-spin" />
-            ) : (
-              <ChevronRightIcon className="-ml-1 mr-1 inline h-5 w-5" />
             )}
             Submit
           </Button>
