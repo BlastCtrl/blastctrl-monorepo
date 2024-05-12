@@ -59,6 +59,7 @@ export async function buildJupiterSwapToSOL(
   quote: JupiterQuoteResponseSchema;
   messageToken: string;
 }> {
+  // TODO: decide if we need this genesis hash check. Might just be unnecessary
   // Connection's genesis hash is cached to prevent an extra RPC query to the node on each call.
   // const genesisHashKey = `genesis/${connection.rpcEndpoint}`;
   // let genesisHash = await cache
@@ -183,9 +184,15 @@ export async function buildJupiterSwapToSOL(
   }).compileToV0Message(addressLookupTableAccounts);
 
   // Here we get the actual simulated fee that Octane will pay for this transaction
-  // TODO: this might just be 5000 lamports every time, but I'm not sure,
-  // does this take priority fees into account?
-  // The priority fees are determined by the Jupiter Swap API, but we can override that
+  // including the priority fees. We want this fee to also be paid back to Octane
+  // from the amount that the user got from the swap along with the platform fee.
+  //
+  // It's annoying that we need to make a request to find out how much the user needs
+  // to pay back, but I don't know if there's a different way to do it. We can set the
+  // fee ourself, or decode the `computeBudgetInstructions`, either way we'll get
+  // the compute budget limit and microLamports per compute unit, but at that point we
+  // don't know exactly how many compute units we'll use, so we don't know what the
+  // fee will exactly be.
   let transactionFee: RpcResponseAndContext<number | null>;
   try {
     transactionFee = await connection.getFeeForMessage(messageV0, "confirmed");
