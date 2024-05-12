@@ -221,7 +221,7 @@ export const UploaderView = ({ irys }: { irys: IrysStorage }) => {
 
   // TODO: add FAQ, disclosures
   return (
-    <div className="flex flex-col md:max-w-[80rem] md:p-1">
+    <div className="mx-auto flex flex-col md:max-w-screen-sm md:p-1">
       {/* Drop upload */}
       <div>
         <Transition
@@ -237,7 +237,7 @@ export const UploaderView = ({ irys }: { irys: IrysStorage }) => {
             <div className="mt-1 sm:col-span-2 sm:mt-0">
               <div
                 className={cn(
-                  "flex max-w-lg justify-center rounded-md border-2 border-dashed border-gray-300 px-6 pb-6 pt-5 transition-colors",
+                  "mx-auto flex max-w-lg justify-center rounded-md border-2 border-dashed border-gray-300 px-6 pb-6 pt-5 transition-colors",
                   dragActive && "bg-accent/30",
                 )}
               >
