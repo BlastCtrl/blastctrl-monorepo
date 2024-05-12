@@ -122,6 +122,7 @@ const NftComboboxInput = ({
   return (
     <div className="relative">
       <ComboboxInput
+        autoComplete="off"
         onChange={({ target }) => onChange(target.value)}
         displayValue={(mint: string) => {
           return selectedNft?.content?.metadata?.name ?? mint;
@@ -129,6 +130,7 @@ const NftComboboxInput = ({
         className={cn(
           "block w-full rounded-md border-gray-300 pr-9 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
           error && "border-red-600 focus:border-red-500 focus:ring-red-600",
+          selectedNft && "bg-indigo-100/50",
         )}
       />
       <ComboboxButton className="group absolute inset-y-0 right-0 px-2.5">
