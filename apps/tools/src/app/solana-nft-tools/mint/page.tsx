@@ -217,8 +217,11 @@ export default function Mint() {
       if (files.length > 0)
         Object.assign(json, { properties: { category, files } });
 
-      const { uri } = await metaplex.nfts().uploadMetadata(json);
-      jsonUrl = uri;
+      const metadata = new File([JSON.stringify(json)], data.name, {
+        type: "application/json",
+      });
+
+      jsonUrl = `https://arweave.net/${(await irys.uploadFile(metadata)).id}`;
     } else {
       jsonUrl = data.uri;
     }
