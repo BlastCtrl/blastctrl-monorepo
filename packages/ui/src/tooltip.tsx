@@ -15,7 +15,6 @@ import {
   useFocus,
   useRole,
   useDismiss,
-  FloatingPortal,
   useMergeRefs,
   arrow,
   FloatingArrow,
@@ -89,31 +88,30 @@ export function Tooltip({
           "data-state": open ? "open" : "closed",
         }),
       )}
-      <FloatingPortal>
-        {isMounted && (
+      {isMounted && (
+        <div
+          ref={refs.setFloating}
+          style={floatingStyles}
+          {...getFloatingProps()}
+          className="z-tooltip"
+        >
           <div
-            ref={refs.setFloating}
-            style={floatingStyles}
-            {...getFloatingProps()}
+            style={styles}
+            className={cn(
+              "max-w-[400px] break-words rounded-lg bg-gray-600 px-3 py-2 text-left text-sm text-white",
+              className,
+            )}
           >
-            <div
-              style={styles}
-              className={cn(
-                "z-50 max-w-[400px] break-words rounded-lg bg-gray-600 px-3 py-2 text-left text-sm text-white",
-                className,
-              )}
-            >
-              <FloatingArrow
-                className={cn("fill-gray-600", arrowClassName)}
-                tipRadius={2}
-                ref={arrowRef}
-                context={context}
-              />
-              {content}
-            </div>
+            <FloatingArrow
+              className={cn("fill-gray-600", arrowClassName)}
+              tipRadius={2}
+              ref={arrowRef}
+              context={context}
+            />
+            {content}
           </div>
-        )}
-      </FloatingPortal>
+        </div>
+      )}
     </>
   );
 }
