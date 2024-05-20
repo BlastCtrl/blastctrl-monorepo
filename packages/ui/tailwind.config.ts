@@ -6,7 +6,9 @@ import type { Config } from "tailwindcss";
 
 import baseConfig from "@blastctrl/tailwind-config/web";
 
-export default {
+const config: Config = {
   content: ["./src/**/*.tsx"],
   presets: [baseConfig],
-} satisfies Config;
+};
+
+export default config;
