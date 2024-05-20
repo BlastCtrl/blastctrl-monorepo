@@ -5,15 +5,16 @@ import {
   notifyManyPromises,
   notifyPromise,
 } from "@/components";
+import useUmi from "@/lib/hooks/use-umi";
 import { isPublicKey } from "@/lib/solana/common";
 import { fetcher } from "@/lib/utils";
 import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
 import { useWalletConnection } from "@/state/use-wallet-connection";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { Transaction } from "@solana/web3.js";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import * as base58 from "bs58";
 
 type FormData = {
   nftList: string;
@@ -21,8 +22,7 @@ type FormData = {
 
 export const RemoveFrom = () => {
   const { network } = useNetworkConfigurationStore();
-  const { connection, wallet, sendAndConfirmTransaction, signAllTransactions } =
-    useWalletConnection();
+  const { wallet } = useWalletConnection();
   const { setVisible } = useWalletModal();
   const {
     register,
@@ -30,6 +30,7 @@ export const RemoveFrom = () => {
     formState: { errors },
   } = useForm<FormData>({});
   const [isConfirming, setIsConfirming] = useState(false);
+  const umi = useUmi();
 
   const onUnverifyItems = async (data: FormData) => {
     if (!wallet) {
@@ -45,7 +46,6 @@ export const RemoveFrom = () => {
         tx: removeCollectionResponse,
         blockhash,
         lastValidBlockHeight,
-        minContextSlot,
       } = await fetcher<TxUnverifyData>("/api/tx/remove-from-collection", {
         method: "POST",
         body: JSON.stringify({
@@ -57,7 +57,7 @@ export const RemoveFrom = () => {
       });
 
       const transactions = removeCollectionResponse.map((tx) =>
-        Transaction.from(Buffer.from(tx, "base64")),
+        umi.transactions.deserialize(Buffer.from(tx, "base64")),
       );
 
       if (transactions.length > 1) {
@@ -66,40 +66,45 @@ export const RemoveFrom = () => {
           description: `This action requires multiple transactions and will be split into ${transactions.length} batches.`,
         });
       } else if (transactions[0]) {
-        return void notifyPromise(sendAndConfirmTransaction(transactions[0]), {
-          loading: { description: "Confirming transaction..." },
-          success: {
-            title: "Remove from collection success",
-            description: `${nftMints.length} NFTs removed from collection.`,
+        return void notifyPromise(
+          umi.rpc.sendTransaction(
+            await umi.identity.signTransaction(transactions[0]),
+          ),
+          {
+            loading: { description: "Confirming transaction..." },
+            success: {
+              title: "Remove from collection success",
+              description: `${nftMints.length} NFTs removed from collection.`,
+            },
+            error: (err) => ({
+              title: "Error removing from collection",
+              description: (
+                <div>
+                  <p className="block">Transaction failed with message: </p>
+                  <p className="mt-1.5 block">{err?.message}</p>
+                </div>
+              ),
+            }),
           },
-          error: (err) => ({
-            title: "Error removing from collection",
-            description: (
-              <div>
-                <p className="block">Transaction failed with message: </p>
-                <p className="mt-1.5 block">{err?.message}</p>
-              </div>
-            ),
-          }),
-        });
+        );
       }
 
       // Request signature from wallet
-      // @ts-expect-error: this could error if the wallet doesnt support signAll
-      const signed = await signAllTransactions(transactions);
+      const signed = await umi.identity.signAllTransactions(transactions);
       const txids = await Promise.all(
         signed.map(async (signedTx) => {
-          return await connection.sendRawTransaction(signedTx.serialize(), {
-            minContextSlot,
-          });
+          return await umi.rpc.sendTransaction(signedTx);
         }),
       );
 
       const promises = txids.map(async (signature) => {
-        const { value } = await connection.confirmTransaction({
-          blockhash,
-          lastValidBlockHeight,
-          signature,
+        const { value } = await umi.rpc.confirmTransaction(signature, {
+          commitment: "confirmed",
+          strategy: {
+            blockhash,
+            lastValidBlockHeight,
+            type: "blockhash",
+          },
         });
         if (value.err) throw Error("msg", { cause: "test" });
         return { value };
@@ -107,7 +112,7 @@ export const RemoveFrom = () => {
 
       const transactionPromises = promises.map((promise, idx) => ({
         label: `SetAndVerify ~ batch ${idx + 1}`,
-        txid: txids[idx]!,
+        txid: base58.encode(txids[idx]!),
         promise,
       }));
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 "use client";
 
 import { InputGroup, notify } from "@/components";
@@ -15,23 +16,18 @@ import {
   QuestionMarkCircleIcon,
   XMarkIcon,
 } from "@heroicons/react/20/solid";
-import type { UpdateNftInput } from "@metaplex-foundation/js";
-import { Metaplex, walletAdapterIdentity } from "@metaplex-foundation/js";
 import { WalletError } from "@solana/wallet-adapter-base";
-import type { WalletContextState } from "@solana/wallet-adapter-react";
-import {
-  useConnection,
-  useLocalStorage,
-  useWallet,
-} from "@solana/wallet-adapter-react";
+import { useLocalStorage, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { PublicKey } from "@solana/web3.js";
 import { useState } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
-
-type NonNullableFields<T> = {
-  [P in keyof T]: NonNullable<T[P]>;
-};
+import useUmi from "@/lib/hooks/use-umi";
+import {
+  fetchMetadataFromSeeds,
+  updateV1,
+} from "@metaplex-foundation/mpl-token-metadata";
+import { publicKey } from "@metaplex-foundation/umi";
+import * as base58 from "bs58";
 
 export type FormToken = {
   name: string;
@@ -68,11 +64,11 @@ const defaultValues = {
 };
 
 export default function Update() {
-  const { connection } = useConnection();
   const wallet = useWallet();
   const { setVisible } = useWalletModal();
   const { data } = useOwnerNfts(wallet?.publicKey?.toBase58() ?? "");
   const [isConfirming, setIsConfirming] = useState(false);
+  const umi = useUmi();
 
   const [isShowingCurrentValues, setIsShowingCurrentValues] = useLocalStorage(
     "showCurrentValues",
@@ -126,16 +122,12 @@ export default function Update() {
     }
 
     setIsConfirming(true);
-    const metaplex = Metaplex.make(connection).use(
-      walletAdapterIdentity(wallet),
-    );
 
-    const mintAddress = new PublicKey(data.mint);
-    const token = await metaplex
-      .nfts()
-      .findByMint({ mintAddress }, { commitment: "confirmed" });
+    const initialMetadata = await fetchMetadataFromSeeds(umi, {
+      mint: publicKey(data.mint),
+    });
 
-    if (!token.updateAuthorityAddress.equals(wallet.publicKey)) {
+    if (initialMetadata.updateAuthority !== wallet.publicKey.toBase58()) {
       notify({
         type: "error",
         title: "Invalid update authority",
@@ -143,7 +135,7 @@ export default function Update() {
           <>
             Your wallet is not the valid update authority. Update authority is{" "}
             <span className="font-medium text-blue-300">
-              {token.updateAuthorityAddress.toBase58()}
+              {initialMetadata.updateAuthority}
             </span>
           </>
         ),
@@ -166,40 +158,39 @@ export default function Update() {
       return;
     }
 
-    const updateNftInput: UpdateNftInput = {
-      nftOrSft: token,
-      name: dirtyFields.name ? data.name : undefined,
-      symbol: dirtyFields.symbol ? data.symbol : undefined,
-      uri: dirtyFields.uri ? data.uri : undefined,
-      newUpdateAuthority: dirtyFields.updateAuthority
-        ? new PublicKey(data.updateAuthority)
-        : undefined,
-      isMutable: dirtyFields.isMutable ? data.isMutable : undefined,
-      primarySaleHappened: dirtyFields.primarySaleHappened
-        ? data.primarySaleHappened
-        : undefined,
-      creators: dirtyFields.creators
-        ? data.creators.map(({ address, share }) => ({
-            address: new PublicKey(address),
-            share,
-            authority:
-              address === wallet.publicKey?.toBase58()
-                ? (wallet as NonNullableFields<WalletContextState>)
-                : undefined,
-          }))
-        : undefined,
-      sellerFeeBasisPoints: dirtyFields.sellerFeeBasisPoints
-        ? data.sellerFeeBasisPoints
-        : undefined,
-    };
-
     try {
-      const { response } = await metaplex.nfts().update(updateNftInput);
-      console.log(response.signature);
+      const { signature } = await updateV1(umi, {
+        mint: publicKey(data.mint),
+        isMutable: dirtyFields.isMutable ? data.isMutable : undefined,
+        primarySaleHappened: dirtyFields.primarySaleHappened
+          ? data.primarySaleHappened
+          : undefined,
+        newUpdateAuthority: dirtyFields.updateAuthority
+          ? publicKey(data.updateAuthority)
+          : undefined,
+        data: {
+          ...initialMetadata,
+          name: dirtyFields.name ? data.name : initialMetadata.name,
+          symbol: dirtyFields.symbol ? data.symbol : initialMetadata.symbol,
+          uri: dirtyFields.uri ? data.uri : initialMetadata.uri,
+          creators: dirtyFields.creators
+            ? data.creators.map(({ address, share }) => ({
+                address: publicKey(address),
+                share,
+                verified: false,
+              }))
+            : initialMetadata.creators,
+          sellerFeeBasisPoints: dirtyFields.sellerFeeBasisPoints
+            ? data.sellerFeeBasisPoints
+            : initialMetadata.sellerFeeBasisPoints,
+        },
+      }).sendAndConfirm(umi);
+
+      console.log(base58.encode(signature as Uint8Array));
       notify({
         title: "Metadata update success",
         type: "success",
-        txid: response.signature,
+        txid: base58.encode(signature as Uint8Array),
       });
     } catch (err: any) {
       if (err instanceof WalletError) {
