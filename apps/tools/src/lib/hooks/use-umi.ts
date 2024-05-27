@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { mplCandyMachine } from "@metaplex-foundation/mpl-candy-machine";
