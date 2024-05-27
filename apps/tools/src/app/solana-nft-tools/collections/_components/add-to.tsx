@@ -5,7 +5,6 @@ import {
   notifyManyPromises,
   notifyPromise,
 } from "@/components";
-import { Transaction } from "@solana/web3.js";
 
 import type { TxSetAndVerifyData } from "@/app/api/tx/add-to-collection/route";
 import { fetcher } from "@/lib/utils";
@@ -16,6 +15,8 @@ import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import useUmi from "@/lib/hooks/use-umi";
+import * as base58 from "bs58";
 
 type FormData = {
   nftList: string;
@@ -24,8 +25,7 @@ type FormData = {
 
 export const AddTo = () => {
   const { network } = useNetworkConfigurationStore();
-  const { connection, wallet, signAllTransactions, sendAndConfirmTransaction } =
-    useWalletConnection();
+  const { wallet } = useWalletConnection();
   const { setVisible } = useWalletModal();
   const {
     register,
@@ -33,6 +33,7 @@ export const AddTo = () => {
     formState: { errors },
   } = useForm<FormData>();
   const [isConfirming, setIsConfirming] = useState(false);
+  const umi = useUmi();
 
   const onSetCollection = async (data: FormData) => {
     if (!wallet) {
@@ -44,11 +45,11 @@ export const AddTo = () => {
     try {
       // set
       setIsConfirming(true);
+
       const {
         tx: addCollectionResponse,
         blockhash,
         lastValidBlockHeight,
-        minContextSlot,
       } = await fetcher<TxSetAndVerifyData>("/api/tx/add-to-collection", {
         method: "POST",
         body: JSON.stringify({
@@ -61,8 +62,9 @@ export const AddTo = () => {
       });
 
       const transactions = addCollectionResponse.map((tx) =>
-        Transaction.from(Buffer.from(tx, "base64")),
+        umi.transactions.deserialize(Buffer.from(tx, "base64")),
       );
+
       if (!transactions[0]) {
         console.log("Nothing to sign");
         return;
@@ -74,43 +76,48 @@ export const AddTo = () => {
           description: `This action requires multiple transactions and will be split into ${transactions.length} batches.`,
         });
       } else {
-        return void notifyPromise(sendAndConfirmTransaction(transactions[0]), {
-          loading: { description: "Confirming transaction..." },
-          success: {
-            title: "Add to collection success",
-            description: `${nftMints.length} NFTs added to collection ${compress(
-              collectionAddress,
-              4,
-            )}`,
+        return void notifyPromise(
+          umi.rpc.sendTransaction(
+            await umi.identity.signTransaction(transactions[0]),
+          ),
+          {
+            loading: { description: "Confirming transaction..." },
+            success: {
+              title: "Add to collection success",
+              description: `${nftMints.length} NFTs added to collection ${compress(
+                collectionAddress,
+                4,
+              )}`,
+            },
+            error: (err) => ({
+              title: "Add to collection Error",
+              description: (
+                <div>
+                  <p className="block">Transaction failed with message: </p>
+                  <p className="mt-1.5 block">{err?.message}</p>
+                </div>
+              ),
+            }),
           },
-          error: (err) => ({
-            title: "Add to collection Error",
-            description: (
-              <div>
-                <p className="block">Transaction failed with message: </p>
-                <p className="mt-1.5 block">{err?.message}</p>
-              </div>
-            ),
-          }),
-        });
+        );
       }
 
       // Request signature from wallet
-      // @ts-expect-error TODO: wallets might not support signAllTransactions
-      const signed = await signAllTransactions(transactions);
+      const signed = await umi.identity.signAllTransactions(transactions);
       const txids = await Promise.all(
         signed.map(async (signedTx) => {
-          return await connection.sendRawTransaction(signedTx.serialize(), {
-            minContextSlot,
-          });
+          return await umi.rpc.sendTransaction(signedTx);
         }),
       );
 
       const promises = txids.map(async (signature) => {
-        const { value } = await connection.confirmTransaction({
-          blockhash,
-          lastValidBlockHeight,
-          signature,
+        const { value } = await umi.rpc.confirmTransaction(signature, {
+          commitment: "confirmed",
+          strategy: {
+            blockhash,
+            lastValidBlockHeight,
+            type: "blockhash",
+          },
         });
         if (value.err) throw Error("msg", { cause: "test" });
         return { value };
@@ -118,7 +125,7 @@ export const AddTo = () => {
 
       const transactionPromises = promises.map((promise, idx) => ({
         label: `SetAndVerify ~ batch ${idx + 1}`,
-        txid: txids[idx]!,
+        txid: base58.encode(txids[idx]!),
         promise,
       }));
 

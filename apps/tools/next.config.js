@@ -15,6 +15,15 @@ const config = {
   // },
   transpilePackages: ["@blastctrl/ui", "@blastctrl/octane-core"],
   eslint: { ignoreDuringBuilds: true },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'arweave.net',
+        port: '',
+      },
+    ],
+  },
   // typescript: { ignoreBuildErrors: true },
 };
 

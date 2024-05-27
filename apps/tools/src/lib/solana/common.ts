@@ -1,3 +1,5 @@
+import type { PublicKey as UmiPublicKey } from "@metaplex-foundation/umi";
+import { publicKey } from "@metaplex-foundation/umi";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token-next";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { clusterApiUrl, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
@@ -6,23 +8,31 @@ import base58 from "bs58";
 export const PROGRAM_ADDRESS = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s";
 export const METADATA_PROGRAM_ID = new PublicKey(PROGRAM_ADDRESS);
 
-export const getMasterEdition = (mint: PublicKey): PublicKey => {
-  return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("metadata"),
-      METADATA_PROGRAM_ID.toBuffer(),
-      mint.toBuffer(),
-      Buffer.from("edition"),
-    ],
-    METADATA_PROGRAM_ID,
-  )[0];
+export const getMasterEdition = (mint: UmiPublicKey): UmiPublicKey => {
+  return publicKey(
+    PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("metadata"),
+        METADATA_PROGRAM_ID.toBuffer(),
+        new PublicKey(mint).toBuffer(),
+        Buffer.from("edition"),
+      ],
+      METADATA_PROGRAM_ID,
+    )[0].toBase58(),
+  );
 };
 
-export const getMetadata = (mint: PublicKey): PublicKey => {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("metadata"), METADATA_PROGRAM_ID.toBuffer(), mint.toBuffer()],
-    METADATA_PROGRAM_ID,
-  )[0];
+export const getMetadata = (mint: UmiPublicKey): UmiPublicKey => {
+  return publicKey(
+    PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("metadata"),
+        METADATA_PROGRAM_ID.toBuffer(),
+        new PublicKey(mint).toBuffer(),
+      ],
+      METADATA_PROGRAM_ID,
+    )[0].toBase58(),
+  );
 };
 
 export const mergeClusterApiUrl = (network: WalletAdapterNetwork) => {

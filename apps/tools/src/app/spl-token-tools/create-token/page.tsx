@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 "use client";
 
 import {
@@ -20,12 +21,16 @@ import { ChevronUpDownIcon } from "@heroicons/react/20/solid";
 import { WalletError } from "@solana/wallet-adapter-base";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import type { TransactionInstruction } from "@solana/web3.js";
+import { TransactionInstruction } from "@solana/web3.js";
 import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { UploadFile } from "./_components/upload-file";
+import useUmi from "@/lib/hooks/use-umi";
+import type { Instruction, TransactionBuilder } from "@metaplex-foundation/umi";
+import { publicKey } from "@metaplex-foundation/umi";
+import * as base58 from "bs58";
 
 type TokenData = {
   mint: string;
@@ -42,8 +47,7 @@ type Actions = (typeof actions)[number];
 export default function CreateToken() {
   const wallet = useWallet();
   const { setVisible } = useWalletModal();
-  const { simulateVersionedTransaction, sendAndConfirmVersionedTransaction } =
-    useWalletConnection();
+  const { simulateVersionedTransaction } = useWalletConnection();
   const { network } = useNetworkConfigurationStore();
   const [isConfirming, setIsConfirming] = useState(false);
   const [selectedAction, setSelectedAction] = useState<Actions>(actions[0]);
@@ -53,6 +57,7 @@ export default function CreateToken() {
     handleSubmit,
     setValue,
   } = useForm<TokenData>({});
+  const umi = useUmi();
 
   const onSubmit = async (data: TokenData) => {
     if (!wallet.publicKey) {
@@ -64,19 +69,33 @@ export default function CreateToken() {
     const irys = await IrysStorage.makeWebIrys(network, wallet);
 
     // Test if creating metadata is possible
-    const ix =
+    const ixs: Instruction[] =
       selectedAction === "Add"
         ? createMetadataInstruction(
-            wallet.publicKey,
-            new PublicKey(data.mint),
+            umi,
+            publicKey(wallet.publicKey.toBase58()),
+            publicKey(data.mint),
             {},
-          )
+          ).getInstructions()
         : updateMetadataInstruction(
-            wallet.publicKey,
-            new PublicKey(data.mint),
+            umi,
+            publicKey(wallet.publicKey.toBase58()),
+            publicKey(data.mint),
             {},
-          );
-    const { value } = await simulateVersionedTransaction([ix]);
+          ).getInstructions();
+    const { value } = await simulateVersionedTransaction(
+      ixs.map(
+        (ix) =>
+          new TransactionInstruction({
+            keys: ix.keys.map((key) => ({
+              ...key,
+              pubkey: new PublicKey(key.pubkey),
+            })),
+            programId: new PublicKey(ix.programId),
+            data: Buffer.from(ix.data),
+          }),
+      ),
+    );
 
     if (value.err) {
       setIsConfirming(false);
@@ -185,11 +204,12 @@ export default function CreateToken() {
     );
 
     try {
-      let ix: TransactionInstruction;
+      let tx: TransactionBuilder;
       if (selectedAction === "Add") {
-        ix = createMetadataInstruction(
-          wallet.publicKey,
-          new PublicKey(data.mint),
+        tx = createMetadataInstruction(
+          umi,
+          publicKey(wallet.publicKey),
+          publicKey(data.mint),
           {
             name: data.name,
             symbol: data.symbol,
@@ -197,9 +217,10 @@ export default function CreateToken() {
           },
         );
       } else {
-        ix = updateMetadataInstruction(
-          wallet.publicKey,
-          new PublicKey(data.mint),
+        tx = updateMetadataInstruction(
+          umi,
+          publicKey(wallet.publicKey),
+          publicKey(data.mint),
           {
             name: data.name,
             symbol: data.symbol,
@@ -207,10 +228,10 @@ export default function CreateToken() {
           },
         );
       }
-      await notifyPromise(sendAndConfirmVersionedTransaction([ix]), {
+      await notifyPromise(tx.sendAndConfirm(umi), {
         loading: { description: "Confirming transaction" },
         success: (value) => ({
-          txid: value.signature,
+          txid: base58.encode(value.signature),
           title: `${selectedAction} Metadata Success`,
           description: (
             <>

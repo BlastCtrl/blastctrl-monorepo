@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 "use client";
 
 import { InputGroup } from "@/components";
@@ -7,14 +8,8 @@ import {
   QuestionMarkCircleIcon,
   XMarkIcon,
 } from "@heroicons/react/20/solid";
-import type { CreateNftInput, JsonMetadata } from "@metaplex-foundation/js";
-import {
-  Metaplex,
-  toBigNumber,
-  walletAdapterIdentity,
-} from "@metaplex-foundation/js";
-import type { WalletContextState } from "@solana/wallet-adapter-react";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import type { JsonMetadata } from "@metaplex-foundation/js";
+import { useWallet } from "@solana/wallet-adapter-react";
 import Link from "next/link";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 
@@ -26,17 +21,24 @@ import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
 import { Switch } from "@headlessui/react";
 import { WalletError } from "@solana/wallet-adapter-base";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { PublicKey } from "@solana/web3.js";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
 import { Attributes } from "./_components/attributes";
 import { MediaFiles } from "./_components/media-files";
+import useUmi from "@/lib/hooks/use-umi";
+import { createProgrammableNft } from "@metaplex-foundation/mpl-token-metadata";
+import {
+  generateSigner,
+  percentAmount,
+  publicKey,
+} from "@metaplex-foundation/umi";
+import {
+  setComputeUnitLimit,
+  setComputeUnitPrice,
+} from "@metaplex-foundation/mpl-toolbox";
+import * as base58 from "bs58";
+import { useEffect, useState } from "react";
 
 const MAX_CREATORS = 5;
-
-type NonNullableFields<T> = {
-  [P in keyof T]: NonNullable<T[P]>;
-};
 
 export type CreateFormInputs = {
   name: string;
@@ -64,13 +66,13 @@ export type CreateFormInputs = {
 };
 
 export default function Mint() {
-  const { connection } = useConnection();
   const { network } = useNetworkConfigurationStore();
   const wallet = useWallet();
   const { setVisible } = useWalletModal();
   const params = useSearchParams();
   const [isConfirming, setIsConfirming] = useState(false);
   const [createJson, setCreateJson] = useState(true);
+  const umi = useUmi();
 
   const {
     register,
@@ -139,127 +141,128 @@ export default function Mint() {
 
     // Setup
     setIsConfirming(true);
-    const metaplex = Metaplex.make(connection).use(
-      walletAdapterIdentity(wallet),
-    );
+
     const irys = await IrysStorage.makeWebIrys(network, wallet);
 
     // Check if we are uploading a json file
     let jsonUrl: string;
-    if (createJson) {
-      notify({
-        title: "Uploading external metadata",
-        description:
-          "The metadata JSON file is being uploaded to Arweave via Irys. This will require multiple wallet confirmations, including payment and signature verification.",
-      });
-
-      // Check if we're also uploading media files
-      const { image, animation_url } = data;
-      let imageUrl: string | undefined;
-      let animationUrl: string | undefined;
-      try {
-        if (image)
-          imageUrl = `https://arweave.net/${(await irys.uploadFile(image)).id}`;
-        if (animation_url)
-          animationUrl = `https://arweave.net/${(await irys.uploadFile(animation_url)).id}`;
-      } catch (err: any) {
-        setIsConfirming(false);
-        return notify({
-          type: "error",
-          title: "File upload error",
-          description: (
-            <div className="break-normal">
-              <p>
-                There has been an error while uploading with the message:{" "}
-                <span className="break-all font-medium text-yellow-300">
-                  {err?.message}
-                </span>
-                .
-              </p>
-              <p className="mt-2">
-                You can recover any lost funds on the{" "}
-                <Link
-                  href="/permanent-storage-tools/file-upload"
-                  className="font-medium text-blue-300"
-                >
-                  /permanent-storage-tools
-                </Link>{" "}
-                page.
-              </p>
-            </div>
-          ),
-        });
-      }
-
-      const category = animation_url
-        ? mimeTypeToCategory(animation_url)
-        : image
-          ? mimeTypeToCategory(image)
-          : undefined;
-
-      const { name, symbol, description, attributes, external_url } = data;
-      const json: JsonMetadata<string> = {
-        name,
-        symbol,
-        description,
-        external_url,
-      };
-      const files: Array<{ type?: string; uri: string }> = [];
-      if (attributes) Object.assign(json, { attributes });
-      if (imageUrl) {
-        Object.assign(json, { image: imageUrl });
-        files.push({ uri: imageUrl, type: image?.type });
-      }
-      if (animationUrl) {
-        Object.assign(json, { animation_url: animationUrl });
-        files.push({ uri: animationUrl, type: animation_url?.type });
-      }
-      if (files.length > 0)
-        Object.assign(json, { properties: { category, files } });
-
-      const metadata = new File([JSON.stringify(json)], data.name, {
-        type: "application/json",
-      });
-
-      jsonUrl = `https://arweave.net/${(await irys.uploadFile(metadata)).id}`;
-    } else {
-      jsonUrl = data.uri;
-    }
-
-    const {
-      name,
-      symbol,
-      isMutable,
-      isCollection,
-      collectionIsSized,
-      maxSupply,
-    } = data;
-    const createNftInput: CreateNftInput = {
-      name,
-      symbol,
-      uri: jsonUrl,
-      isMutable,
-      isCollection,
-      collectionIsSized,
-      maxSupply: toBigNumber(maxSupply),
-      creators: dirtyFields.creators
-        ? data.creators.map(({ address, share }) => ({
-            address: new PublicKey(address),
-            share,
-            authority:
-              address === wallet.publicKey?.toBase58()
-                ? (wallet as NonNullableFields<WalletContextState>)
-                : undefined,
-          }))
-        : undefined,
-      sellerFeeBasisPoints: dirtyFields.sellerFeePercentage
-        ? data.sellerFeePercentage * 100
-        : 0,
-    };
 
     try {
-      const { response } = await metaplex.nfts().create(createNftInput);
-      console.log(response);
+      if (createJson) {
+        notify({
+          title: "Uploading external metadata",
+          description:
+            "The metadata JSON file is being uploaded to Arweave via Irys. This will require multiple wallet confirmations, including payment and signature verification.",
+        });
+
+        // Check if we're also uploading media files
+        const { image, animation_url } = data;
+        let imageUrl: string | undefined;
+        let animationUrl: string | undefined;
+
+        try {
+          if (image)
+            imageUrl = `https://arweave.net/${(await irys.uploadFile(image)).id}`;
+          if (animation_url)
+            animationUrl = `https://arweave.net/${(await irys.uploadFile(animation_url)).id}`;
+        } catch (err: any) {
+          setIsConfirming(false);
+          return notify({
+            type: "error",
+            title: "File upload error",
+            description: (
+              <div className="break-normal">
+                <p>
+                  There has been an error while uploading with the message:{" "}
+                  <span className="break-all font-medium text-yellow-300">
+                    {err?.message}
+                  </span>
+                  .
+                </p>
+                <p className="mt-2">
+                  You can recover any lost funds on the{" "}
+                  <Link
+                    href="/permanent-storage-tools/file-upload"
+                    className="font-medium text-blue-300"
+                  >
+                    /permanent-storage-tools
+                  </Link>{" "}
+                  page.
+                </p>
+              </div>
+            ),
+          });
+        }
+        const category = animation_url
+          ? mimeTypeToCategory(animation_url)
+          : image
+            ? mimeTypeToCategory(image)
+            : undefined;
+
+        const { name, symbol, description, attributes, external_url } = data;
+        const json: JsonMetadata<string> = {
+          name,
+          symbol,
+          description,
+          external_url,
+        };
+
+        const files: Array<{ type?: string; uri: string }> = [];
+        if (attributes) Object.assign(json, { attributes });
+        if (imageUrl) {
+          Object.assign(json, { image: imageUrl });
+          files.push({ uri: imageUrl, type: image?.type });
+        }
+
+        if (animationUrl) {
+          Object.assign(json, { animation_url: animationUrl });
+          files.push({ uri: animationUrl, type: animation_url?.type });
+        }
+        if (files.length > 0)
+          Object.assign(json, { properties: { category, files } });
+
+        const metadata = new File([JSON.stringify(json)], data.name, {
+          type: "application/json",
+        });
+
+        jsonUrl = `https://arweave.net/${(await irys.uploadFile(metadata)).id}`;
+      } else {
+        jsonUrl = data.uri;
+      }
+
+      const { name, symbol, isMutable, isCollection, maxSupply } = data;
+
+      const { signature } = await createProgrammableNft(umi, {
+        mint: generateSigner(umi),
+        uri: jsonUrl,
+        name,
+        symbol,
+        isMutable,
+        isCollection,
+        sellerFeeBasisPoints: percentAmount(
+          dirtyFields.sellerFeePercentage ? data.sellerFeePercentage : 0,
+        ),
+        printSupply:
+          maxSupply === 0
+            ? {
+                __kind: "Zero",
+              }
+            : {
+                __kind: "Limited",
+                fields: [maxSupply],
+              },
+        creators: dirtyFields.creators
+          ? data.creators.map(({ address, share }) => ({
+              address: publicKey(address),
+              share,
+              verified: false,
+            }))
+          : undefined,
+      })
+        .add(setComputeUnitLimit(umi, { units: 1_000_000 }))
+        .add(setComputeUnitPrice(umi, { microLamports: 1_000_000 }))
+        .sendAndConfirm(umi);
+      console.log(base58.encode(signature as Uint8Array));
       notify({
         title: "NFT mint successful",
         description: (
@@ -269,7 +272,7 @@ export default function Mint() {
           </>
         ),
         type: "success",
-        txid: response.signature,
+        txid: base58.encode(signature as Uint8Array),
       });
     } catch (err: any) {
       if (err instanceof WalletError) {
