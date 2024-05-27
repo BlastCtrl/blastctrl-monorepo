@@ -1,10 +1,19 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+import { chunk } from "@/lib/utils";
 import { getMetadata } from "@/lib/solana";
 import { unverifyCollectionNft } from "@/lib/solana/collections";
 import { Networks } from "@/lib/solana/endpoints";
-import { chunk } from "@/lib/utils";
-import { Metadata } from "@metaplex-foundation/mpl-token-metadata";
+import { fetchMetadata } from "@metaplex-foundation/mpl-token-metadata";
+import {
+  createNoopSigner,
+  publicKey,
+  signerIdentity,
+} from "@metaplex-foundation/umi";
+import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import type { Cluster } from "@solana/web3.js";
-import { Connection, PublicKey, Transaction } from "@solana/web3.js";
+import type { Umi } from "@metaplex-foundation/umi";
 import type { NextRequest } from "next/server";
 
 export type TxUnverifyData = {
@@ -23,68 +32,55 @@ export type Input = {
 export async function POST(req: NextRequest) {
   const { authorityAddress, nftMints, network } = (await req.json()) as Input;
 
-  const connection = new Connection(Networks[network]);
-  const authority = new PublicKey(authorityAddress);
-  const nfts = nftMints.map((str) => new PublicKey(str));
+  const authority = publicKey(authorityAddress);
+  const umi = createUmi(Networks[network]).use(
+    signerIdentity(createNoopSigner(authority)),
+  );
+  const nfts = nftMints.map((str) => publicKey(str));
+
   if (!nfts[0]) {
     return new Response("Missing nft mints", {
       status: 400,
       statusText: "Bad Request",
     });
   }
-  const nftMetadata = await Metadata.fromAccountAddress(
-    connection,
-    getMetadata(nfts[0]),
-  );
-  const collection = nftMetadata.collection?.key;
+
+  const nftMetadata = await fetchMetadata(umi, getMetadata(nfts[0]));
+
+  const collection = (nftMetadata as any).collection?.value?.key;
+
   if (!collection) {
     return new Response("NFT missing collection key", {
       status: 400,
       statusText: "Bad Request",
     });
   }
-  const collectionMetadata = await Metadata.fromAccountAddress(
-    connection,
-    getMetadata(collection),
-  );
 
   const batchSize = 12;
   const chunkedInstructions = chunk(
     nfts.map((nft) =>
-      unverifyCollectionNft(nft, authority, collection, collectionMetadata),
+      unverifyCollectionNft(umi as Umi, authority, nft, collection),
     ),
     batchSize,
   );
 
-  const {
-    context: { slot: minContextSlot },
-    value: { blockhash, lastValidBlockHeight },
-  } = await connection.getLatestBlockhashAndContext("finalized");
+  const { blockhash, lastValidBlockHeight } =
+    await umi.rpc.getLatestBlockhash();
   const transactions = chunkedInstructions.map((batch) =>
-    new Transaction({
-      feePayer: authority,
+    umi.transactions.create({
+      version: 0,
+      payer: authority,
+      instructions: [...batch.flat()],
       blockhash,
-      lastValidBlockHeight,
-    }).add(...batch.flat()),
+    }),
   );
-
-  // for (const tx of transactions) {
-  //   const result = await connection.simulateTransaction(tx, []);
-  // }
-
   const serializedTransactionsBase64 = transactions.map((tx) =>
-    tx
-      .serialize({
-        requireAllSignatures: false,
-        verifySignatures: true,
-      })
-      .toString("base64"),
+    Buffer.from(umi.transactions.serialize(tx)).toString("base64"),
   );
 
   return Response.json({
     tx: serializedTransactionsBase64,
     blockhash,
     lastValidBlockHeight,
-    minContextSlot,
   });
 }

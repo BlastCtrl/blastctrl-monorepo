@@ -1,79 +1,62 @@
-import type { Metadata } from "@metaplex-foundation/mpl-token-metadata";
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 import {
-  createUnverifySizedCollectionItemInstruction,
-  createUnverifyCollectionInstruction,
-  createSetAndVerifySizedCollectionItemInstruction,
-  createSetAndVerifyCollectionInstruction,
+  unverifyCollectionV1,
+  updateV1,
+  verifyCollectionV1,
 } from "@metaplex-foundation/mpl-token-metadata";
-import type { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { getMasterEdition, getMetadata } from "./common";
+import type { Instruction, PublicKey, Umi } from "@metaplex-foundation/umi";
+import { createNoopSigner } from "@metaplex-foundation/umi";
 
 export const unverifyCollectionNft = (
-  nftMint: PublicKey,
+  umi: Umi,
   wallet: PublicKey,
+  nftMint: PublicKey,
   collectionMint: PublicKey,
-  collectionInfo: Metadata,
-): TransactionInstruction => {
+): Instruction[] => {
   const metadata = getMetadata(nftMint);
   const collection = getMetadata(collectionMint);
-  const collectionMasterEditionAccount = getMasterEdition(collectionMint);
 
-  if (
-    collectionInfo?.collectionDetails &&
-    collectionInfo?.collectionDetails?.size
-  ) {
-    // This is a sized collection
-    return createUnverifySizedCollectionItemInstruction({
-      payer: wallet,
-      metadata,
-      collectionMint,
-      collection,
-      collectionMasterEditionAccount,
-      collectionAuthority: wallet,
-    });
-  } else {
-    // This is an unsized collection
-    return createUnverifyCollectionInstruction({
-      metadata,
-      collectionMint,
-      collection,
-      collectionMasterEditionAccount,
-      collectionAuthority: wallet,
-    });
-  }
+  return unverifyCollectionV1(umi, {
+    authority: createNoopSigner(wallet),
+    collectionMint,
+    collectionMetadata: collection,
+    metadata,
+  }).getInstructions();
 };
 
 export const addNftToCollection = (
+  umi: Umi,
   wallet: PublicKey,
   nftMint: PublicKey,
   collectionMint: PublicKey,
-  collectionMetadata: Metadata,
-): TransactionInstruction => {
+): Instruction[] => {
   const metadata = getMetadata(nftMint);
   const collection = getMetadata(collectionMint);
   const collectionMasterEditionAccount = getMasterEdition(collectionMint);
+  const instructions = updateV1(umi, {
+    mint: nftMint,
+    collection: {
+      __kind: "Set",
+      fields: [
+        {
+          verified: false,
+          key: collectionMint,
+        },
+      ],
+    },
+  }).getInstructions();
 
-  if (collectionMetadata.collectionDetails) {
-    // This is a sized collection
-    return createSetAndVerifySizedCollectionItemInstruction({
-      payer: wallet,
-      updateAuthority: wallet,
+  instructions.push(
+    ...verifyCollectionV1(umi, {
+      authority: createNoopSigner(wallet),
       collectionMint,
-      collection,
-      collectionMasterEditionAccount,
-      collectionAuthority: wallet,
+      collectionMetadata: collection,
+      collectionMasterEdition: collectionMasterEditionAccount,
       metadata,
-    });
-  } else {
-    // This is an unsized collection
-    return createSetAndVerifyCollectionInstruction({
-      payer: wallet,
-      updateAuthority: wallet,
-      collectionMint,
-      collection,
-      collectionMasterEditionAccount,
-      collectionAuthority: wallet,
-      metadata,
-    });
-  }
+    }).getInstructions(),
+  );
+
+  return instructions as Instruction[];
 };

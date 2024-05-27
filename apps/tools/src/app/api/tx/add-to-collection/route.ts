@@ -1,12 +1,20 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { chunk } from "@/lib/utils";
 import { Networks } from "@/lib/solana/endpoints";
-import { getMetadata } from "@/lib/solana";
+z;
 import { addNftToCollection } from "@/lib/solana/collections";
-import { Metadata } from "@metaplex-foundation/mpl-token-metadata";
 import type { Cluster } from "@solana/web3.js";
-import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
+import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
+import {
+  createNoopSigner,
+  publicKey,
+  signerIdentity,
+} from "@metaplex-foundation/umi";
+import type { Umi } from "@metaplex-foundation/umi";
 
 export type TxSetAndVerifyData = {
   tx: string[];
@@ -23,7 +31,7 @@ export type Input = {
 };
 
 const schema = z.object({
-  network: z.string(),
+  network: z.enum(["mainnet-beta", "devnet", "testnet"]),
   authorityAddress: z.string(),
   collectionAddress: z.string(),
   nftMints: z.array(z.string()).min(1),
@@ -44,50 +52,38 @@ export async function POST(req: NextRequest) {
 
   const { authorityAddress, collectionAddress, nftMints, network } = params;
 
-  // @ts-expect-error TODO: fix the zod schema
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-  const connection = new Connection(Networks[network]);
-  const authority = new PublicKey(authorityAddress);
-  const collection = new PublicKey(collectionAddress);
-  const nfts = nftMints.map((str) => new PublicKey(str));
-  const collectionMetadata = await Metadata.fromAccountAddress(
-    connection,
-    getMetadata(collection),
+  const authority = publicKey(authorityAddress);
+  const umi = createUmi(Networks[network]).use(
+    signerIdentity(createNoopSigner(authority)),
   );
+  const collection = publicKey(collectionAddress);
+  const nfts = nftMints.map((str) => publicKey(str));
 
-  const batchSize = 12;
+  const batchSize = 6;
   const chunkedInstructions = chunk(
     nfts.map((nft) =>
-      addNftToCollection(authority, nft, collection, collectionMetadata),
+      addNftToCollection(umi as Umi, authority, nft, collection),
     ),
     batchSize,
   );
 
-  const {
-    context: { slot: minContextSlot },
-    value: { blockhash, lastValidBlockHeight },
-  } = await connection.getLatestBlockhashAndContext("finalized");
+  const { blockhash, lastValidBlockHeight } =
+    await umi.rpc.getLatestBlockhash();
   const transactions = chunkedInstructions.map((batch) =>
-    new Transaction({
-      feePayer: authority,
+    umi.transactions.create({
+      version: 0,
+      payer: authority,
+      instructions: [...batch.flat()],
       blockhash,
-      lastValidBlockHeight,
-    }).add(...batch.flat()),
+    }),
   );
-
   const serializedTransactionsBase64 = transactions.map((tx) =>
-    tx
-      .serialize({
-        requireAllSignatures: false,
-        verifySignatures: true,
-      })
-      .toString("base64"),
+    Buffer.from(umi.transactions.serialize(tx)).toString("base64"),
   );
 
   return Response.json({
     tx: serializedTransactionsBase64,
     blockhash,
     lastValidBlockHeight,
-    minContextSlot,
   });
 }
