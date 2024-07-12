@@ -2,10 +2,7 @@
 
 import { notify } from "@/components";
 import { useDebounce } from "@/lib/hooks/use-debounce";
-import {
-  buildWhirlpoolsSwapTransaction,
-  sendWhirlpoolsSwapTransaction,
-} from "@/lib/octane";
+import * as Octane from "@/lib/octane";
 import { lamportsToSol } from "@/lib/solana/common";
 import { formatNumber, numberFormatter } from "@/lib/utils";
 import { useJupQuery } from "@/state/queries/use-jup-quote";
@@ -78,14 +75,18 @@ export default function GaslessSwap() {
     let messageToken: string;
     setIsSwapping(true);
     try {
-      const swap = await buildWhirlpoolsSwapTransaction(
+      const swap = await Octane.buildWhirlpoolsSwapTransaction(
         publicKey,
         selectToken.address,
         amountAsDecimals,
         slippage,
       );
       messageToken = swap.messageToken;
+      // console.log("-------------------- Pre sign -------------------");
+      // console.log(JSON.stringify(swap.transaction));
       signedTransaction = await signTransaction(swap.transaction);
+      // console.log("-------------------- Post sign ------------------");
+      // console.log(JSON.stringify(signedTransaction));
     } catch (err: any) {
       setIsSwapping(false);
       if (err instanceof WalletSignTransactionError) return;
@@ -101,7 +102,7 @@ export default function GaslessSwap() {
       description: "Confirming transaction",
     });
     try {
-      const signature = await sendWhirlpoolsSwapTransaction(
+      const signature = await Octane.sendWhirlpoolsSwapTransaction(
         signedTransaction,
         messageToken,
       );
@@ -275,6 +276,7 @@ export default function GaslessSwap() {
             <Button
               color="indigo"
               type="button"
+              className="w-full"
               onClick={() => setVisible(true)}
             >
               Connect your wallet
