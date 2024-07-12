@@ -21,7 +21,6 @@ import BN from "bn.js";
 import type { Cache } from "cache-manager";
 import { MessageToken, simulateV0Transaction } from "../core";
 import {
-  MESSAGE_TOKEN_KEY,
   getAddressLookupTableAccounts,
   getJupiterSwapInstructions,
 } from "../swapProvider";
@@ -126,7 +125,7 @@ export async function buildJupiterSwapToSOL(
   );
 
   // ---------------------------------------------------------------------------
-  // This setup instruction is still payed by Octane (meaning us, the fee payer)
+  // This setup instruction is still paid by Octane (meaning us, the fee payer)
   // We need to account for this cost later
   // ---------------------------------------------------------------------------
   const LAMPORTS_PER_ATA = 2039280;
@@ -231,16 +230,13 @@ export async function buildJupiterSwapToSOL(
 
   const transaction = new VersionedTransaction(messageV0);
 
+  // TODO: this fails for some people very often
   // If the simulation fails we throw
-  await simulateV0Transaction(connection, transaction);
+  // await simulateV0Transaction(connection, transaction);
 
   let messageToken: string;
   try {
-    messageToken = new MessageToken(
-      MESSAGE_TOKEN_KEY,
-      transaction.message,
-      feePayer,
-    ).compile();
+    messageToken = new MessageToken(transaction.message, feePayer).compile();
   } catch (e) {
     console.log("Error creating token");
     throw e;

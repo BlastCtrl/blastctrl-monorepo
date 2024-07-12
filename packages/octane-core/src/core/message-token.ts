@@ -2,13 +2,10 @@ import base58 from "bs58";
 import nacl from "tweetnacl";
 import { Keypair, Message, VersionedMessage, PublicKey } from "@solana/web3.js";
 
-function bufferToSign(
-  key: string,
-  serializedMessage: Buffer | Uint8Array,
-): Buffer {
+function bufferToSign(serializedMessage: Buffer | Uint8Array): Buffer {
   return Buffer.concat([
     Buffer.from("octane-message-token", "utf-8"),
-    Buffer.from(key),
+
     serializedMessage,
   ]);
 }
@@ -19,28 +16,21 @@ function bufferToSign(
  * by an untrusted source.
  */
 export class MessageToken {
-  key: string; // identifies what kind of transaction within octane is this token for. for example, "whirlpools-swap".
   message: Message | VersionedMessage;
   keypair: Keypair;
 
-  constructor(
-    key: string,
-    message: Message | VersionedMessage,
-    keypair: Keypair,
-  ) {
-    this.key = key;
+  constructor(message: Message | VersionedMessage, keypair: Keypair) {
     this.message = message;
     this.keypair = keypair;
   }
 
   compile(): string {
-    const buffer = bufferToSign(this.key, this.message.serialize());
+    const buffer = bufferToSign(this.message.serialize());
     const signature = nacl.sign.detached(buffer, this.keypair.secretKey);
     return base58.encode(signature);
   }
 
   static isValid(
-    key: string,
     message: Message | VersionedMessage,
     token: string,
     publicKey: PublicKey,
@@ -48,7 +38,7 @@ export class MessageToken {
     if (!token) {
       return false;
     }
-    const buffer = bufferToSign(key, message.serialize());
+    const buffer = bufferToSign(message.serialize());
     const signature = base58.decode(token);
     return nacl.sign.detached.verify(buffer, signature, publicKey.toBuffer());
   }

@@ -1,10 +1,7 @@
 import { env } from "@/env/server";
 import { env as publicEnv } from "@/env/client";
 import cache from "@/lib/cache-manager";
-import {
-  MESSAGE_TOKEN_KEY,
-  signGeneratedTransaction,
-} from "@blastctrl/octane-core";
+import { signGeneratedTransaction } from "@blastctrl/octane-core";
 import { Connection, Keypair, VersionedTransaction } from "@solana/web3.js";
 import base58 from "bs58";
 import { z } from "zod";
@@ -38,7 +35,7 @@ export async function POST(req: Request) {
 
     // Deserialize a base58 wire-encoded transaction from the request
 
-    let transaction: VersionedTransaction;
+    let transaction;
     try {
       transaction = VersionedTransaction.deserialize(base58.decode(serialized));
     } catch (e) {
@@ -51,7 +48,6 @@ export async function POST(req: Request) {
         connection,
         transaction,
         ENV_SECRET_KEYPAIR,
-        MESSAGE_TOKEN_KEY,
         messageToken,
         cache,
       );
