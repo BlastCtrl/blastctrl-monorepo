@@ -11,19 +11,6 @@ export type TokenFee = {
   transferFeeBp?: number;
 };
 
-export type OctaneConfig = {
-  feePayer: string;
-  rpcUrl: string;
-  maxSignatures: number;
-  lamportsPerSignature: number;
-  corsOrigin: boolean;
-  endpoints: {
-    transfer: { tokens: TokenFee[] };
-    createAssociatedTokenAccount: { tokens: TokenFee[] };
-    whirlpoolsSwap: { tokens: TokenFee[] };
-  };
-};
-
 type WhirlpoolsQuote = {
   estimatedAmountIn: string;
   estimatedAmountOut: string;
