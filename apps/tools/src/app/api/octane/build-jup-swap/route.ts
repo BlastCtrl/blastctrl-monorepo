@@ -43,6 +43,8 @@ export async function POST(req: Request) {
       },
     );
 
+    console.log(transaction);
+
     return Response.json({
       status: "ok",
       transaction: base58.encode(transaction.serialize()),

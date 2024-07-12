@@ -43,18 +43,12 @@ export async function signGeneratedTransaction(
   connection: Connection,
   transaction: VersionedTransaction,
   feePayer: Keypair,
-  messageTokenKey: string,
   messageToken: string,
   cache: Cache,
 ): Promise<{ signature: string }> {
   // Check that we actually produced this transaction previously
   if (
-    !MessageToken.isValid(
-      messageTokenKey,
-      transaction.message,
-      messageToken,
-      feePayer.publicKey,
-    )
+    !MessageToken.isValid(transaction.message, messageToken, feePayer.publicKey)
   ) {
     throw new Error("Message token isn't valid");
   }
