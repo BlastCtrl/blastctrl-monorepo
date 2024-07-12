@@ -118,6 +118,10 @@ export async function buildJupiterSwapToSOL(
     addressLookupTableAddresses,
   } = swapInstructions;
 
+  // SOLFLARE SPECIAL CASE
+  // Solflare likes to edit compute budget instructions. Here we flip the order of them, so they are in order that solflare won't touch
+  computeBudgetInstructions.reverse();
+
   // This fn can throw, sends a getMultipleAccounts rpc request
   const addressLookupTableAccounts = await getAddressLookupTableAccounts(
     addressLookupTableAddresses,
