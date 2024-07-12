@@ -52,7 +52,6 @@ describe("signGeneratedTransaction action", async () => {
     );
 
     const messageToken = new MessageToken(
-      "test-transaction",
       transaction.message,
       feePayer,
     ).compile();
@@ -77,7 +76,6 @@ describe("signGeneratedTransaction action", async () => {
       connection,
       transaction,
       feePayer,
-      "test-transaction",
       messageToken,
       cache,
     );
@@ -104,7 +102,6 @@ describe("signGeneratedTransaction action", async () => {
       }).compileToV0Message(),
     );
     const messageToken = new MessageToken(
-      "test-transaction",
       transaction.message,
       feePayer,
     ).compile();
@@ -126,7 +123,6 @@ describe("signGeneratedTransaction action", async () => {
           connection,
           transaction,
           feePayer,
-          "test-transaction",
           messageToken,
           cache,
         );
@@ -151,7 +147,6 @@ describe("signGeneratedTransaction action", async () => {
     );
 
     const messageToken = new MessageToken(
-      "test-transaction",
       transaction.message,
       feePayer,
     ).compile();
@@ -161,7 +156,6 @@ describe("signGeneratedTransaction action", async () => {
       connection,
       transaction,
       feePayer,
-      "test-transaction",
       messageToken,
       cache,
     );
@@ -172,7 +166,6 @@ describe("signGeneratedTransaction action", async () => {
           connection,
           transaction,
           feePayer,
-          "test-transaction",
           messageToken,
           cache,
         );
@@ -197,7 +190,6 @@ describe("signGeneratedTransaction action", async () => {
     );
 
     const messageToken = new MessageToken(
-      "test-transaction",
       transaction.message,
       feePayer,
     ).compile();
@@ -209,7 +201,6 @@ describe("signGeneratedTransaction action", async () => {
           connection,
           transaction,
           feePayer,
-          "test-transaction",
           messageToken,
           cache,
         );
@@ -237,7 +228,6 @@ describe("signGeneratedTransaction action", async () => {
     );
 
     const messageToken = new MessageToken(
-      "test-transaction",
       transaction.message,
       feePayer,
     ).compile();
@@ -247,7 +237,6 @@ describe("signGeneratedTransaction action", async () => {
           connection,
           transaction,
           feePayer,
-          "test-transaction",
           messageToken,
           cache,
         );
@@ -275,7 +264,6 @@ describe("signGeneratedTransaction action", async () => {
     );
 
     const messageToken = new MessageToken(
-      "test-transaction",
       transaction.message,
       feePayer,
     ).compile();
@@ -288,7 +276,6 @@ describe("signGeneratedTransaction action", async () => {
           connection,
           transaction,
           feePayer,
-          "test-transaction",
           messageToken,
           cache,
         );
