@@ -18,7 +18,7 @@ import {
   WalletAdapterNetwork,
   WalletSignTransactionError,
 } from "@solana/wallet-adapter-base";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import type { VersionedTransaction } from "@solana/web3.js";
 import Image from "next/image";
@@ -44,7 +44,8 @@ const slippages = [
 
 export default function BonkSwap() {
   const { network } = useNetworkConfigurationStore();
-  const { publicKey, signTransaction } = useWallet();
+  const { publicKey, signTransaction, sendTransaction } = useWallet();
+  const { connection } = useConnection();
   const { setVisible } = useWalletModal();
   const {
     register,
@@ -103,8 +104,7 @@ export default function BonkSwap() {
     const { swapAmount, slippage } = data;
     const amountAsDecimals = Math.floor(swapAmount * 10 ** BONK_DECIMALS);
 
-    let signedTransaction: VersionedTransaction;
-    let messageToken: string;
+    let transaction: VersionedTransaction;
     setIsSwapping(true);
     try {
       const swap = await buildWhirlpoolsSwapTransaction(
@@ -113,8 +113,8 @@ export default function BonkSwap() {
         amountAsDecimals,
         slippage,
       );
-      messageToken = swap.messageToken;
-      signedTransaction = await signTransaction(swap.transaction);
+
+      transaction = swap.transaction;
     } catch (err: any) {
       setIsSwapping(false);
       if (err instanceof WalletSignTransactionError) return;
@@ -124,14 +124,16 @@ export default function BonkSwap() {
         description: err?.message,
       });
     }
+    const signature = await sendTransaction(transaction, connection);
+    const { value } = await connection.getLatestBlockhashAndContext();
 
     await notifyPromise(
-      sendWhirlpoolsSwapTransaction(signedTransaction, messageToken),
+      connection.confirmTransaction({ signature, ...value }, "confirmed"),
       {
         loading: { description: "Confirming transaction" },
-        success: (value) => ({
+        success: () => ({
           title: "BONK Swap Success",
-          txid: value,
+          txid: signature,
         }),
         error: (err) => ({
           title: "Bonk Swap Error",
