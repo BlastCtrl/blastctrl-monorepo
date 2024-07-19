@@ -205,18 +205,18 @@ export async function buildJupiterSwapToSOL(
   }
 
   // Modify our cleanup instruction to add this transaction fee as well
-  // cleanupInstructions.splice(
-  //   1,
-  //   1,
-  //   SystemProgram.transfer({
-  //     fromPubkey: user,
-  //     toPubkey: feePayer.publicKey,
-  //     lamports:
-  //       LAMPORTS_PER_ATA +
-  //       platformFeeLamports.toNumber() +
-  //       (transactionFee?.value ?? 0),
-  //   }),
-  // );
+  cleanupInstructions.splice(
+    1,
+    1,
+    SystemProgram.transfer({
+      fromPubkey: user,
+      toPubkey: feePayer.publicKey,
+      lamports:
+        LAMPORTS_PER_ATA +
+        platformFeeLamports.toNumber() +
+        (transactionFee?.value ?? 0),
+    }),
+  );
 
   // Now we have the final transaction
   messageV0 = new TransactionMessage({
