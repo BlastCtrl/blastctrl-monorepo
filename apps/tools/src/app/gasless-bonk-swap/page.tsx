@@ -2,10 +2,7 @@
 
 import { Select, notify, notifyPromise } from "@/components";
 import { useDebounce } from "@/lib/hooks/use-debounce";
-import {
-  buildWhirlpoolsSwapTransaction,
-  sendWhirlpoolsSwapTransaction,
-} from "@/lib/octane";
+import { buildWhirlpoolsSwapTransaction } from "@/lib/octane";
 import { formatNumber, numberFormatter } from "@/lib/utils";
 import { useJupQuery } from "@/state/queries/use-jup-quote";
 import { useTokenBalance } from "@/state/queries/use-token-balance";
