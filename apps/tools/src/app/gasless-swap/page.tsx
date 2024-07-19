@@ -14,9 +14,12 @@ import {
   WalletAdapterNetwork,
   WalletSignTransactionError,
 } from "@solana/wallet-adapter-base";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import type { VersionedTransaction } from "@solana/web3.js";
+import {
+  sendAndConfirmTransaction,
+  type VersionedTransaction,
+} from "@solana/web3.js";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
@@ -39,7 +42,7 @@ type SelectToken = {
 
 export default function GaslessSwap() {
   const { network } = useNetworkConfigurationStore();
-  const { publicKey, signTransaction } = useWallet();
+  const { publicKey, signTransaction, sendTransaction } = useWallet();
   const { setVisible } = useWalletModal();
   const {
     register,
@@ -63,6 +66,7 @@ export default function GaslessSwap() {
       ? debouncedSwapAmount * Math.pow(10, selectToken?.decimals)
       : 0,
   });
+  const { connection } = useConnection();
 
   const submitSwap = async (data: FormData) => {
     if (!selectToken || !publicKey || !signTransaction) return;
@@ -71,8 +75,8 @@ export default function GaslessSwap() {
       swapAmount * 10 ** selectToken.decimals,
     );
 
-    let signedTransaction: VersionedTransaction;
-    let messageToken: string;
+    let transaction: VersionedTransaction;
+
     setIsSwapping(true);
     try {
       const swap = await Octane.buildWhirlpoolsSwapTransaction(
@@ -81,12 +85,8 @@ export default function GaslessSwap() {
         amountAsDecimals,
         slippage,
       );
-      messageToken = swap.messageToken;
-      // console.log("-------------------- Pre sign -------------------");
-      // console.log(JSON.stringify(swap.transaction));
-      signedTransaction = await signTransaction(swap.transaction);
-      // console.log("-------------------- Post sign ------------------");
-      // console.log(JSON.stringify(signedTransaction));
+
+      transaction = swap.transaction;
     } catch (err: any) {
       setIsSwapping(false);
       if (err instanceof WalletSignTransactionError) return;
@@ -102,10 +102,17 @@ export default function GaslessSwap() {
       description: "Confirming transaction",
     });
     try {
-      const signature = await Octane.sendWhirlpoolsSwapTransaction(
-        signedTransaction,
-        messageToken,
+      const signature = await sendTransaction(transaction, connection);
+      const { value } = await connection.getLatestBlockhashAndContext();
+      const res = await connection.confirmTransaction(
+        { signature, ...value },
+        "confirmed",
       );
+
+      if (res.value.err) {
+        throw Error("Error while confirming swap");
+      }
+
       notify(
         {
           type: "success",

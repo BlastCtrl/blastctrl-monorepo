@@ -45,7 +45,6 @@ export async function buildWhirlpoolsSwapTransaction(
 ): Promise<{
   transaction: VersionedTransaction;
   quote: WhirlpoolsQuote;
-  messageToken: string;
 }> {
   const response = await fetch(OCTANE_ENDPOINT + "/build-jup-swap", {
     method: "POST",
@@ -65,22 +64,5 @@ export async function buildWhirlpoolsSwapTransaction(
       base58.decode(response.transaction),
     ),
     quote: response.quote,
-    messageToken: response.messageToken,
   };
-}
-
-export async function sendWhirlpoolsSwapTransaction(
-  transaction: VersionedTransaction,
-  messageToken: string,
-): Promise<string> {
-  const res = await fetch(OCTANE_ENDPOINT + "/send-jup-swap", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      transaction: base58.encode(transaction.serialize()),
-      messageToken,
-    }),
-  });
-  const data = await res.json();
-  return data.signature as string;
 }

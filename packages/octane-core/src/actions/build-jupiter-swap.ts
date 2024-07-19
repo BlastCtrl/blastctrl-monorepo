@@ -19,7 +19,6 @@ import {
 } from "@solana/web3.js";
 import BN from "bn.js";
 import type { Cache } from "cache-manager";
-import { MessageToken, simulateV0Transaction } from "../core";
 import {
   getAddressLookupTableAccounts,
   getJupiterSwapInstructions,
@@ -40,7 +39,7 @@ const BONK_MINT = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
  * @param cache
  * @param feeOptions
  *
- * @return { Transaction, quote, messageToken }
+ * @return { Transaction, quote }
  */
 export async function buildJupiterSwapToSOL(
   connection: Connection,
@@ -56,7 +55,6 @@ export async function buildJupiterSwapToSOL(
 ): Promise<{
   transaction: VersionedTransaction;
   quote: JupiterQuoteResponseSchema;
-  messageToken: string;
 }> {
   // TODO: decide if we need this genesis hash check. Might just be unnecessary
   // Connection's genesis hash is cached to prevent an extra RPC query to the node on each call.
@@ -234,20 +232,10 @@ export async function buildJupiterSwapToSOL(
 
   const transaction = new VersionedTransaction(messageV0);
 
-  // TODO: this fails for some people very often
-  // If the simulation fails we throw
-  // await simulateV0Transaction(connection, transaction);
-
-  let messageToken: string;
-  try {
-    messageToken = new MessageToken(transaction.message, feePayer).compile();
-  } catch (e) {
-    console.log("Error creating token");
-    throw e;
-  }
+  transaction.sign([feePayer]);
 
   // set last signature for mint and user
   await cache.set(key, Date.now());
 
-  return { transaction, quote: quoteResponse, messageToken };
+  return { transaction, quote: quoteResponse };
 }

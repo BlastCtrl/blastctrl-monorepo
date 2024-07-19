@@ -30,7 +30,7 @@ export async function POST(req: Request) {
 
     const { user, sourceMint, amount } = validatedBody.data;
     // Check for TokenFee
-    const { messageToken, quote, transaction } = await buildJupiterSwapToSOL(
+    const { quote, transaction } = await buildJupiterSwapToSOL(
       connection,
       ENV_SECRET_KEYPAIR,
       new PublicKey(user),
@@ -43,13 +43,10 @@ export async function POST(req: Request) {
       },
     );
 
-    console.log(transaction);
-
     return Response.json({
       status: "ok",
       transaction: base58.encode(transaction.serialize()),
       quote,
-      messageToken,
     });
   } catch (err) {
     console.error(err);
