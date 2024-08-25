@@ -55,8 +55,9 @@ export function isPublicKey(putativeAddress: string) {
     return false;
   }
   // Slow-path; actually attempt to decode the input string.
-  const bytes = base58.decode(putativeAddress);
-  return bytes.byteLength === 32;
+
+  const bytes = base58.decodeUnsafe(putativeAddress);
+  return 32 === bytes?.byteLength;
 }
 
 export function isATA({
