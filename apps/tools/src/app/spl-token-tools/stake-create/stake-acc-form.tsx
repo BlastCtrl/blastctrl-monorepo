@@ -88,7 +88,12 @@ export function StakeAccountForm() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<FormSchemaFields>({ resolver: zodResolver(formSchema) });
+  } = useForm<FormSchemaFields>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      voteAddress: "GREEDkpTvpKzcGvBu9qd36yk6BfjTWPShB67gLWuixMv",
+    },
+  });
 
   const onSubmit = async (values: unknown) => {
     const data = values as FormSchemaOutput;
@@ -278,7 +283,7 @@ export function StakeAccountForm() {
               className="shrink-0"
             />
             <Label className="font-semibold text-zinc-700">
-              Delegate Funds
+              Delegate Stake
             </Label>
           </Field>
         </SwitchGroup>
@@ -286,7 +291,7 @@ export function StakeAccountForm() {
         {useDelegate && (
           <Field className="mt-2">
             <Label className="text-sm/5 text-zinc-500">
-              Set the vote address of the validator to which the staked funds
+              Set the vote address of the validator to which the staked account
               will be delegated to.
             </Label>
 
@@ -323,9 +328,10 @@ export function StakeAccountForm() {
                 period
               </Label>
               <div className="relative">
-                <Input
+                <input
                   // {...register("custodian", { required: useLockup })}
                   readOnly
+                  inert
                   className={inputClass}
                   placeholder="Address of the lockup custodian"
                   type="text"
