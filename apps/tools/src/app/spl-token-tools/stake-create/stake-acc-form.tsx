@@ -394,7 +394,7 @@ export function StakeAccountForm() {
       >
         <div className="fixed inset-0 w-screen overflow-y-auto p-4">
           <div className="flex min-h-full items-center justify-center">
-            <DialogPanel className="max-w-lg space-y-4 rounded-lg bg-white p-4 shadow">
+            <DialogPanel className="min-w-[300px] max-w-lg space-y-4 rounded-lg bg-white p-4 shadow">
               <DialogTitle className="font-bold">
                 Confirm Stake Account Creation
               </DialogTitle>
@@ -404,7 +404,7 @@ export function StakeAccountForm() {
                   <DescriptionList className="w-full">
                     <DescriptionTerm>Staked Amount</DescriptionTerm>
                     <DescriptionDetails>{submitData.amount}</DescriptionDetails>
-                    {submitData.voteAddress && (
+                    {useDelegate && submitData.voteAddress && (
                       <>
                         <DescriptionTerm>
                           Validator Vote Address
@@ -414,7 +414,7 @@ export function StakeAccountForm() {
                         </DescriptionDetails>
                       </>
                     )}
-                    {submitData.withdrawAuth && (
+                    {useAuthorities && submitData.withdrawAuth && (
                       <>
                         <DescriptionTerm>Withdraw Authority</DescriptionTerm>
                         <DescriptionDetails className="truncate">
@@ -422,7 +422,7 @@ export function StakeAccountForm() {
                         </DescriptionDetails>
                       </>
                     )}
-                    {submitData.stakerAuth && (
+                    {useAuthorities && submitData.stakerAuth && (
                       <>
                         <DescriptionTerm>Staker Authority</DescriptionTerm>
                         <DescriptionDetails className="truncate">
@@ -430,7 +430,7 @@ export function StakeAccountForm() {
                         </DescriptionDetails>
                       </>
                     )}
-                    {submitData.lockTime && (
+                    {useLockup && submitData.lockTime && (
                       <>
                         <DescriptionTerm>Lockup (UTC)</DescriptionTerm>
                         <DescriptionDetails>
@@ -441,18 +441,11 @@ export function StakeAccountForm() {
                             },
                           )}
                         </DescriptionDetails>
-                      </>
-                    )}
-                    {submitData.lockTime && (
-                      <>
                         <DescriptionTerm>Lockup (Local)</DescriptionTerm>
                         <DescriptionDetails>
                           {new Date(submitData.lockTime).toLocaleString()}
                         </DescriptionDetails>
-                      </>
-                    )}
-                    {submitData.lockTime && (
-                      <>
+
                         <DescriptionTerm>Lockup (timestamp)</DescriptionTerm>
                         <DescriptionDetails>
                           {Math.floor(
@@ -461,6 +454,7 @@ export function StakeAccountForm() {
                         </DescriptionDetails>
                       </>
                     )}
+
                     {useLockup && (
                       <>
                         <DescriptionTerm>Lockup Custodian</DescriptionTerm>
