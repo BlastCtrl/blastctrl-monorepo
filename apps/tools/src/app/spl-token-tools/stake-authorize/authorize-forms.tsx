@@ -3,7 +3,7 @@
 import { isPublicKey, lamportsToSolString } from "@/lib/solana/common";
 import type { StakeAccountType } from "@/state/queries/use-stake-account";
 import { useStakeAccount } from "@/state/queries/use-stake-account";
-import { Button, cn } from "@blastctrl/ui";
+import { Button, cn, SpinnerIcon } from "@blastctrl/ui";
 import {
   Checkbox,
   Field,
@@ -34,7 +34,7 @@ import {
 export function AuthorizeFormsContainer() {
   const queryClient = useQueryClient();
   const [stakeAccAddr, setStakeAccAddr] = useState("");
-  const { data, error, refetch } = useStakeAccount(stakeAccAddr);
+  const { data, error, refetch, isLoading } = useStakeAccount(stakeAccAddr);
 
   const isSuccess = !!stakeAccAddr && !!data;
   const isInvalid = stakeAccAddr !== "" && !isPublicKey(stakeAccAddr);
@@ -80,8 +80,9 @@ export function AuthorizeFormsContainer() {
           type="submit"
           color="indigo"
           className="h-9 px-5 sm:px-5"
-          disabled={isSuccess || isInvalid}
+          disabled={isSuccess || isInvalid || isLoading}
         >
+          {isLoading && <SpinnerIcon className="size-3.5 animate-spin" />}
           Confirm
         </Button>
       </form>
