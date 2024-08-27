@@ -19,7 +19,7 @@ import {
   DescriptionDetails,
   DescriptionList,
   DescriptionTerm,
-} from "./description-list";
+} from "@/components/description-list";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { notify } from "@/components/notification";
 import { retryWithBackoff } from "@/lib/utils";
