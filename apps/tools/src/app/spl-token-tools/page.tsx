@@ -26,6 +26,13 @@ export default function Tokens() {
       active: true,
     },
     {
+      name: "Create stake account",
+      href: "/spl-token-tools/stake-create",
+      description:
+        "Create a stake account with custom signing authorities and a lockup.",
+      active: true,
+    },
+    {
       name: "Update stake authority",
       href: "/spl-token-tools/stake-authorize",
       description: "Update your stake account signing authorities.",
