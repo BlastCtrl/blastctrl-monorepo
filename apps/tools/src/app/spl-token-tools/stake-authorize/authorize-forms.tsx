@@ -118,7 +118,7 @@ function StakeAccountDescription({
   stakeData: StakeAccountType;
 }) {
   return (
-    <DescriptionList className="w-[min(100%,320px)] rounded-lg border border-zinc-200 px-4">
+    <DescriptionList className="w-[min(100%,350px)] rounded-lg border border-zinc-200 px-4">
       <DescriptionTerm>Balance</DescriptionTerm>
       <DescriptionDetails className="truncate">
         {lamportsToSolString(stakeData.lamports)} SOL
@@ -139,14 +139,20 @@ function StakeAccountDescription({
       <DescriptionDetails className="truncate">
         {stakeData.data.info.meta.lockup.custodian ?? "None"}
       </DescriptionDetails>
-      <DescriptionTerm>Lockup Timestamp</DescriptionTerm>
-      <DescriptionDetails className="truncate">
-        {stakeData.data.info.meta.lockup.unixTimestamp
-          ? new Date(
+      {stakeData.data.info.meta.lockup.unixTimestamp > 0 ? (
+        <>
+          <DescriptionTerm>Lockup (Local time)</DescriptionTerm>
+          <DescriptionDetails className="truncate">
+            {new Date(
               stakeData.data.info.meta.lockup.unixTimestamp * 1000,
-            ).toLocaleDateString()
-          : "None"}
-      </DescriptionDetails>
+            ).toLocaleString()}
+          </DescriptionDetails>
+          <DescriptionTerm>Lockup Timestamp</DescriptionTerm>
+          <DescriptionDetails className="truncate">
+            {stakeData.data.info.meta.lockup.unixTimestamp}
+          </DescriptionDetails>
+        </>
+      ) : null}
     </DescriptionList>
   );
 }
