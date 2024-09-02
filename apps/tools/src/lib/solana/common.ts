@@ -1,8 +1,7 @@
 import type { PublicKey as UmiPublicKey } from "@metaplex-foundation/umi";
 import { publicKey } from "@metaplex-foundation/umi";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token-next";
-import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
-import { clusterApiUrl, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import base58 from "bs58";
 
 export const PROGRAM_ADDRESS = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s";
@@ -33,14 +32,6 @@ export const getMetadata = (mint: UmiPublicKey): UmiPublicKey => {
       METADATA_PROGRAM_ID,
     )[0].toBase58(),
   );
-};
-
-export const mergeClusterApiUrl = (network: WalletAdapterNetwork) => {
-  const envRpc =
-    process.env.NEXT_PUBLIC_RPC_ENDPOINT ?? clusterApiUrl("mainnet-beta");
-  return network === WalletAdapterNetwork.Mainnet
-    ? envRpc
-    : clusterApiUrl(network);
 };
 
 export function isPublicKey(putativeAddress: string) {

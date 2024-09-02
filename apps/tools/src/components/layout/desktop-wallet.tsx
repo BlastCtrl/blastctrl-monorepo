@@ -1,8 +1,15 @@
 import SolanaLogo from "@/../public/solanaLogoMark.svg";
 import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
 import { compress } from "@/lib/solana";
-import { CopyButton, Switch, SwitchField, cn } from "@blastctrl/ui";
-import { Menu, RadioGroup, Transition } from "@headlessui/react";
+import { Button, CopyButton, Switch, SwitchField, cn } from "@blastctrl/ui";
+import {
+  Field,
+  Input,
+  Menu,
+  RadioGroup,
+  Radio,
+  Transition,
+} from "@headlessui/react";
 import { ClipboardDocumentIcon } from "@heroicons/react/20/solid";
 import { useWallet } from "@solana/wallet-adapter-react";
 import {
@@ -11,10 +18,9 @@ import {
   useWalletModal,
 } from "@solana/wallet-adapter-react-ui";
 import Image from "next/image";
-import { Fragment, useCallback, useMemo } from "react";
+import { Fragment, useCallback, useMemo, useState } from "react";
 import { useAutoConnect } from "@/state/context/AutoConnectProvider";
 import { Label } from "@blastctrl/ui/fieldset";
-import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 
 export const DesktopWallet = () => {
   // eslint-disable-next-line @typescript-eslint/unbound-method
@@ -142,37 +148,60 @@ const ToggleAutoConnect = () => {
 
 const NetworkPicker = () => {
   const { network, setNetwork } = useNetworkConfigurationStore();
-  const availableNetworks = [
-    WalletAdapterNetwork.Mainnet,
-    WalletAdapterNetwork.Testnet,
-    WalletAdapterNetwork.Devnet,
-  ] as const;
+  const availableNetworks = ["mainnet-beta", "testnet", "devnet"];
+  const [customRpc, setCustomRpc] = useState(() =>
+    !availableNetworks.includes(network) ? network : "",
+  );
 
   return (
-    <div className="pb-2">
-      <RadioGroup
-        className="flex items-center gap-x-2 px-3 text-white"
-        value={network}
-        onChange={setNetwork}
-      >
-        {availableNetworks.map((item) => (
-          <RadioGroup.Option key={item} value={item}>
-            <button
-              type="button"
-              className={cn(
-                "rounded-md border border-gray-300 px-1.5 py-0.5 text-sm capitalize",
-                "focus:outline-none focus:ring-1",
-                network === item
-                  ? "text-secondary-content border-indigo-600 bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-600"
-                  : "border-gray-300 text-gray-600 hover:bg-gray-50 focus:ring-gray-300",
-              )}
-            >
-              {/* split by - and extract the first part because of mainnet-beta */}
-              {item.split("-")[0]}
-            </button>
-          </RadioGroup.Option>
-        ))}
-      </RadioGroup>
-    </div>
+    <>
+      <div className="pb-2">
+        <RadioGroup
+          className="flex items-center gap-x-2 px-3 text-white"
+          value={network}
+          onChange={(value) => {
+            setNetwork(value);
+            setCustomRpc("");
+          }}
+        >
+          {availableNetworks.map((item) => (
+            <Radio key={item} value={item.toLowerCase()} className="grow">
+              <button
+                type="button"
+                className={cn(
+                  "w-full rounded-md border border-gray-300 px-1.5 py-0.5 text-sm capitalize",
+                  "focus:outline-none focus:ring-1",
+                  network === item
+                    ? "text-secondary-content border-indigo-600 bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-600"
+                    : "border-gray-300 text-gray-600 hover:bg-gray-50 focus:ring-gray-300",
+                )}
+              >
+                {/* split by - and extract the first part because of mainnet-beta */}
+                {item.split("-")[0]}
+              </button>
+            </Radio>
+          ))}
+        </RadioGroup>
+      </div>
+      <div className="flex h-9 items-center gap-2 px-3">
+        <Field>
+          <Input
+            placeholder="Enter custom RPC"
+            type="text"
+            value={customRpc}
+            onChange={({ target }) => setCustomRpc(target.value)}
+            className="w-36 min-w-0 rounded border border-zinc-300 py-1 text-sm/6"
+          />
+        </Field>
+        <Button
+          type="button"
+          color="indigo"
+          className="h-9"
+          onClick={() => setNetwork(customRpc)}
+        >
+          Set
+        </Button>
+      </div>
+    </>
   );
 };

@@ -5,14 +5,14 @@ import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-ad
 import { mplTokenMetadata } from "@metaplex-foundation/mpl-token-metadata";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useMemo } from "react";
-import { mergeClusterApiUrl } from "../solana/common";
 import type { Umi } from "@metaplex-foundation/umi";
 import { mplCore } from "@metaplex-foundation/mpl-core";
+import { getEndpoint } from "@/state/context/SolanaProvider";
 
 const useUmi = (): Umi => {
   const wallet = useWallet();
   const { network } = useNetworkConfigurationStore();
-  const endpoint = useMemo(() => mergeClusterApiUrl(network), [network]);
+  const endpoint = useMemo(() => getEndpoint(network), [network]);
 
   const umi = useMemo(
     () =>

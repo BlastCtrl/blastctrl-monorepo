@@ -1,6 +1,5 @@
 import { notify } from "@/components";
 import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
-import { mergeClusterApiUrl } from "@/lib/solana/common";
 import type { WalletError } from "@solana/wallet-adapter-base";
 import {
   WalletConnectionError,
@@ -19,6 +18,7 @@ import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
 import { useCallback, useMemo } from "react";
 import { AutoConnectProvider, useAutoConnect } from "./AutoConnectProvider";
+import { clusterApiUrl } from "@solana/web3.js";
 
 const DynamicReactUiWalletModalProvider = dynamic(
   () =>
@@ -31,7 +31,7 @@ const DynamicReactUiWalletModalProvider = dynamic(
 function WalletContextProvider({ children }: { children: ReactNode }) {
   const { autoConnect } = useAutoConnect();
   const { network } = useNetworkConfigurationStore();
-  const endpoint = useMemo(() => mergeClusterApiUrl(network), [network]);
+  const endpoint = useMemo(() => getEndpoint(network), [network]);
 
   const wallets = useMemo(() => [new LedgerWalletAdapter()], []);
 
@@ -83,4 +83,21 @@ export function SolanaProvider({ children }: { children: ReactNode }) {
       <WalletContextProvider>{children}</WalletContextProvider>
     </AutoConnectProvider>
   );
+}
+
+export function getEndpoint(
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  endpoint: "mainnet-beta" | "testnet" | "devnet" | (string & {}),
+): string {
+  endpoint = endpoint.toLowerCase();
+  switch (endpoint) {
+    case "mainnet-beta":
+      return process.env.NEXT_PUBLIC_RPC_ENDPOINT!;
+    case "testnet":
+      return clusterApiUrl("testnet");
+    case "devnet":
+      return clusterApiUrl("devnet");
+    default:
+      return endpoint;
+  }
 }
