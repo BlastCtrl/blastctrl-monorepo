@@ -1,16 +1,18 @@
-import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
+/* eslint-disable @typescript-eslint/ban-types */
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+type Network = "mainnet-beta" | "testnet" | "devnet" | (string & {});
+
 interface NetworkConfigurationStore {
-  network: WalletAdapterNetwork;
-  setNetwork: (network: WalletAdapterNetwork) => void;
+  network: Network;
+  setNetwork: (network: Network) => void;
 }
 
 export const useNetworkConfigurationStore = create<NetworkConfigurationStore>()(
   persist(
     (set) => ({
-      network: WalletAdapterNetwork.Mainnet,
+      network: "mainnet-beta",
       setNetwork: (network) => set({ network: network }),
     }),
     {

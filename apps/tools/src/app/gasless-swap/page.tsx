@@ -10,16 +10,10 @@ import { useTokenBalance } from "@/state/queries/use-token-balance";
 import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
 import { Button } from "@blastctrl/ui";
 import { ChevronRightIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
-import {
-  WalletAdapterNetwork,
-  WalletSignTransactionError,
-} from "@solana/wallet-adapter-base";
+import { WalletSignTransactionError } from "@solana/wallet-adapter-base";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import {
-  sendAndConfirmTransaction,
-  type VersionedTransaction,
-} from "@solana/web3.js";
+import type { VersionedTransaction } from "@solana/web3.js";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
@@ -133,7 +127,7 @@ export default function GaslessSwap() {
     }
   };
 
-  if (network === WalletAdapterNetwork.Devnet) {
+  if (network === "devnet") {
     return (
       <div className="mx-auto text-lg">
         This page is only available on mainnet! Switch your network in the

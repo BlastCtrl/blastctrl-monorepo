@@ -1,19 +1,18 @@
 import { WebIrys } from "@irys/sdk";
 import type { UploadResponse } from "@irys/sdk/build/cjs/common/types";
-import type { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import type { WalletContextState } from "@solana/wallet-adapter-react";
 import BigNumber from "bignumber.js";
 import type { Amount } from "@/types";
 import { lamports, toBigNumber } from "@/types";
 
-const nodes = {
-  "mainnet-beta": [
-    "https://node1.irys.xyz",
-    process.env.NEXT_PUBLIC_RPC_ENDPOINT!,
+const nodes = new Map<string, [string, string]>([
+  [
+    "mainnet-beta",
+    ["https://node1.irys.xyz", process.env.NEXT_PUBLIC_RPC_ENDPOINT!],
   ],
-  testnet: ["https://devnet.irys.xyz", "https://api.devnet.solana.com"],
-  devnet: ["https://devnet.irys.xyz", "https://api.devnet.solana.com"],
-} as const;
+  ["testnet", ["https://devnet.irys.xyz", "https://api.devnet.solana.com"]],
+  ["devnet", ["https://devnet.irys.xyz", "https://api.devnet.solana.com"]],
+]);
 
 export class IrysStorage {
   private webIrys: WebIrys;
@@ -21,11 +20,11 @@ export class IrysStorage {
     this.webIrys = irys;
   }
 
-  static async makeWebIrys(
-    network: WalletAdapterNetwork,
-    provider: WalletContextState,
-  ) {
-    const [irysNode, rpcUrl] = nodes[network] ?? nodes["mainnet-beta"];
+  static async makeWebIrys(network: string, provider: WalletContextState) {
+    const [irysNode, rpcUrl] = nodes.get(network) ?? [
+      "https://node1.irys.xyz",
+      process.env.NEXT_PUBLIC_RPC_ENDPOINT!,
+    ];
     const wallet = { rpcUrl, name: "solana", provider };
     const webIrys = new WebIrys({ url: irysNode, token: "solana", wallet });
     await webIrys.ready();
