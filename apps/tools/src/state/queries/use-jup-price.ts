@@ -11,7 +11,7 @@ type PriceResponse = {
   timeTaken: number;
 };
 
-const BASE_URL = "https://price.jup.ag/v4/price";
+const BASE_URL = "https://price.jup.ag/v6/price";
 
 export function useJupPrice(mintOrSymbol: string, vsMint: string) {
   return useQuery<PriceResponse, Error>({

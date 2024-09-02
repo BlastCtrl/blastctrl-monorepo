@@ -33,7 +33,7 @@ export const TokenQuote = ({ quoteToken }: Props) => {
       {data &&
         (() => {
           const decimalCount =
-            data.SOL.price > 1e6 ? 0 : data.SOL.price > 1e3 ? 2 : 3;
+            data?.SOL?.price > 1e6 ? 0 : data?.SOL?.price > 1e3 ? 2 : 3;
 
           return (
             <div className="flex flex-nowrap items-center justify-center gap-x-2 text-sm font-medium text-gray-600">
@@ -44,7 +44,7 @@ export const TokenQuote = ({ quoteToken }: Props) => {
               </div>
 
               <span>
-                {formatNumber.format(data.SOL?.price, decimalCount)}{" "}
+                {formatNumber.format(data?.SOL?.price, decimalCount)}{" "}
                 {quoteToken.name}
               </span>
             </div>
