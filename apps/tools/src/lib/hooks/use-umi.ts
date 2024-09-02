@@ -7,6 +7,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useMemo } from "react";
 import { mergeClusterApiUrl } from "../solana/common";
 import type { Umi } from "@metaplex-foundation/umi";
+import { mplCore } from "@metaplex-foundation/mpl-core";
 
 const useUmi = (): Umi => {
   const wallet = useWallet();
@@ -18,7 +19,8 @@ const useUmi = (): Umi => {
       createUmi(endpoint)
         .use(walletAdapterIdentity(wallet))
         .use(mplCandyMachine())
-        .use(mplTokenMetadata()),
+        .use(mplTokenMetadata())
+        .use(mplCore()),
     [wallet, endpoint],
   );
 
