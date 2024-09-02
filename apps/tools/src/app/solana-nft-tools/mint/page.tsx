@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 "use client";
 
 import { InputGroup } from "@/components";
@@ -262,7 +261,7 @@ export default function Mint() {
         .add(setComputeUnitLimit(umi, { units: 1_000_000 }))
         .add(setComputeUnitPrice(umi, { microLamports: 1_000_000 }))
         .sendAndConfirm(umi);
-      console.log(base58.encode(signature as Uint8Array));
+      console.log(base58.encode(signature));
       notify({
         title: "NFT mint successful",
         description: (
@@ -272,7 +271,7 @@ export default function Mint() {
           </>
         ),
         type: "success",
-        txid: base58.encode(signature as Uint8Array),
+        txid: base58.encode(signature),
       });
     } catch (err: any) {
       if (err instanceof WalletError) {
