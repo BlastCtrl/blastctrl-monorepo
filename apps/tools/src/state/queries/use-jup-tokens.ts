@@ -47,7 +47,9 @@ export function useJupTokens(wallet = "") {
   return useQuery<Array<TokensResponse>, Error>({
     queryKey: ["jup-tokens", wallet || "none"],
     queryFn: async () => {
-      const jupFetch = fetch(`https://token.jup.ag/all`);
+      const jupFetch = fetch(`https://tokens.jup.ag/tokens`, {
+        headers: { origin: "https://tools.blastctrl.com" },
+      });
 
       if (!wallet) {
         const jupResponse = await jupFetch;
@@ -89,9 +91,9 @@ export function useJupTokens(wallet = "") {
       ]);
 
       const set = new Set(userAssets?.result?.items?.map((asset) => asset?.id));
-      const intersectionTokens = jupTokens.filter((token) =>
-        set.has(token.address),
-      );
+      const intersectionTokens = jupTokens
+        .filter((token) => set.has(token.address))
+        .reverse();
 
       return intersectionTokens;
     },
