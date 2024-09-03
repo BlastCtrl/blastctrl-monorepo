@@ -204,6 +204,7 @@ export default function GaslessSwap() {
               type="number"
               step="any"
               inputMode="numeric"
+              autoComplete="off"
               {...register("swapAmount", {
                 required: true,
                 validate: {
