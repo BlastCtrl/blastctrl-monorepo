@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, queryOptions } from "@tanstack/react-query";
 
 type TokensResponse = {
   address: string;
@@ -38,18 +38,16 @@ type AssetsResponse = {
 
 const ignoreList = ["Bonk", "SOL"];
 
-/**
- * Get JUP tokens owned by a wallet
- * @param wallet
- * @returns
- */
-export function useJupTokens(wallet = "") {
-  return useQuery<Array<TokensResponse>, Error>({
+export function jupTokensQuery(wallet = "") {
+  return queryOptions<Array<TokensResponse>, Error>({
     queryKey: ["jup-tokens", wallet || "none"],
     queryFn: async () => {
-      const jupFetch = fetch(`https://tokens.jup.ag/tokens?tags=verified`, {
-        headers: { origin: "https://tools.blastctrl.com" },
-      });
+      const jupFetch = fetch(
+        `https://tokens.jup.ag/tokens?tags=verified,unknown`,
+        {
+          headers: { origin: "https://tools.blastctrl.com" },
+        },
+      );
 
       if (!wallet) {
         const jupResponse = await jupFetch;
@@ -89,7 +87,6 @@ export function useJupTokens(wallet = "") {
         jupResponse.json() as Promise<TokensResponse[]>,
         assetsResponse.json() as Promise<AssetsResponse>,
       ]);
-      console.log(userAssets);
 
       const set = new Set(userAssets?.result?.items?.map((asset) => asset?.id));
       const intersectionTokens = jupTokens
@@ -103,5 +100,15 @@ export function useJupTokens(wallet = "") {
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
+    staleTime: 60000,
   });
+}
+
+/**
+ * Get JUP tokens owned by a wallet
+ * @param wallet
+ * @returns
+ */
+export function useJupTokens(wallet = "") {
+  return useQuery(jupTokensQuery(wallet));
 }
