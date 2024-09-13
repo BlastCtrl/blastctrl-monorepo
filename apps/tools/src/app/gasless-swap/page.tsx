@@ -21,6 +21,8 @@ import { useForm } from "react-hook-form";
 import { Popover, PopoverButton, PopoverPanel } from "./_components/popover";
 import { TokenQuote } from "./_components/token-quote";
 import { TokenSelectPanel } from "./_components/token-select-panel";
+import { useQueryClient } from "@tanstack/react-query";
+import { jupTokensQuery } from "@/state/queries/use-jup-tokens";
 
 type FormData = {
   swapAmount: number;
@@ -61,6 +63,11 @@ export default function GaslessSwap() {
       : 0,
   });
   const { connection } = useConnection();
+  const queryClient = useQueryClient();
+
+  const prefetchJupTokens = () => {
+    void queryClient.prefetchQuery(jupTokensQuery(publicKey?.toString() ?? ""));
+  };
 
   const submitSwap = async (data: FormData) => {
     if (!selectToken || !publicKey || !signTransaction) return;
@@ -190,7 +197,10 @@ export default function GaslessSwap() {
           </span>
           <div className="mt-2 flex gap-x-2 sm:mt-1">
             <Popover as="div" className="relative xs:w-32">
-              <PopoverButton className="inline-flex size-full items-center justify-between rounded-md border border-transparent bg-gray-200 px-3 font-medium text-gray-800">
+              <PopoverButton
+                onMouseEnter={prefetchJupTokens}
+                className="inline-flex size-full items-center justify-between rounded-md border border-transparent bg-gray-200 px-3 font-medium text-gray-800"
+              >
                 <span className="mr-2 block xs:mr-0">
                   {selectToken?.symbol ?? "Name"}
                 </span>
