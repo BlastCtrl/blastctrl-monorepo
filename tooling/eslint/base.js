@@ -31,6 +31,7 @@ const config = {
         checksVoidReturn: false,
       },
     ],
+    "@typescript-eslint/no-unsafe-return": "warn",
   },
   ignorePatterns: [
     "**/*.config.js",
