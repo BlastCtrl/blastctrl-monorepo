@@ -1,6 +1,6 @@
 import type { PublicKey as UmiPublicKey } from "@metaplex-foundation/umi";
 import { publicKey } from "@metaplex-foundation/umi";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token-next";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import base58 from "bs58";
 
@@ -99,6 +99,16 @@ export function lamportsToSol(lamports: number | bigint): number {
     "." +
     lamportsString.slice(splitIndex);
   return signMultiplier * parseFloat(solString);
+}
+
+export function solToLamports<
+  T = number | bigint,
+  R = T extends number ? number : bigint,
+>(lamports: T) {
+  if (typeof lamports === "bigint") {
+    return (lamports * BigInt(LAMPORTS_PER_SOL)) as R;
+  }
+  return (Number(lamports) * LAMPORTS_PER_SOL) as R;
 }
 
 export function lamportsToSolString(
