@@ -7,13 +7,13 @@ export default function StakeAccounts() {
   const navigation = [
     {
       name: "Create a stake account",
-      href: "/spl-token-tools/stake-create",
+      href: "/solana-stake-tools/stake-create",
       description: "Create a stake account with advanced options.",
       active: true,
     },
     {
       name: "Modify stake account authorities",
-      href: "/spl-token-tools/stake-authorize",
+      href: "/solana-stake-tools/stake-authorize",
       description:
         "Modify stake/withdraw authorities on an existing stake account.",
       active: true,
