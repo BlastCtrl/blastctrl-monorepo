@@ -73,7 +73,7 @@ export function Topbar() {
                   </div>
                 </div>
                 <div className="flex flex-1 items-center justify-center px-2 lg:ml-6 lg:justify-end">
-                  <div className="w-full max-w-lg lg:max-w-xs">
+                  <div className="w-full max-w-md lg:max-w-60">
                     <label htmlFor="search" className="sr-only">
                       Search
                     </label>

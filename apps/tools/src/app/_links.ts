@@ -10,6 +10,11 @@ export const navigation = [
     description: "Manage token accounts",
   },
   {
+    name: "Staking",
+    href: "/solana-stake-tools",
+    description: "Manage staking accounts",
+  },
+  {
     name: "Permanent Storage",
     href: "/permanent-storage-tools",
     description: "Decentralized file hosting",
