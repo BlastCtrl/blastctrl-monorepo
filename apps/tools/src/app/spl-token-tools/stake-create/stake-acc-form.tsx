@@ -20,6 +20,7 @@ import {
 } from "@headlessui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import {
   ComputeBudgetProgram,
   Keypair,
@@ -75,6 +76,7 @@ type FormSchemaOutput = z.output<typeof formSchema>;
 export function StakeAccountForm() {
   const { connection } = useConnection();
   const { publicKey, sendTransaction } = useWallet();
+  const { setVisible } = useWalletModal();
   const [isConfirming, setIsConfirming] = useState(false);
   const [useLockup, setUseLockup] = useState(false);
   const [useDelegate, setUseDelegate] = useState(false);
@@ -96,12 +98,16 @@ export function StakeAccountForm() {
   });
 
   const onSubmit = async (values: unknown) => {
+    if (!publicKey) {
+      setVisible(true);
+      return;
+    }
     const data = values as FormSchemaOutput;
     setSubmitData(data);
   };
 
   const submitTransaction = async (data: FormSchemaOutput) => {
-    if (!publicKey || !sendTransaction) return;
+    if (!sendTransaction || !publicKey) return;
 
     try {
       const { context, value } = await retryWithBackoff(() =>
@@ -372,18 +378,27 @@ export function StakeAccountForm() {
 
       <div className="mt-4 flex justify-center">
         {errors.withdrawAuth?.message}
-        <Button
-          disabled={isConfirming}
-          color="indigo"
-          type="submit"
-          className="w-[min(320px,100%)]"
-        >
-          {isConfirming ? (
-            <SpinnerIcon className="-ml-1 mr-1 inline h-5 w-5 animate-spin" />
-          ) : (
-            "Submit"
-          )}
-        </Button>
+        {publicKey ? (
+          <Button
+            disabled={isConfirming || !publicKey}
+            color="indigo"
+            type="submit"
+            className="w-[min(320px,100%)]"
+          >
+            {isConfirming ? (
+              <SpinnerIcon className="-ml-1 mr-1 inline h-5 w-5 animate-spin" />
+            ) : (
+              "Submit"
+            )}
+          </Button>
+        ) : (
+          <Button
+            onClick={() => setVisible(true)}
+            className="w-[min(320px,100%)]"
+          >
+            Connect your wallet
+          </Button>
+        )}
       </div>
 
       <Dialog
