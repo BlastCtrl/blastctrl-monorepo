@@ -88,6 +88,18 @@ export default function Page() {
           >
             Close empty accounts
           </Link>
+          <Link
+            href="/spl-token-tools/stake-create"
+            className="inline-flex items-center justify-center rounded-lg border-2 border-green-600 px-3 py-1.5 text-green-950 shadow hover:bg-green-50"
+          >
+            Create a stake account
+          </Link>
+          <Link
+            href="/spl-token-tools/stake-authorize"
+            className="inline-flex items-center justify-center rounded-lg border-2 border-amber-600 px-3 py-1.5 text-amber-950 shadow hover:bg-amber-50"
+          >
+            Set stake account authorities
+          </Link>
         </div>
         <div className="mt-6 text-sm font-medium text-gray-700">
           More to come...
