@@ -172,7 +172,7 @@ export async function buildJupiterSwapToSOL(
     );
   }
 
-  const blockhash = (await connection.getLatestBlockhash()).blockhash;
+  const blockhash = (await connection.getLatestBlockhash('confirmed')).blockhash;
   let messageV0 = new TransactionMessage({
     payerKey: feePayer.publicKey,
     recentBlockhash: blockhash,
