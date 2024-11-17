@@ -126,7 +126,9 @@ function StakeAccountDescription({
       </DescriptionDetails>
       <DescriptionTerm>Delegated Voter</DescriptionTerm>
       <DescriptionDetails className="truncate">
-        {stakeData.data.info.stake.delegation.voter}
+        {stakeData.data.info.stake
+          ? stakeData.data.info.stake.delegation.voter
+          : "Not delegated"}
       </DescriptionDetails>
       <DescriptionTerm>Withdraw Auth</DescriptionTerm>
       <DescriptionDetails className="truncate">
