@@ -18,6 +18,13 @@ export default function StakeAccounts() {
         "Modify stake/withdraw authorities on an existing stake account.",
       active: true,
     },
+    {
+      name: "Modify stake account lockup",
+      href: "/solana-stake-tools/set-lockup",
+      description:
+        "Modify the lockup period and custodian for a stake account.",
+      active: true,
+    },
   ];
   return (
     <>
