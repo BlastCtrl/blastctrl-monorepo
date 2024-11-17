@@ -379,7 +379,7 @@ function SetLockupTransactionBuilder({
             </Button>
             <Button type="submit" color="indigo" className="flex-1">
               {isConfirming && (
-                <SpinnerIcon className="size- -ml-1 mr-1 inline animate-spin" />
+                <SpinnerIcon className="-ml-1 mr-1 inline size-[1em] animate-spin" />
               )}
               Submit
             </Button>
