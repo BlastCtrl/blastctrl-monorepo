@@ -45,18 +45,18 @@ export const stakeAccountSchema = z.object({
         }),
         rentExemptReserve: z.string(),
       }),
-      stake: z.object({
-        creditsObserved: z.number().nonnegative(),
-        delegation: z
-          .object({
+      stake: z
+        .object({
+          creditsObserved: z.number().nonnegative(),
+          delegation: z.object({
             activationEpoch: z.string(),
             deactivationEpoch: z.string(),
             stake: z.string(),
             voter: z.string(),
             warmupCooldownRate: z.number().nonnegative(),
-          })
-          .nullable(),
-      }),
+          }),
+        })
+        .nullable(),
     }),
     type: z.string(),
   }),
