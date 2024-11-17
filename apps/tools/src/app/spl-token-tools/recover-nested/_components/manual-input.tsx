@@ -1,12 +1,12 @@
 import { Dialog, Transition } from "@headlessui/react";
 import { CheckCircleIcon } from "@heroicons/react/20/solid";
 import { PublicKey, zipMap } from "@metaplex-foundation/js";
-import type { Mint, RawAccount } from "@solana/spl-token-next";
+import type { Mint, RawAccount } from "@solana/spl-token";
 import {
   AccountLayout,
   getAssociatedTokenAddressSync,
   getMint,
-} from "@solana/spl-token-next";
+} from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Transaction } from "@solana/web3.js";

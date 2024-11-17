@@ -7,8 +7,8 @@ import { SpinnerIcon } from "@blastctrl/ui";
 import { Tooltip } from "@blastctrl/ui/tooltip";
 import { ChevronRightIcon, WalletIcon } from "@heroicons/react/20/solid";
 import { QuestionMarkCircleIcon } from "@heroicons/react/24/solid";
-import type { Account } from "@solana/spl-token-next";
-import { getAssociatedTokenAddressSync, getMint } from "@solana/spl-token-next";
+import type { Account } from "@solana/spl-token";
+import { getAssociatedTokenAddressSync, getMint } from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Transaction } from "@solana/web3.js";
 import Image from "next/image";
@@ -162,7 +162,7 @@ export const NestedInfo = ({
   return (
     <div className="divide-y divide-gray-200 overflow-hidden rounded-lg bg-white shadow ring-1 ring-black/5">
       <div className="px-4 py-5 sm:p-6">
-        <div className="xs:grid-cols-2 grid gap-y-4">
+        <div className="grid gap-y-4 xs:grid-cols-2">
           {[parent, nested].map((account, idx) => {
             const tokenInfo = idx === 0 ? parentTokenInfo : nestedTokenInfo;
 

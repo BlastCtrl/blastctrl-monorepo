@@ -1,6 +1,6 @@
 import { sleep } from "@/lib/utils";
-import type { Account } from "@solana/spl-token-next";
-import { TOKEN_PROGRAM_ID, unpackAccount } from "@solana/spl-token-next";
+import type { Account } from "@solana/spl-token";
+import { TOKEN_PROGRAM_ID, unpackAccount } from "@solana/spl-token";
 import type { Connection } from "@solana/web3.js";
 
 export const findNestedAta = async ({

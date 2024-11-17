@@ -7,7 +7,7 @@ import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
 import {
   createAssociatedTokenAccountInstruction,
   getAssociatedTokenAddressSync,
-} from "@solana/spl-token-next";
+} from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { PublicKey, Transaction } from "@solana/web3.js";
