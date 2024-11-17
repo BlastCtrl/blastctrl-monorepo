@@ -36,6 +36,20 @@ import { getSetLockupInstruction } from "@/lib/solana/stake";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { ZodError } from "zod";
 import { useCurrentEpoch } from "@/state/queries/use-epoch";
+import { Badge } from "@/components/badge";
+
+function getLockupStatus(
+  stakeData: StakeAccountType | undefined,
+  currentEpoch: number | undefined,
+): boolean | undefined {
+  if (stakeData === undefined) return undefined;
+  if (currentEpoch === undefined) return undefined;
+  const lockupEpoch = stakeData.data.info.meta.lockup.epoch;
+  const lockupTimestamp = stakeData.data.info.meta.lockup.unixTimestamp;
+  const currentTimestamp = Math.floor(Date.now() / 1000);
+
+  return lockupTimestamp > currentTimestamp || lockupEpoch > currentEpoch;
+}
 
 export function LockupFormContainer() {
   const queryClient = useQueryClient();
@@ -136,15 +150,18 @@ function StakeAccountDescription({
   stakeData: StakeAccountType;
 }) {
   const { publicKey } = useWallet();
+  const { data: epochData } = useCurrentEpoch(); // prefetch
+
   const withdrawAuthMatch =
     publicKey?.toString() === stakeData.data.info.meta.authorized.withdrawer;
   const stakerAuthMatch =
     publicKey?.toString() === stakeData.data.info.meta.authorized.staker;
   const custodianMatch =
     publicKey?.toString() === stakeData.data.info.meta.lockup.custodian;
+  const isLockupActive = getLockupStatus(stakeData, epochData?.epoch);
 
   return (
-    <DescriptionList className="w-full rounded-lg border border-zinc-200 px-4 font-normal underline-offset-4 shadow *:decoration-green-400 *:decoration-[3px]">
+    <DescriptionList className="relative w-full rounded-lg border border-zinc-200 px-4 font-normal underline-offset-4 shadow *:decoration-green-500/50 *:decoration-[3px]">
       <DescriptionTerm>Balance</DescriptionTerm>
       <DescriptionDetails className="truncate">
         {lamportsToSolString(stakeData.lamports)} SOL
@@ -195,6 +212,16 @@ function StakeAccountDescription({
           <DescriptionTerm>Lockup epoch</DescriptionTerm>
           <DescriptionDetails className="truncate">
             {stakeData.data.info.meta.lockup.epoch}
+          </DescriptionDetails>
+        </>
+      ) : null}
+      {isLockupActive !== undefined ? (
+        <>
+          <DescriptionTerm>Lockup state</DescriptionTerm>
+          <DescriptionDetails>
+            <Badge color={isLockupActive ? "zinc" : "green"}>
+              {isLockupActive ? "Enforced" : "Inactive"}
+            </Badge>
           </DescriptionDetails>
         </>
       ) : null}
