@@ -78,7 +78,7 @@ export function LockupFormContainer() {
               "data-[disabled]:bg-zinc-100 data-[disabled]:text-zinc-500",
               "data-[invalid]:text-red-600 data-[invalid]:data-[focus]:outline-red-600 data-[invalid]:ring-red-600",
             )}
-            placeholder="Address of a staking account you have signing authority over"
+            placeholder="Enter a staking account where you are the custodian"
           />
         </Field>
         <Button
@@ -291,7 +291,7 @@ function SetLockupTransactionBuilder({
           </div>
 
           <Field className="w-full">
-            <Label className="font-medium sm:text-sm/6">New timestamp</Label>
+            <Label className="font-medium sm:text-sm/6">Lockup timestamp</Label>
             <div className="flex rounded-lg bg-white/5 shadow-sm">
               <StyledInput
                 autoCorrect="false"
