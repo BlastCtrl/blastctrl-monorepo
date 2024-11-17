@@ -154,4 +154,38 @@ describe("getSetLockupInstruction", () => {
 
     expect(lockupInfo.custodian).toEqual(newCustodian.publicKey.toBase58());
   });
+
+  it("should change the timestamp, epoch and the custodian", async () => {
+    const newCustodian = Keypair.generate();
+    const newLockup = {
+      unixTimestamp: Math.floor(Date.now() / 1000) + 3 * 24 * 60 * 60,
+      epoch: 10,
+      custodian: newCustodian.publicKey,
+    };
+
+    const instruction = getSetLockupInstruction(
+      programId,
+      stakeAccount.publicKey,
+      newLockup,
+      authority.publicKey,
+    );
+
+    const transaction = new Transaction().add(instruction);
+    await sendAndConfirmTransaction(connection, transaction, [payer], {
+      skipPreflight: true,
+      preflightCommitment: "confirmed",
+    });
+
+    // Fetch the updated stake account info
+    const stakeAccountInfo = await connection.getParsedAccountInfo(
+      stakeAccount.publicKey,
+    );
+
+    // @ts-expect-error this will be parsed
+    const lockupInfo = stakeAccountInfo.value?.data?.parsed?.info?.meta?.lockup;
+
+    expect(lockupInfo.unixTimestamp).toEqual(newLockup.unixTimestamp);
+    expect(lockupInfo.epoch).toEqual(newLockup.epoch);
+    expect(lockupInfo.custodian).toEqual(newCustodian.publicKey);
+  });
 });
