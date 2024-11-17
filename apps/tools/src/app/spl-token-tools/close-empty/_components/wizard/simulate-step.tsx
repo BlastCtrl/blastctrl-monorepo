@@ -2,7 +2,7 @@ import type { ParsedTokenAccount } from "@/state/queries/use-owner-assets";
 import { useWalletConnection } from "@/state/use-wallet-connection";
 import { Button } from "@blastctrl/ui/button";
 import { Dialog } from "@headlessui/react";
-import { createCloseAccountInstruction } from "@solana/spl-token-next";
+import { createCloseAccountInstruction } from "@solana/spl-token";
 import { useConnection } from "@solana/wallet-adapter-react";
 import {
   PublicKey,

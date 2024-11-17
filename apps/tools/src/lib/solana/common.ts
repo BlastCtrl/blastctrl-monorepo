@@ -1,6 +1,6 @@
 import type { PublicKey as UmiPublicKey } from "@metaplex-foundation/umi";
 import { publicKey } from "@metaplex-foundation/umi";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token-next";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import base58 from "bs58";
 

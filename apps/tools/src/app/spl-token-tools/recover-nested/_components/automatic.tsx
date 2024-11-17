@@ -1,7 +1,7 @@
 import { isATA } from "@/lib/solana/common";
 import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
-import type { Account } from "@solana/spl-token-next";
-import { TOKEN_PROGRAM_ID, unpackAccount } from "@solana/spl-token-next";
+import type { Account } from "@solana/spl-token";
+import { TOKEN_PROGRAM_ID, unpackAccount } from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useCallback, useState } from "react";

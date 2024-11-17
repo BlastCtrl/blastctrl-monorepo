@@ -3,7 +3,7 @@ import {
   AccountState,
   TOKEN_2022_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
-} from "@solana/spl-token-next";
+} from "@solana/spl-token";
 import { useConnection } from "@solana/wallet-adapter-react";
 import type { GetProgramAccountsFilter } from "@solana/web3.js";
 import { PublicKey } from "@solana/web3.js";

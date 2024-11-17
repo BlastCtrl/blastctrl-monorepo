@@ -3,7 +3,7 @@ import { useCloseAccountsStore } from "./wizard-context";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { chunk, retryWithBackoff } from "@/lib/utils";
 import type { ParsedTokenAccount } from "@/state/queries/use-owner-assets";
-import { createCloseAccountInstruction } from "@solana/spl-token-next";
+import { createCloseAccountInstruction } from "@solana/spl-token";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { notify } from "@/components/notification";

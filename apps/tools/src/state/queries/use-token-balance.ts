@@ -1,4 +1,4 @@
-import { getAssociatedTokenAddressSync } from "@solana/spl-token-next";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
