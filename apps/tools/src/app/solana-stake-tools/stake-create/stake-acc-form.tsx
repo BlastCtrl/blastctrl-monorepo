@@ -5,6 +5,7 @@ import {
   DescriptionList,
   DescriptionTerm,
 } from "@/components/description-list";
+import { InfoTooltip } from "@/components/info-tooltip";
 import { notify } from "@/components/notification";
 import { isPublicKey } from "@/lib/solana/common";
 import { retryWithBackoff } from "@/lib/utils";
@@ -31,6 +32,7 @@ import {
   StakeProgram,
   Transaction,
 } from "@solana/web3.js";
+import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -332,6 +334,19 @@ export function StakeAccountForm() {
               <Label className="text-sm/5 text-zinc-500">
                 The custodian has the control over the staking account lockup
                 period
+                <InfoTooltip className="ml-1 inline-block">
+                  We currently don&apos;t support modifying the staking account
+                  lockup custodian during stake account creation. You can
+                  however use the{" "}
+                  <Link
+                    href="/solana-stake-tools/set-lockup"
+                    className="font-medium text-blue-400"
+                  >
+                    Modify stake account lockup
+                  </Link>{" "}
+                  tool to change the lockup settings after the account has been
+                  created.
+                </InfoTooltip>
               </Label>
               <div className="relative">
                 <input
