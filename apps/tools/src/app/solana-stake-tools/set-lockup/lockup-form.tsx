@@ -35,11 +35,13 @@ import { retryWithBackoff } from "@/lib/utils";
 import { getSetLockupInstruction } from "@/lib/solana/stake";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { ZodError } from "zod";
+import { useCurrentEpoch } from "@/state/queries/use-epoch";
 
 export function LockupFormContainer() {
   const queryClient = useQueryClient();
   const [stakeAccAddr, setStakeAccAddr] = useState("");
   const { data, error, refetch, isLoading } = useStakeAccount(stakeAccAddr);
+  useCurrentEpoch(); // prefetch
 
   const isSuccess = !!stakeAccAddr && !!data;
   const isInvalid = stakeAccAddr !== "" && !isPublicKey(stakeAccAddr);
@@ -133,8 +135,16 @@ function StakeAccountDescription({
 }: {
   stakeData: StakeAccountType;
 }) {
+  const { publicKey } = useWallet();
+  const withdrawAuthMatch =
+    publicKey?.toString() === stakeData.data.info.meta.authorized.withdrawer;
+  const stakerAuthMatch =
+    publicKey?.toString() === stakeData.data.info.meta.authorized.staker;
+  const custodianMatch =
+    publicKey?.toString() === stakeData.data.info.meta.lockup.custodian;
+
   return (
-    <DescriptionList className="w-full rounded-lg border border-zinc-200 px-4 font-normal shadow">
+    <DescriptionList className="w-full rounded-lg border border-zinc-200 px-4 font-normal underline-offset-4 shadow *:decoration-green-400 *:decoration-[3px]">
       <DescriptionTerm>Balance</DescriptionTerm>
       <DescriptionDetails className="truncate">
         {lamportsToSolString(stakeData.lamports)} SOL
@@ -146,15 +156,24 @@ function StakeAccountDescription({
           : "Undelegated"}
       </DescriptionDetails>
       <DescriptionTerm>Withdraw Auth</DescriptionTerm>
-      <DescriptionDetails className="truncate">
+      <DescriptionDetails
+        data-match={withdrawAuthMatch}
+        className="truncate data-[match=true]:underline"
+      >
         {stakeData.data.info.meta.authorized.withdrawer}
       </DescriptionDetails>
       <DescriptionTerm>Staking Auth</DescriptionTerm>
-      <DescriptionDetails className="truncate">
+      <DescriptionDetails
+        data-match={stakerAuthMatch}
+        className="truncate data-[match=true]:underline"
+      >
         {stakeData.data.info.meta.authorized.staker}
       </DescriptionDetails>
-      <DescriptionTerm>Lockup Auth</DescriptionTerm>
-      <DescriptionDetails className="truncate">
+      <DescriptionTerm>Lockup Auth (Custodian)</DescriptionTerm>
+      <DescriptionDetails
+        data-match={custodianMatch}
+        className="truncate data-[match=true]:underline"
+      >
         {stakeData.data.info.meta.lockup.custodian ?? "None"}
       </DescriptionDetails>
       {stakeData.data.info.meta.lockup.unixTimestamp > 0 ? (
@@ -192,6 +211,7 @@ function SetLockupTransactionBuilder({
   stakeData: StakeAccountType;
   reset: () => void;
 }) {
+  const { data } = useCurrentEpoch();
   const { connection } = useConnection();
   const { publicKey, sendTransaction } = useWallet();
   const [custodian, setCustodian] = useState("");
@@ -286,7 +306,8 @@ function SetLockupTransactionBuilder({
             </Legend>
             <p className="text-sm text-zinc-500">
               If you don&apos;t want to modify a field, leave it empty. To use
-              the current value, press the button next to the input field.
+              the previous lockup value, press the button next to the input
+              field.
             </p>
           </div>
 
@@ -315,7 +336,10 @@ function SetLockupTransactionBuilder({
           </Field>
 
           <Field className="w-full">
-            <Label className="font-medium sm:text-sm/6">Lockup epoch</Label>
+            <Label className="font-medium sm:text-sm/6">
+              Lockup epoch
+              {data?.epoch !== undefined ? ` (current: ${data.epoch})` : null}
+            </Label>
             <div className="flex rounded-lg bg-white/5 shadow-sm">
               <StyledInput
                 autoCorrect="false"
@@ -348,6 +372,16 @@ function SetLockupTransactionBuilder({
                 invalid={custodian !== "" && !isPublicKey(custodian)}
                 placeholder="New lockup custodian"
               />
+              <InsetButton
+                handleClick={() => {
+                  window.alert(
+                    "This will set the custodian to a non-existing wallet. It will not be possible to modify the lockup until it expires.",
+                  );
+                  void setCustodian(PublicKey.default.toString());
+                }}
+              >
+                Disable
+              </InsetButton>
               <InsetButton
                 handleClick={() =>
                   void setCustodian(stakeData.data.info.meta.lockup.custodian)
@@ -390,14 +424,22 @@ function SetLockupTransactionBuilder({
   );
 }
 
-function InsetButton({ handleClick }: { handleClick: () => void }) {
+function InsetButton({
+  handleClick,
+  children,
+}: {
+  handleClick: () => void;
+  children?: ReactNode;
+}) {
   return (
     <button
       type="button"
+      title="Use previous value"
+      aria-label="Use previous value"
       onClick={handleClick}
-      className="relative -ml-px inline-flex items-center gap-x-1.5 rounded-r-md px-3 py-2 text-sm font-semibold text-zinc-600 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+      className="relative -ml-px inline-flex items-center gap-x-1.5 rounded-r-md px-3 py-2 text-sm font-semibold text-zinc-600 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 [&:has(+button)]:rounded-r-none"
     >
-      <ArrowUturnLeftIcon className="size-4" />
+      {children ?? <ArrowUturnLeftIcon className="size-4" />}
     </button>
   );
 }
