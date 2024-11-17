@@ -30,6 +30,7 @@ import {
   StakeProgram,
   Transaction,
 } from "@solana/web3.js";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 
 export function AuthorizeFormsContainer() {
   const queryClient = useQueryClient();
@@ -166,6 +167,7 @@ function AuthorizeTransactionBuilder({
 }) {
   const { connection } = useConnection();
   const { publicKey, sendTransaction } = useWallet();
+  const { setVisible } = useWalletModal();
   const [authority, setAuthority] = useState("");
   const [withdrawCheckbox, setWithdrawCheckbox] = useState(true);
   const [stakeCheckbox, setStakeCheckbox] = useState(false);
@@ -324,19 +326,32 @@ function AuthorizeTransactionBuilder({
             placeholder="Address of the new signing authority"
           />
         </Field>
-        <div className="flex justify-end gap-2">
-          <Button
-            type="button"
-            onClick={reset}
-            color="dark/zinc"
-            className="sm:px-5"
-          >
-            Reset
-          </Button>
-          <Button type="submit" color="indigo" className="sm:px-5">
-            Submit
-          </Button>
-        </div>
+
+        {!publicKey ? (
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              color="indigo"
+              onClick={() => void setVisible(true)}
+            >
+              Connect your wallet
+            </Button>
+          </div>
+        ) : (
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              onClick={reset}
+              color="dark/zinc"
+              className="flex-1"
+            >
+              Reset
+            </Button>
+            <Button type="submit" color="indigo" className="flex-1">
+              Submit
+            </Button>
+          </div>
+        )}
       </form>
     </div>
   );
