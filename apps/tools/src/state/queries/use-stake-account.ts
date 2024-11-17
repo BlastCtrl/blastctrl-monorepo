@@ -6,10 +6,11 @@ import { z } from "zod";
 export function useStakeAccount(address = "") {
   const { connection } = useConnection();
 
-  return useQuery({
+  return useQuery<StakeAccountType, StakeAccountError>({
     queryKey: ["stake-account", address],
     enabled: false,
-    retry: 3,
+    retry: 1,
+    staleTime: 30000,
     gcTime: 30000,
     queryFn: async () => {
       if (!address) throw Error("No address");
@@ -21,7 +22,7 @@ export function useStakeAccount(address = "") {
 
       const result = stakeAccountSchema.safeParse(accountData.value?.data);
       if (result.error) {
-        throw Error("Failed to parse account");
+        throw result.error;
       }
 
       return { lamports: accountData.value.lamports, data: result.data.parsed };
@@ -46,13 +47,15 @@ export const stakeAccountSchema = z.object({
       }),
       stake: z.object({
         creditsObserved: z.number().nonnegative(),
-        delegation: z.object({
-          activationEpoch: z.string(),
-          deactivationEpoch: z.string(),
-          stake: z.string(),
-          voter: z.string(),
-          warmupCooldownRate: z.number().nonnegative(),
-        }),
+        delegation: z
+          .object({
+            activationEpoch: z.string(),
+            deactivationEpoch: z.string(),
+            stake: z.string(),
+            voter: z.string(),
+            warmupCooldownRate: z.number().nonnegative(),
+          })
+          .nullable(),
       }),
     }),
     type: z.string(),
@@ -65,3 +68,5 @@ export type StakeAccountType = {
   lamports: number;
   data: z.infer<typeof stakeAccountSchema>["parsed"];
 };
+
+type StakeAccountError = Error | z.ZodError<z.infer<typeof stakeAccountSchema>>;

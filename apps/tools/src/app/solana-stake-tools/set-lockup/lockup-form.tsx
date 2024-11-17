@@ -34,6 +34,7 @@ import { notify } from "@/components/notification";
 import { retryWithBackoff } from "@/lib/utils";
 import { getSetLockupInstruction } from "@/lib/solana/stake";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { ZodError } from "zod";
 
 export function LockupFormContainer() {
   const queryClient = useQueryClient();
@@ -96,7 +97,17 @@ export function LockupFormContainer() {
           <p className="font-medium">
             There was an error loading the staking account with the message:
           </p>
-          <p className="font-medium text-red-600">{error.message}</p>
+          {error instanceof ZodError ? (
+            <div className="space-y-1">
+              {error.errors.map((e, i) => (
+                <p key={i} className="font-medium text-red-600">
+                  {e.path.join(".")}: {e.message}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="font-medium text-red-600">{error.message}</p>
+          )}
         </div>
       )}
 
@@ -130,7 +141,9 @@ function StakeAccountDescription({
       </DescriptionDetails>
       <DescriptionTerm>Delegated Voter</DescriptionTerm>
       <DescriptionDetails className="truncate">
-        {stakeData.data.info.stake.delegation.voter}
+        {stakeData.data.info.stake
+          ? stakeData.data.info.stake.delegation.voter
+          : "Undelegated"}
       </DescriptionDetails>
       <DescriptionTerm>Withdraw Auth</DescriptionTerm>
       <DescriptionDetails className="truncate">
