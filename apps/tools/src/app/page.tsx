@@ -100,6 +100,12 @@ export default function Page() {
           >
             Set stake account authorities
           </Link>
+          <Link
+            href="/solana-stake-tools/set-lockup"
+            className="inline-flex items-center justify-center rounded-lg border-2 border-purple-600 px-3 py-1.5 text-purple-950 shadow hover:bg-purple-50"
+          >
+            Set stake lockup
+          </Link>
         </div>
         <div className="mt-6 text-sm font-medium text-gray-700">
           More to come...
