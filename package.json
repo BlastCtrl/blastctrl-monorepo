@@ -8,23 +8,12 @@
     "dev": "pnpm run --parallel dev",
     "format": "pnpm run --recursive format",
     "lint": "pnpm run --recursive lint",
-    "build": "pnpm -F tools build",
-    "storybook": "pnpm -F tools run storybook"
+    "build": "pnpm -F tools build"
   },
   "license": "MIT",
   "devDependencies": {
     "prettier": "^3.2.5",
-    "typescript": "^5.4.5",
-    "@chromatic-com/storybook": "^1.4.0",
-    "@storybook/addon-essentials": "^8.1.1",
-    "@storybook/addon-interactions": "^8.1.1",
-    "@storybook/addon-links": "^8.1.1",
-    "@storybook/addon-onboarding": "^8.1.1",
-    "@storybook/blocks": "^8.1.1",
-    "@storybook/nextjs": "^8.1.1",
-    "@storybook/react": "^8.1.1",
-    "@storybook/test": "^8.1.1",
-    "storybook": "^8.1.1"
+    "typescript": "^5.4.5"
   },
   "dependencies": {
     "@blastctrl/prettier-config": "workspace:^"
