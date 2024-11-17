@@ -294,7 +294,6 @@ function SetLockupTransactionBuilder({
             <Label className="font-medium sm:text-sm/6">New timestamp</Label>
             <div className="flex rounded-lg bg-white/5 shadow-sm">
               <StyledInput
-                required
                 autoCorrect="false"
                 value={timestamp}
                 onChange={({ target }) => {
@@ -319,7 +318,6 @@ function SetLockupTransactionBuilder({
             <Label className="font-medium sm:text-sm/6">Lockup epoch</Label>
             <div className="flex rounded-lg bg-white/5 shadow-sm">
               <StyledInput
-                required
                 autoCorrect="false"
                 value={epoch}
                 onChange={({ target }) => {
@@ -344,7 +342,6 @@ function SetLockupTransactionBuilder({
             <Label className="font-medium sm:text-sm/6">Lockup custodian</Label>
             <div className="flex rounded-lg bg-white/5 shadow-sm">
               <StyledInput
-                required
                 autoCorrect="false"
                 value={custodian}
                 onChange={({ target }) => setCustodian(target.value)}
@@ -381,6 +378,9 @@ function SetLockupTransactionBuilder({
               Reset
             </Button>
             <Button type="submit" color="indigo" className="flex-1">
+              {isConfirming && (
+                <SpinnerIcon className="size- -ml-1 mr-1 inline animate-spin" />
+              )}
               Submit
             </Button>
           </div>
