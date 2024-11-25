@@ -51,10 +51,15 @@ function getLockupStatus(
   return lockupTimestamp > currentTimestamp || lockupEpoch > currentEpoch;
 }
 
+const DISABLE_OVERRIDE = true;
+
 export function LockupFormContainer() {
   const queryClient = useQueryClient();
   const [stakeAccAddr, setStakeAccAddr] = useState("");
-  const { data, error, refetch, isLoading } = useStakeAccount(stakeAccAddr);
+  const { data, error, refetch, isLoading } = useStakeAccount(
+    stakeAccAddr,
+    DISABLE_OVERRIDE,
+  );
   useCurrentEpoch(); // prefetch
 
   const isSuccess = !!stakeAccAddr && !!data;

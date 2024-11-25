@@ -3,12 +3,12 @@ import { PublicKey } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-export function useStakeAccount(address = "") {
+export function useStakeAccount(address = "", disableOverride = false) {
   const { connection } = useConnection();
 
   return useQuery<StakeAccountType, StakeAccountError>({
     queryKey: ["stake-account", address],
-    enabled: false,
+    enabled: !!address && !disableOverride,
     retry: 1,
     staleTime: 30000,
     gcTime: 30000,
