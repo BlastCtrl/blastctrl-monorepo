@@ -25,6 +25,12 @@ export default function StakeAccounts() {
         "Modify the lockup period and custodian for a stake account.",
       active: true,
     },
+    {
+      name: "Split stake",
+      href: "/solana-stake-tools/split-stake",
+      description: "Split a single stake account into two.",
+      active: true,
+    },
   ];
   return (
     <>

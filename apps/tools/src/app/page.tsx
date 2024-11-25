@@ -102,7 +102,13 @@ export default function Page() {
           </Link>
           <Link
             href="/solana-stake-tools/set-lockup"
-            className="inline-flex items-center justify-center rounded-lg border-2 border-purple-600 px-3 py-1.5 text-purple-950 shadow hover:bg-purple-50"
+            className="inline-flex items-center justify-center rounded-lg border-2 border-fuchsia-600 px-3 py-1.5 text-fuchsia-950 shadow hover:bg-fuchsia-50"
+          >
+            Set stake lockup
+          </Link>
+          <Link
+            href="/solana-stake-tools/set-lockup"
+            className="inline-flex items-center justify-center rounded-lg border-2 border-red-600 px-3 py-1.5 text-red-950 shadow hover:bg-red-50"
           >
             Set stake lockup
           </Link>
