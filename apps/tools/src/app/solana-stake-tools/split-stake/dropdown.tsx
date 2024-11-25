@@ -41,18 +41,23 @@ export function Dropdown<T>({
   );
 }
 
+interface DropdownOptionProps<T> extends ListboxOptionProps<"div", T> {
+  children: ReactNode;
+}
+
 export function DropdownOption<T>({
   children,
   ...props
-}: ListboxOptionProps<"div", T>) {
+}: DropdownOptionProps<T>) {
   return (
     <ListboxOption as={Fragment} {...props}>
-      {(bag) => {
-        return bag.selectedOption ? (
+      {({ selectedOption }) => {
+        return selectedOption ? (
+          // @ts-ignore
           <>{children}</>
         ) : (
           <div className="w-full cursor-default rounded-md px-3 py-1 text-base/6 data-[selected]:bg-indigo-500 data-[selected]:text-white sm:text-sm/6 [&:not([data-selected])]:data-[focus]:bg-blue-100">
-            {typeof children === "function" ? children(bag) : children}
+            {children}
           </div>
         );
       }}
