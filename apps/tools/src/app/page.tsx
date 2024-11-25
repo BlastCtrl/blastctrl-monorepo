@@ -110,7 +110,7 @@ export default function Page() {
             href="/solana-stake-tools/set-lockup"
             className="inline-flex items-center justify-center rounded-lg border-2 border-red-600 px-3 py-1.5 text-red-950 shadow hover:bg-red-50"
           >
-            Set stake lockup
+            Split stake
           </Link>
         </div>
         <div className="mt-6 text-sm font-medium text-gray-700">
