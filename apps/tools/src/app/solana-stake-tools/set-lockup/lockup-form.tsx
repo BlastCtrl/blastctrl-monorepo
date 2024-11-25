@@ -2,14 +2,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { isPublicKey, lamportsToSolString } from "@/lib/solana/common";
-import {
-  Field,
-  Fieldset,
-  Input,
-  InputProps,
-  Label,
-  Legend,
-} from "@headlessui/react";
+import { Field, Fieldset, Input, Label, Legend } from "@headlessui/react";
+import type { InputProps } from "@headlessui/react";
 import {
   DescriptionDetails,
   DescriptionList,
@@ -19,10 +13,8 @@ import type { FormEvent, ReactNode } from "react";
 import { ArrowUturnLeftIcon } from "@heroicons/react/16/solid";
 
 import { Button, cn, SpinnerIcon } from "@blastctrl/ui";
-import {
-  StakeAccountType,
-  useStakeAccount,
-} from "@/state/queries/use-stake-account";
+import { useStakeAccount } from "@/state/queries/use-stake-account";
+import type { StakeAccountType } from "@/state/queries/use-stake-account";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import {
   ComputeBudgetProgram,
@@ -266,6 +258,25 @@ function SetLockupTransactionBuilder({
       return;
     }
 
+    // possible fail condition:
+    if (
+      getLockupStatus(stakeData, data?.epoch) === false &&
+      stakeData.data.info.meta.authorized.withdrawer !== publicKey.toString()
+    ) {
+      window.confirm(
+        "This transaction might fail due to: lockup has expired and connected wallet does not match the withdrawer authority.",
+      );
+    }
+
+    if (
+      getLockupStatus(stakeData, data?.epoch) &&
+      stakeData.data.info.meta.lockup.custodian !== publicKey.toString()
+    ) {
+      window.confirm(
+        "This transaction might fail due to: lockup is currently active and connected wallet does not match the lockup custodian.",
+      );
+    }
+
     try {
       const { context, value } = await retryWithBackoff(() =>
         connection.getLatestBlockhashAndContext("confirmed"),
@@ -280,8 +291,8 @@ function SetLockupTransactionBuilder({
           stakePubkey,
           {
             custodian: custodian ? new PublicKey(custodian) : undefined,
-            epoch: !!epoch ? Number(epoch) : undefined,
-            unixTimestamp: !!timestamp ? Number(timestamp) : undefined,
+            epoch: epoch ? Number(epoch) : undefined,
+            unixTimestamp: timestamp ? Number(timestamp) : undefined,
           },
           publicKey,
         ),
