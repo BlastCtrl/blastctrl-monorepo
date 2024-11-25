@@ -32,10 +32,15 @@ import {
 } from "@solana/web3.js";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 
+const DISABLE_OVERRIDE = true;
+
 export function AuthorizeFormsContainer() {
   const queryClient = useQueryClient();
   const [stakeAccAddr, setStakeAccAddr] = useState("");
-  const { data, error, refetch, isLoading } = useStakeAccount(stakeAccAddr);
+  const { data, error, refetch, isLoading } = useStakeAccount(
+    stakeAccAddr,
+    DISABLE_OVERRIDE,
+  );
 
   const isSuccess = !!stakeAccAddr && !!data;
   const isInvalid = stakeAccAddr !== "" && !isPublicKey(stakeAccAddr);
