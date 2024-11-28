@@ -164,7 +164,7 @@ export default function BonkSwap() {
           {!balanceQuery.data && (
             <div aria-hidden="true" className="mb-2 block h-[33px]" />
           )}
-          {balanceQuery.data?.uiAmount && (
+          {balanceQuery.data?.uiAmount ? (
             <button
               aria-disabled={balanceQuery.status !== "success"}
               onClick={() => {
@@ -179,7 +179,7 @@ export default function BonkSwap() {
                 {numberFormatter.format(balanceQuery?.data?.uiAmount)}
               </span>
             </button>
-          )}
+          ) : null}
           <div>
             <span className="text-base font-medium text-gray-600">
               You will sell:
