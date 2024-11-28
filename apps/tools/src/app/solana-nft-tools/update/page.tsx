@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 "use client";
 
 import { InputGroup, notify } from "@/components";
@@ -265,7 +264,7 @@ export default function Update() {
                   }
                 }}
               />
-              <Label>Load current values</Label>
+              <span>Load current values</span>
             </Field>
           </div>
         </div>
