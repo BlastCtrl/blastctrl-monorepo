@@ -10,9 +10,11 @@ type Props = {
   } | null;
 };
 
+const SOL_MINT = "So11111111111111111111111111111111111111112";
+
 export const TokenQuote = ({ quoteToken }: Props) => {
   const { data, error, isLoading } = useJupPrice(
-    "SOL",
+    SOL_MINT,
     quoteToken?.address ?? "",
   );
 
@@ -32,8 +34,8 @@ export const TokenQuote = ({ quoteToken }: Props) => {
 
       {data &&
         (() => {
-          const decimalCount =
-            data?.SOL?.price > 1e6 ? 0 : data?.SOL?.price > 1e3 ? 2 : 3;
+          const price = Number(data[SOL_MINT]?.price) ?? 0;
+          const decimalCount = price > 1e6 ? 0 : price > 1e3 ? 2 : 3;
 
           return (
             <div className="flex flex-nowrap items-center justify-center gap-x-2 text-sm font-medium text-gray-600">
@@ -44,8 +46,7 @@ export const TokenQuote = ({ quoteToken }: Props) => {
               </div>
 
               <span>
-                {formatNumber.format(data?.SOL?.price, decimalCount)}{" "}
-                {quoteToken.name}
+                {formatNumber.format(price, decimalCount)} {quoteToken.name}
               </span>
             </div>
           );

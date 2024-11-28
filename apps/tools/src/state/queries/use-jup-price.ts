@@ -20,7 +20,7 @@ type JupiterPriceResponse = {
 const BASE_URL = "https://price.jup.ag/v6/price";
 
 export function useJupPrice(mintOrSymbol: string, vsMint: string) {
-  return useQuery<JupiterPriceResponse, Error>({
+  return useQuery<JupiterPriceResponse["data"], Error>({
     enabled: !!mintOrSymbol && !!vsMint,
     queryKey: ["jup-price", mintOrSymbol, vsMint],
     queryFn: async () => {
@@ -35,7 +35,8 @@ export function useJupPrice(mintOrSymbol: string, vsMint: string) {
         throw new Error("Error fetching price");
       }
 
-      return priceResponse.json();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+      return priceResponse.json().then((res) => res?.data);
     },
   });
 }
