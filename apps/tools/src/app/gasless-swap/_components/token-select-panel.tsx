@@ -7,6 +7,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useRef, useState } from "react";
 import { PopoverButton } from "./popover";
+import { Checkbox } from "@headlessui/react";
 
 type Token = {
   name: string;
@@ -21,7 +22,11 @@ export function TokenSelectPanel({
   onSelect: (token: Token) => void;
 }) {
   const { publicKey } = useWallet();
-  const { data, status, error } = useJupTokens(publicKey?.toString());
+  const [enableUnknownTokens, setEnableUnknownTokens] = useState(false);
+  const { data, status, error } = useJupTokens(
+    publicKey?.toString(),
+    enableUnknownTokens,
+  );
   const [filter, setFilter] = useState("");
   const debouncedFilter = useDebounce(filter, 400);
   const filteredTokens =
@@ -53,13 +58,27 @@ export function TokenSelectPanel({
   if (status === "pending") {
     return (
       <div className="grid h-[440px] w-[280px] place-content-center bg-white">
-        <SpinnerIcon className="size-8 animate-spin" />
+        <SpinnerIcon className="mx-auto size-8 animate-spin" />
+        <span className="pt-4 text-center text-sm text-zinc-500">
+          Loading tokens can take a long time, especially if unverified tokens
+          are included.
+        </span>
       </div>
     );
   }
 
   return (
     <div className="flex h-[440px] w-[280px] flex-col bg-white">
+      <div className="-mt-1 flex w-full justify-end pb-1">
+        <Checkbox
+          onChange={(checked) => {
+            setEnableUnknownTokens(checked);
+          }}
+          className="cursor-default rounded-full px-2.5 py-1 text-sm/6 font-medium text-zinc-700 ring-1 ring-zinc-200 transition-colors data-[checked]:bg-indigo-500 data-[checked]:data-[hover]:bg-indigo-400 data-[checked]:text-white [&:not([data-checked])]:data-[hover]:bg-zinc-100"
+        >
+          Enable Unverified Tokens
+        </Checkbox>
+      </div>
       <div className="relative pb-3">
         <MagnifyingGlassIcon className="absolute left-2 mt-2.5 size-5 text-gray-400" />
         <input

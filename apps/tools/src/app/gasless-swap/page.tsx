@@ -66,7 +66,9 @@ export default function GaslessSwap() {
   const queryClient = useQueryClient();
 
   const prefetchJupTokens = () => {
-    void queryClient.prefetchQuery(jupTokensQuery(publicKey?.toString() ?? ""));
+    void queryClient.prefetchQuery(
+      jupTokensQuery(publicKey?.toString() ?? "", false),
+    );
   };
 
   const submitSwap = async (data: FormData) => {
