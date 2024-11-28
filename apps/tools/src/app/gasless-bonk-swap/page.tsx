@@ -65,36 +65,6 @@ export default function BonkSwap() {
     amount: debouncedSwapAmount * Math.pow(10, BONK_DECIMALS),
   });
 
-  // const getQuote = useCallback(
-  //   async (num: number) => {
-  //     if (!num) return setPriceQuote(null);
-
-  //     setIsFetchingQuote(true);
-  //     const feeConfig = getSwapFeeConfig(selectToken.mint);
-  //     const feeBp = feeConfig.burnFeeBp + feeConfig.transferFeeBp;
-  //     try {
-  //       const quote = await fetcher<WhirlpoolQuoteData>("/api/bonk/whirlpool-quote", {
-  //         method: "POST",
-  //         body: JSON.stringify({
-  //           quoteMint: selectToken.mint,
-  //           amountIn: num * (1 - feeBp / 10000),
-  //           numerator: 10,
-  //           denominator: 1000,
-  //         }),
-  //         headers: { "Content-type": "application/json; charset=UTF-8" },
-  //       });
-  //       setPriceQuote(quote);
-  //     } catch (err) {
-  //       setPriceQuote(null);
-  //     } finally {
-  //       setIsFetchingQuote(false);
-  //     }
-  //   },
-  //   [selectToken.mint, getSwapFeeConfig]
-  // );
-
-  // const debouncedGetQuote = useMemo(() => debounce(getQuote, 500), [getQuote]);
-
   const submitSwap = async (data: FormData) => {
     if (!publicKey || !signTransaction) return;
     // Bonk!
@@ -143,56 +113,6 @@ export default function BonkSwap() {
     });
   };
 
-  // const handleSolClick = (amount: number) => async () => {
-  //   const id = notify(
-  //     {
-  //       type: "info",
-  //       title: `${amount} SOL is enough for...`,
-  //       description: (
-  //         <ul className="mt-1 ">
-  //           <li>
-  //             <span className="font-bold text-blue-400">~{Math.round(amount / 0.000005)}</span>{" "}
-  //             token transfers or swaps
-  //           </li>
-  //           <li>
-  //             <span className="font-bold text-blue-400">~{Math.round(amount / 0.0022)}</span> token
-  //             accounts created
-  //           </li>
-  //           <li>
-  //             <span className="font-bold text-blue-400">~{Math.round(amount / 0.005)}</span> NFTs
-  //             minted
-  //           </li>
-  //         </ul>
-  //       ),
-  //     },
-  //     notifyId ? notifyId : null
-  //   );
-  //   if (!notifyId) setNotifyId(id);
-
-  //   setIsFetchingQuote(true);
-  //   const feeConfig = getSwapFeeConfig(selectToken.mint);
-  //   try {
-  //     const quote = await fetcher<WhirlpoolQuoteData>("/api/bonk/whirlpool-quote", {
-  //       method: "POST",
-  //       body: JSON.stringify({
-  //         quoteMint: selectToken.mint,
-  //         amountOut: amount,
-  //         numerator: 10,
-  //         denominator: 1000,
-  //       }),
-  //       headers: { "Content-type": "application/json; charset=UTF-8" },
-  //     });
-
-  //     const ratioReducedByFee = 1 - (feeConfig.burnFeeBp + feeConfig.transferFeeBp) / 10000;
-  //     const swapAmount = parseFloat(quote.estimatedAmountIn) / ratioReducedByFee;
-  //     setValue("swapAmount", swapAmount > 1e6 ? Math.ceil(swapAmount) : roundTo(swapAmount, 5));
-  //     setPriceQuote(quote);
-  //   } catch (err) {
-  //   } finally {
-  //     setIsFetchingQuote(false);
-  //   }
-  // };
-
   if (network === WalletAdapterNetwork.Devnet) {
     return (
       <div className="mx-auto text-lg">
@@ -234,7 +154,7 @@ export default function BonkSwap() {
 
       <div className="mt-4 flex gap-x-8">
         {/* Image + exchange rate */}
-        <FormLeft quoteToken={{ name: "Bonk", mint: BONK_MINT_58 }} />
+        <FormLeft />
 
         {/* Form */}
         <form

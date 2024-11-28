@@ -5,16 +5,12 @@ import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
 import { useRef } from "react";
 import { CheemsImage } from "./cheems-image";
 
-type Props = {
-  quoteToken: {
-    name: string;
-    mint: string;
-  };
-};
+const SOL_MINT = "So11111111111111111111111111111111111111112";
+const BONK_MINT_58 = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
 
-export const FormLeft = ({ quoteToken }: Props) => {
+export const FormLeft = () => {
   const cheemsWrapRef = useRef<HTMLDivElement>(null);
-  const { data, error, isLoading } = useJupPrice("SOL", quoteToken.mint);
+  const { data, error, isLoading } = useJupPrice(SOL_MINT, BONK_MINT_58);
 
   const getDecimalCount = (price: number) =>
     price > 1e6 ? 0 : price > 1e3 ? 2 : 3;
@@ -43,10 +39,10 @@ export const FormLeft = ({ quoteToken }: Props) => {
           </div>
           <span className="text-sm font-medium text-gray-600">
             {formatNumber.format(
-              data.SOL?.price,
-              getDecimalCount(data.SOL.price),
-            )}{" "}
-            {quoteToken.name}
+              Number(data.data.SOL?.price) ?? 0,
+              getDecimalCount(Number(data.data.SOL?.price ?? 0)),
+            )}
+            {" BONK"}
           </span>
         </div>
       )}

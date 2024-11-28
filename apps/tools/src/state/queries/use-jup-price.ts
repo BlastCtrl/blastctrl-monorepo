@@ -1,12 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 
-type PriceResponse = {
-  SOL: {
-    id: string; // Address of a token
-    mintSymbol: string; // Symbol of id token
-    vsToken: string; // Address of vs token
-    vsTokenSymbol: string; // Symbol of vs token
-    price: number; // Default: 1 unit of the token worth in USDC if vsToken isn't specified
+// # Unit price of 1 JUP & 1 SOL based on the Derived Price in USDC
+// https://api.jup.ag/price/v2?ids=JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN,So11111111111111111111111111111111111111112
+//https://api.jup.ag/price/v2?ids=JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN&vsToken=DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263&showExtraInfo=true
+
+type TokenData = {
+  id: string;
+  type: "derivedPrice";
+  price: string;
+};
+
+type JupiterPriceResponse = {
+  data: {
+    [key: string]: TokenData;
   };
   timeTaken: number;
 };
@@ -14,7 +20,7 @@ type PriceResponse = {
 const BASE_URL = "https://price.jup.ag/v6/price";
 
 export function useJupPrice(mintOrSymbol: string, vsMint: string) {
-  return useQuery<PriceResponse, Error>({
+  return useQuery<JupiterPriceResponse, Error>({
     enabled: !!mintOrSymbol && !!vsMint,
     queryKey: ["jup-price", mintOrSymbol, vsMint],
     queryFn: async () => {
@@ -28,8 +34,8 @@ export function useJupPrice(mintOrSymbol: string, vsMint: string) {
       if (!priceResponse.ok) {
         throw new Error("Error fetching price");
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return priceResponse.json().then((res) => res?.data);
+
+      return priceResponse.json();
     },
   });
 }
