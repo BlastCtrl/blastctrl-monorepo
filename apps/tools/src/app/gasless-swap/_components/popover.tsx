@@ -1,5 +1,5 @@
 import { cn } from "@blastctrl/ui";
-import { PopoverPanel, PopoverOverlay } from "@headlessui/react";
+import { PopoverPanel, PopoverBackdrop } from "@headlessui/react";
 import type { ComponentPropsWithoutRef, ComponentRef } from "react";
 import React from "react";
 
@@ -11,10 +11,10 @@ const PopoverInternalPanel = React.forwardRef<
 
   return (
     <>
-      <PopoverOverlay className="fixed inset-0 isolate z-10 bg-black/60 xs:hidden" />
+      <PopoverBackdrop className="fixed inset-0 isolate z-10 bg-black/60 xs:hidden" />
       <PopoverPanel
         className={cn(
-          "z-20 overflow-hidden rounded border border-black/5 bg-white p-4 shadow-md",
+          "z-20 overflow-hidden rounded border border-black/5 bg-white px-4 pt-4 shadow-md",
           "sm:absolute sm:inset-x-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2",
           "fixed left-8 top-20",
           // eslint-disable-next-line @typescript-eslint/no-unsafe-argument

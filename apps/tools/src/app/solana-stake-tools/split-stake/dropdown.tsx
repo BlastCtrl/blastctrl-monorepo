@@ -2,12 +2,12 @@ import {
   Listbox,
   ListboxButton,
   ListboxOption,
-  ListboxOptionProps,
   ListboxOptions,
-  ListboxProps,
   ListboxSelectedOption,
 } from "@headlessui/react";
-import { Fragment, type ReactNode } from "react";
+import type { ListboxOptionProps, ListboxProps } from "@headlessui/react";
+import { Fragment } from "react";
+import type { ReactNode } from "react";
 import { ChevronUpDownIcon } from "@heroicons/react/16/solid";
 
 interface DropdownProps<T>
@@ -53,7 +53,7 @@ export function DropdownOption<T>({
     <ListboxOption as={Fragment} {...props}>
       {({ selectedOption }) => {
         return selectedOption ? (
-          // @ts-ignore
+          // @ts-ignore idk
           <>{children}</>
         ) : (
           <div className="w-full cursor-default rounded-md px-3 py-1 text-base/6 data-[selected]:bg-indigo-500 data-[selected]:text-white sm:text-sm/6 [&:not([data-selected])]:data-[focus]:bg-blue-100">

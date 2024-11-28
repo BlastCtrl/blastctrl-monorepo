@@ -100,7 +100,7 @@ export function jupTokensQuery(wallet = "", useUnknownTokens: boolean) {
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
-    staleTime: 60000,
+    staleTime: 300_000,
   });
 }
 
