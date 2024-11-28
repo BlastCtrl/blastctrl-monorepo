@@ -57,9 +57,19 @@ export function TokenSelectPanel({
 
   if (status === "pending") {
     return (
-      <div className="grid h-[440px] w-[280px] place-content-center bg-white">
-        <SpinnerIcon className="mx-auto size-8 animate-spin" />
-        <span className="pt-4 text-center text-sm text-zinc-500">
+      <div className="flex h-[440px] w-[280px] flex-col bg-white">
+        <div className="-mt-1 flex w-full justify-end pb-1">
+          <Checkbox
+            onChange={(checked) => {
+              setEnableUnknownTokens(checked);
+            }}
+            className="cursor-default rounded-full px-2.5 py-1 text-sm/6 font-medium text-zinc-500 ring-1 ring-zinc-200 transition-colors data-[checked]:bg-indigo-500 data-[checked]:data-[hover]:bg-indigo-400 data-[checked]:text-white [&:not([data-checked])]:data-[hover]:bg-zinc-100"
+          >
+            Enable Unverified Tokens
+          </Checkbox>
+        </div>
+        <SpinnerIcon className="mx-auto mt-auto size-8 animate-spin" />
+        <span className="mb-auto pt-4 text-center text-sm text-zinc-500">
           Loading tokens can take a long time, especially if unverified tokens
           are included.
         </span>
@@ -74,7 +84,7 @@ export function TokenSelectPanel({
           onChange={(checked) => {
             setEnableUnknownTokens(checked);
           }}
-          className="cursor-default rounded-full px-2.5 py-1 text-sm/6 font-medium text-zinc-700 ring-1 ring-zinc-200 transition-colors data-[checked]:bg-indigo-500 data-[checked]:data-[hover]:bg-indigo-400 data-[checked]:text-white [&:not([data-checked])]:data-[hover]:bg-zinc-100"
+          className="cursor-default rounded-full px-2.5 py-1 text-sm/6 font-medium text-zinc-500 ring-1 ring-zinc-200 transition-colors data-[checked]:bg-indigo-500 data-[checked]:data-[hover]:bg-indigo-400 data-[checked]:text-white [&:not([data-checked])]:data-[hover]:bg-zinc-100"
         >
           Enable Unverified Tokens
         </Checkbox>
@@ -89,7 +99,7 @@ export function TokenSelectPanel({
         />
       </div>
 
-      <div ref={parentRef} className="-mx-4 grow overflow-auto">
+      <div ref={parentRef} className="scroller -mx-4 grow">
         <ul
           style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
           className="relative flex w-full flex-col"
