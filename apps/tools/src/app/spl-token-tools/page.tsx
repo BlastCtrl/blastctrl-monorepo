@@ -25,19 +25,6 @@ export default function Tokens() {
         "Attempt to close your empty token accounts, recovering the SOL used to open them.",
       active: true,
     },
-    {
-      name: "Create stake account",
-      href: "/spl-token-tools/stake-create",
-      description:
-        "Create a stake account with custom signing authorities and a lockup.",
-      active: true,
-    },
-    {
-      name: "Update stake authority",
-      href: "/spl-token-tools/stake-authorize",
-      description: "Update your stake account signing authorities.",
-      active: true,
-    },
   ];
   return (
     <>
