@@ -38,12 +38,12 @@ type AssetsResponse = {
 
 const ignoreList = ["Bonk", "SOL"];
 
-export function jupTokensQuery(wallet = "") {
+export function jupTokensQuery(wallet = "", useUnknownTokens: boolean) {
   return queryOptions<Array<TokensResponse>, Error>({
-    queryKey: ["jup-tokens", wallet || "none"],
+    queryKey: ["jup-tokens", wallet || "none", useUnknownTokens],
     queryFn: async () => {
       const jupFetch = fetch(
-        `https://tokens.jup.ag/tokens?tags=verified,unknown`,
+        `https://tokens.jup.ag/tokens?tags=verified${useUnknownTokens ? ",unknown" : ""}`,
         {
           headers: { origin: "https://tools.blastctrl.com" },
         },
@@ -109,6 +109,6 @@ export function jupTokensQuery(wallet = "") {
  * @param wallet
  * @returns
  */
-export function useJupTokens(wallet = "") {
-  return useQuery(jupTokensQuery(wallet));
+export function useJupTokens(wallet = "", useUnknownTokens: boolean) {
+  return useQuery(jupTokensQuery(wallet, useUnknownTokens));
 }
