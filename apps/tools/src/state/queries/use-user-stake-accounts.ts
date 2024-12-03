@@ -1,14 +1,80 @@
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import {
+import { useConnection } from "@solana/wallet-adapter-react";
+import { StakeProgram } from "@solana/web3.js";
+import type {
+  Connection,
   GetProgramAccountsFilter,
   PublicKey,
-  StakeProgram,
 } from "@solana/web3.js";
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 const META_AUTHORIZED_STAKER_OFFSET = 12;
 const META_AUTHORIZED_WITHDRAWER_OFFSET = 44;
+
+export function userStakeAccountsQuery(
+  connection: Connection,
+  staker?: PublicKey,
+  withdrawer?: PublicKey,
+) {
+  withdrawer ??= staker;
+  return queryOptions({
+    enabled: !!staker,
+    staleTime: Infinity,
+    retry: 1,
+    retryOnMount: false,
+    queryKey: [
+      "user-stake-accounts",
+      staker?.toString(),
+      withdrawer?.toString(),
+    ],
+    queryFn: async () => {
+      if (!staker) {
+        throw Error("Missing publicKey");
+      }
+
+      const filters: GetProgramAccountsFilter[] = [];
+      if (staker) {
+        filters.push({
+          memcmp: {
+            offset: META_AUTHORIZED_STAKER_OFFSET,
+            bytes: staker.toBase58(),
+          },
+        });
+      }
+      if (withdrawer) {
+        filters.push({
+          memcmp: {
+            offset: META_AUTHORIZED_WITHDRAWER_OFFSET,
+            bytes: withdrawer.toBase58(),
+          },
+        });
+      }
+
+      const parsedStakeAccounts = await connection.getParsedProgramAccounts(
+        StakeProgram.programId,
+        {
+          commitment: "confirmed",
+          filters,
+        },
+      );
+
+      return parsedStakeAccounts
+        .map(({ pubkey, account }) => {
+          try {
+            const casted = stakeAccountSchema.parse(account.data);
+            return {
+              accountId: pubkey,
+              lamports: account.lamports,
+              data: casted.parsed,
+            };
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean) as StakeAccountType[];
+    },
+  });
+}
 
 export function useUserStakeAccounts(
   staker?: PublicKey,

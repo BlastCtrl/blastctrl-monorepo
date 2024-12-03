@@ -1,5 +1,5 @@
 "use client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { isPublicKey, lamportsToSolString } from "@/lib/solana/common";
 import { Field, Fieldset, Input, Label, Legend } from "@headlessui/react";
@@ -27,7 +27,7 @@ import { retryWithBackoff } from "@/lib/utils";
 import { getSetLockupInstruction } from "@/lib/solana/stake";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { ZodError } from "zod";
-import { useCurrentEpoch } from "@/state/queries/use-epoch";
+import { currentEpochQuery } from "@/state/queries/use-epoch";
 import { Badge } from "@/components/badge";
 
 function getLockupStatus(
@@ -46,13 +46,14 @@ function getLockupStatus(
 const DISABLE_OVERRIDE = true;
 
 export function LockupFormContainer() {
+  const { connection } = useConnection();
   const queryClient = useQueryClient();
   const [stakeAccAddr, setStakeAccAddr] = useState("");
   const { data, error, refetch, isLoading } = useStakeAccount(
     stakeAccAddr,
     DISABLE_OVERRIDE,
   );
-  useCurrentEpoch(); // prefetch
+  useQuery(currentEpochQuery(connection)); // prefetch
 
   const isSuccess = !!stakeAccAddr && !!data;
   const isInvalid = stakeAccAddr !== "" && !isPublicKey(stakeAccAddr);
@@ -146,8 +147,9 @@ function StakeAccountDescription({
 }: {
   stakeData: StakeAccountType;
 }) {
+  const { connection } = useConnection();
   const { publicKey } = useWallet();
-  const { data: epochData } = useCurrentEpoch(); // prefetch
+  const { data: epochData } = useQuery(currentEpochQuery(connection));
 
   const withdrawAuthMatch =
     publicKey?.toString() === stakeData.data.info.meta.authorized.withdrawer;
@@ -235,8 +237,8 @@ function SetLockupTransactionBuilder({
   stakeData: StakeAccountType;
   reset: () => void;
 }) {
-  const { data } = useCurrentEpoch();
   const { connection } = useConnection();
+  const { data } = useQuery(currentEpochQuery(connection));
   const { publicKey, sendTransaction } = useWallet();
   const [custodian, setCustodian] = useState("");
   const [timestamp, setTimestamp] = useState("");

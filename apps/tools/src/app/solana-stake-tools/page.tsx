@@ -31,6 +31,12 @@ export default function StakeAccounts() {
       description: "Split a single stake account into two.",
       active: true,
     },
+    {
+      name: "Merge stake accounts",
+      href: "/solana-stake-tools/merge-stake",
+      description: "Merge two compatible stake accounts into one.",
+      active: true,
+    },
   ];
   return (
     <>
