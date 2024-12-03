@@ -1,12 +1,11 @@
 "use client";
 
-import {
-  StakeAccountType,
-  useUserStakeAccounts,
-} from "@/state/queries/use-user-stake-accounts";
+import { useUserStakeAccounts } from "@/state/queries/use-user-stake-accounts";
+import type { StakeAccountType } from "@/state/queries/use-user-stake-accounts";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Dropdown, DropdownOption } from "./dropdown";
-import { type FormEvent, useMemo, useState } from "react";
+import type { FormEvent } from "react";
+import { useState } from "react";
 import {
   compress,
   lamportsToSol,
@@ -24,7 +23,6 @@ import { retryWithBackoff } from "@/lib/utils";
 import {
   ComputeBudgetProgram,
   Keypair,
-  PublicKey,
   StakeProgram,
   Transaction,
 } from "@solana/web3.js";
@@ -46,7 +44,7 @@ export function SplitGraphicForm() {
 
   const copyToClipboard = () => {
     if (selectedAccount) {
-      navigator.clipboard.writeText(selectedAccount.accountId.toString());
+      void navigator.clipboard.writeText(selectedAccount.accountId.toString());
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     }
