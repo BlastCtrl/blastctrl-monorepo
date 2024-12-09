@@ -9,7 +9,7 @@ export default function StakeLockupManagement() {
       <Box>
         <header>
           <h1 className="font-display text-3xl font-semibold">
-            Split stake account
+            Merge stake accounts
           </h1>
           <div className="mt-3 text-sm text-gray-500">
             <p>
