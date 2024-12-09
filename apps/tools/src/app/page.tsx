@@ -107,10 +107,16 @@ export default function Page() {
             Set stake lockup
           </Link>
           <Link
-            href="/solana-stake-tools/set-lockup"
+            href="/solana-stake-tools/split-stake"
             className="inline-flex items-center justify-center rounded-lg border-2 border-red-600 px-3 py-1.5 text-red-950 shadow hover:bg-red-50"
           >
             Split stake
+          </Link>
+          <Link
+            href="/solana-stake-tools/merge-stake"
+            className="inline-flex items-center justify-center rounded-lg border-2 border-indigo-600 px-3 py-1.5 text-indigo-950 shadow hover:bg-indigo-50"
+          >
+            Merge stake accounts
           </Link>
         </div>
         <div className="mt-6 text-sm font-medium text-gray-700">
