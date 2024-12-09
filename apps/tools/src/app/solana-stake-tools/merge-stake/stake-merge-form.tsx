@@ -186,8 +186,8 @@ export function StakeMergeForm() {
                 onClick={() => {
                   mutate(
                     {
-                      sourceStakePubKey: selectedPrimary.accountId,
-                      stakePubkey: selectedSecondary.accountId,
+                      sourceStakePubKey: selectedSecondary.accountId,
+                      stakePubkey: selectedPrimary.accountId,
                     },
                     {
                       onSuccess: () => {
