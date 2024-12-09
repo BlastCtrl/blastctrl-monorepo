@@ -6,9 +6,14 @@ import { SplitManualForm } from "./split-manual-form";
 import { SplitGraphicForm } from "./split-graphic-form";
 import { Tab, TabList, TabGroup, TabPanel, TabPanels } from "@headlessui/react";
 import { Box } from "./box";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { Button } from "@blastctrl/ui";
 
 export default function StakeLockupManagement() {
   useRentQuery(StakeProgram.space); // prefetch
+  const { publicKey } = useWallet();
+  const { setVisible } = useWalletModal();
 
   return (
     <TabGroup>
@@ -39,14 +44,27 @@ export default function StakeLockupManagement() {
           </TabList>
         </div>
       </Box>
-      <TabPanels>
-        <TabPanel>
-          <SplitGraphicForm />
-        </TabPanel>
-        <TabPanel>
-          <SplitManualForm />
-        </TabPanel>
-      </TabPanels>
+      {publicKey ? (
+        <TabPanels>
+          <TabPanel>
+            <SplitGraphicForm />
+          </TabPanel>
+          <TabPanel>
+            <SplitManualForm />
+          </TabPanel>
+        </TabPanels>
+      ) : (
+        <Box className="mt-4">
+          <Button
+            color="indigo"
+            type="button"
+            className="w-full"
+            onClick={() => setVisible(true)}
+          >
+            Connect your wallet
+          </Button>
+        </Box>
+      )}
     </TabGroup>
   );
 }

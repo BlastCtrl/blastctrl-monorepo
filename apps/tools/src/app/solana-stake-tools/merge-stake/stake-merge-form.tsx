@@ -38,7 +38,7 @@ export function StakeMergeForm() {
 
   if (!!epochQuery.error || !!stakeAccountsQuery.error) {
     return (
-      <Box className="grid place-content-center">
+      <Box className="mt-4 grid place-content-center">
         <div className="py-10 text-center">
           {epochQuery.error && "There was an error loading the current epoch"}
           {stakeAccountsQuery.error &&
@@ -50,7 +50,7 @@ export function StakeMergeForm() {
 
   if (epochQuery.isPending || stakeAccountsQuery.isPending) {
     return (
-      <Box>
+      <Box className="mt-4">
         <div className="py-10">
           <SpinnerIcon className="mx-auto size-6 animate-spin" />
         </div>
