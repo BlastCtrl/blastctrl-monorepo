@@ -181,8 +181,8 @@ export function SplitGraphicForm() {
                 value={[splitPercentage]}
                 onValueChange={(value) => setSplitPercentage(value[0] ?? 50)}
                 className="group relative mt-1.5 flex w-full touch-none select-none items-center transition-[margin] duration-300 hover:-mx-1 hover:cursor-grab active:cursor-grabbing"
-                min={1}
-                max={99}
+                min={0}
+                max={100}
                 step={0.1}
               >
                 <Slider.Track className="relative h-4 grow rounded-full bg-gradient-to-r from-orange-400 to-yellow-400 duration-300 group-hover:h-[18px]">
@@ -224,7 +224,7 @@ export function SplitGraphicForm() {
             <div className="mt-6">
               <Button type="submit" color="indigo" className="w-full">
                 {isConfirming && (
-                  <SpinnerIcon className="-ml-1 mr-1  inline size-[1em] animate-spin" />
+                  <SpinnerIcon className="-ml-1 mr-1 inline size-[1em] animate-spin" />
                 )}
                 Submit
               </Button>
