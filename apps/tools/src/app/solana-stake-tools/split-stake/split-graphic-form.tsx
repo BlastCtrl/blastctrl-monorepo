@@ -3,14 +3,9 @@
 import { useUserStakeAccounts } from "@/state/queries/use-user-stake-accounts";
 import type { StakeAccountType } from "@/state/queries/use-user-stake-accounts";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { Dropdown, DropdownOption } from "./dropdown";
 import type { FormEvent } from "react";
 import { useState } from "react";
-import {
-  compress,
-  lamportsToSol,
-  lamportsToSolString,
-} from "@/lib/solana/common";
+import { lamportsToSol, lamportsToSolString } from "@/lib/solana/common";
 import {
   ClipboardDocumentIcon,
   ClipboardDocumentCheckIcon,
@@ -28,6 +23,7 @@ import {
 } from "@solana/web3.js";
 import { notify } from "@/components/notification";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { PickerDialog } from "./picker-dialog";
 
 export function SplitGraphicForm() {
   const { publicKey, sendTransaction } = useWallet();
@@ -145,28 +141,11 @@ export function SplitGraphicForm() {
           </Label>
           <div className="flex items-center gap-4">
             <div className="mt-1 w-72">
-              <Dropdown
-                value={selectedAccount}
-                onChange={(s) => setSelectedAccount(s)}
-                by="accountId"
-                placeholder="Select&hellip;"
-              >
-                {data?.map((stakeAcc) => (
-                  <DropdownOption
-                    key={stakeAcc.accountId.toString()}
-                    value={stakeAcc}
-                  >
-                    <div className="flex w-full items-center gap-2.5 overflow-hidden">
-                      <span className="min-w-0 grow truncate text-left">
-                        {compress(stakeAcc.accountId.toString(), 4)}
-                      </span>
-                      <span className="whitespace-nowrap">
-                        ({lamportsToSolString(stakeAcc.lamports)} SOL)
-                      </span>
-                    </div>
-                  </DropdownOption>
-                ))}
-              </Dropdown>
+              <PickerDialog
+                data={data}
+                selectedAccount={selectedAccount}
+                setSelectedAccount={setSelectedAccount}
+              />
             </div>
             {selectedAccount && (
               <Button
