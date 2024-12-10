@@ -68,7 +68,7 @@ export function StakeMergeForm() {
       {!selectedPrimary ? (
         <div>
           <p className="-mt-1 font-medium sm:text-sm/6">
-            Select the primary stake account
+            Select the primary stake account (the one that you&apos;ll keep)
           </p>
 
           <div className="mt-4 space-y-2.5">
@@ -93,7 +93,7 @@ export function StakeMergeForm() {
       ) : !selectedSecondary ? (
         <div>
           <p className="-mt-1 font-medium sm:text-sm/6">
-            Select the secondary stake account
+            Select the secondary stake account (the one that will be merged)
           </p>
 
           <div className="mt-4 space-y-2.5">
@@ -128,17 +128,6 @@ export function StakeMergeForm() {
         <div className="space-y-4">
           <div className="flex items-center gap-4 rounded-lg bg-indigo-100 p-4 shadow-sm">
             <div>
-              <p className="text-sm font-medium">Primary</p>
-              <p className="text-xs">
-                {compress(selectedPrimary.accountId.toString(), 4)}
-              </p>
-              <p className="text-sm font-bold">
-                {lamportsToSolString(selectedPrimary.lamports)} SOL
-              </p>
-              <ValidatorInfo account={selectedPrimary} />
-            </div>
-            <ChevronRightIcon className="size-7 shrink-0 text-indigo-600" />
-            <div>
               <p className="text-sm font-medium">Secondary</p>
               <p className="text-xs">
                 {compress(selectedSecondary.accountId.toString(), 4)}
@@ -147,6 +136,17 @@ export function StakeMergeForm() {
                 {lamportsToSolString(selectedSecondary.lamports)} SOL
               </p>
               <ValidatorInfo account={selectedSecondary} />
+            </div>
+            <ChevronRightIcon className="size-7 shrink-0 text-indigo-600" />
+            <div>
+              <p className="text-sm font-medium">Primary</p>
+              <p className="text-xs">
+                {compress(selectedPrimary.accountId.toString(), 4)}
+              </p>
+              <p className="text-sm font-bold">
+                {lamportsToSolString(selectedPrimary.lamports)} SOL
+              </p>
+              <ValidatorInfo account={selectedPrimary} />
             </div>
           </div>
           <div className="text-center">
@@ -218,7 +218,7 @@ export function StakeMergeForm() {
 }
 
 function ValidatorInfo({ account }: { account: StakeAccountType }) {
-  const { data, error } = useValidatorData(
+  const { data, error, isPending } = useValidatorData(
     account.data.info.stake?.delegation.voter,
   );
 
@@ -230,7 +230,7 @@ function ValidatorInfo({ account }: { account: StakeAccountType }) {
     );
   }
 
-  if (!data) {
+  if (isPending) {
     return (
       <div className="mt-3 h-8 w-full animate-pulse rounded-md bg-indigo-200" />
     );

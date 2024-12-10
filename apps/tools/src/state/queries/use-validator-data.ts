@@ -76,12 +76,21 @@ export function useValidatorData(voteId: string | undefined) {
     enabled: !!voteId,
     staleTime: Infinity,
     queryKey: ["validator-data", voteId],
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: false,
     queryFn: async () => {
       const res = await fetch(`https://api.stakewiz.com/validator/${voteId}`);
       if (!res.ok) {
         throw new Error("Failed to fetch validator data");
       }
-      return res.json() as Promise<ValidatorData>;
+
+      const data = await res.json();
+      if (data === false) {
+        throw new Error("Validator not found");
+      }
+
+      return data as ValidatorData;
     },
   });
 }
