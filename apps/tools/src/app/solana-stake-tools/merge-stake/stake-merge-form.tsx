@@ -75,19 +75,21 @@ export function StakeMergeForm() {
             {stakeAccounts.length === 0 && (
               <div className="text-zinc-500">No stake accounts were found</div>
             )}
-            {stakeAccounts.map((stake) => (
-              <button
-                key={stake.accountId.toString()}
-                className="w-full flex-col items-start justify-between rounded-md bg-gray-50 p-4 ring-2 ring-black/10 hover:ring-2 hover:ring-indigo-600"
-                onClick={() => handlePrimarySelection(stake)}
-              >
-                <div className="flex w-full justify-between">
-                  <span>{compress(stake.accountId.toString(), 4)}</span>
-                  <span>{lamportsToSol(stake.lamports)} SOL</span>
-                </div>
-                <ValidatorInfo account={stake} />
-              </button>
-            ))}
+            {stakeAccounts
+              .sort((a, b) => b.lamports - a.lamports)
+              .map((stake) => (
+                <button
+                  key={stake.accountId.toString()}
+                  className="w-full flex-col items-start justify-between rounded-md bg-gray-50 p-4 ring-2 ring-black/10 hover:ring-2 hover:ring-indigo-600"
+                  onClick={() => handlePrimarySelection(stake)}
+                >
+                  <div className="flex w-full justify-between">
+                    <span>{compress(stake.accountId.toString(), 4)}</span>
+                    <span>{lamportsToSol(stake.lamports)} SOL</span>
+                  </div>
+                  <ValidatorInfo account={stake} />
+                </button>
+              ))}
           </div>
         </div>
       ) : !selectedSecondary ? (

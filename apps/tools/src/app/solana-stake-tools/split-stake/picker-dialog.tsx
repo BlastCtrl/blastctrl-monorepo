@@ -68,21 +68,23 @@ export function PickerDialog({
               className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all data-[closed]:translate-y-4 data-[closed]:opacity-0 data-[enter]:duration-300 data-[leave]:duration-200 data-[enter]:ease-out data-[leave]:ease-in sm:my-8 sm:w-full sm:max-w-lg sm:p-6 data-[closed]:sm:translate-y-0 data-[closed]:sm:scale-95"
             >
               <div className="space-y-4">
-                {data?.map((stake) => (
-                  <CloseButton
-                    key={stake.accountId.toString()}
-                    className="w-full flex-col items-start justify-between rounded-md bg-gray-50 p-4 ring-2 ring-black/10 hover:ring-2 hover:ring-indigo-600"
-                    onClick={() => {
-                      setSelectedAccount(stake);
-                    }}
-                  >
-                    <div className="flex w-full justify-between">
-                      <span>{compress(stake.accountId.toString(), 4)}</span>
-                      <span>{lamportsToSol(stake.lamports)} SOL</span>
-                    </div>
-                    <ValidatorInfo account={stake} />
-                  </CloseButton>
-                ))}
+                {data
+                  ?.sort((a, b) => b.lamports - a.lamports)
+                  ?.map((stake) => (
+                    <CloseButton
+                      key={stake.accountId.toString()}
+                      className="w-full flex-col items-start justify-between rounded-md bg-gray-50 p-4 ring-2 ring-black/10 hover:ring-2 hover:ring-indigo-600"
+                      onClick={() => {
+                        setSelectedAccount(stake);
+                      }}
+                    >
+                      <div className="flex w-full justify-between">
+                        <span>{compress(stake.accountId.toString(), 4)}</span>
+                        <span>{lamportsToSol(stake.lamports)} SOL</span>
+                      </div>
+                      <ValidatorInfo account={stake} />
+                    </CloseButton>
+                  ))}
               </div>
             </DialogPanel>
           </div>
