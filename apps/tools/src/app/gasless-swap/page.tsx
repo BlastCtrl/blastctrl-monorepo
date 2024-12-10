@@ -201,6 +201,7 @@ export default function GaslessSwap() {
             <Popover as="div" className="relative xs:w-32">
               <PopoverButton
                 onMouseEnter={prefetchJupTokens}
+                data-testid="token-selector-popover-trigger"
                 className="inline-flex size-full items-center justify-between rounded-md border border-transparent bg-gray-200 px-3 font-medium text-gray-800"
               >
                 <span className="mr-2 block xs:mr-0">
