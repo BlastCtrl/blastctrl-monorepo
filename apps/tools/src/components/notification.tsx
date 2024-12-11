@@ -16,6 +16,7 @@ export type NotifyProps = {
   title?: string | ReactNode;
   description?: string | ReactNode;
   txid?: string;
+  testId?: string;
 };
 export type NotifyWithPromisesProps<T> = {
   title?: ReactNode;
@@ -39,6 +40,7 @@ export function NotificationWindow({
   txid,
   visible,
   onClose,
+  testId,
 }: NotificationWindowProps) {
   const { fmtUrlWithCluster } = useQueryContext();
 
@@ -93,6 +95,7 @@ export function NotificationWindow({
 
   return (
     <div
+      data-testid={testId}
       className={cn(
         visible ? "animate-enter" : "animate-leave",
         "pointer-events-auto mb-4 w-full max-w-sm overflow-hidden rounded-lg bg-zinc-800 shadow-lg ring-1 ring-black ring-opacity-5 sm:max-w-lg",

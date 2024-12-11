@@ -121,6 +121,7 @@ export default function GaslessSwap() {
           type: "success",
           title: `${selectToken.name} Swap Success`,
           txid: signature,
+          testId: "swap-success-toast",
         },
         id,
       );
