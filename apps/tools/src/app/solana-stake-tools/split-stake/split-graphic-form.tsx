@@ -258,7 +258,7 @@ function SplitFormInner({
                 name="originalStake"
                 value={inputs.originalStake}
                 onChange={({ target }) => {
-                  if (/^\d*\.?\d$/.test(target.value)) {
+                  if (/^\d*\.?\d{0,9}$/.test(target.value)) {
                     handleLeftInput(target.value);
                   }
                 }}
