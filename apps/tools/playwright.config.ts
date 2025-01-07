@@ -40,10 +40,10 @@ export default defineConfig({
     },
   ],
 
-  /* Run your local dev server before starting the tests */
-  webServer: {
-    command: "pnpm -F tools dev",
-    url: "http://127.0.0.1:3000",
-    reuseExistingServer: !process.env.CI,
-  },
+  /* We run the tests on the production version of the app, we don't need the dev server */
+  // webServer: {
+  //   command: "pnpm -F tools dev",
+  //   url: "http://127.0.0.1:3000",
+  //   reuseExistingServer: !process.env.CI,
+  // },
 });
