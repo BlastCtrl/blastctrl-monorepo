@@ -5,8 +5,14 @@ import {
 } from "@/state/queries/use-user-stake-accounts";
 import { Box } from "./box";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { Button, cn, CopyButton, SpinnerIcon, Switch } from "@blastctrl/ui";
-import { SwitchField, SwitchGroup } from "./switch";
+import {
+  Button,
+  cn,
+  CopyButton,
+  SpinnerIcon,
+  Switch,
+  SwitchField,
+} from "@blastctrl/ui";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import {
   Table,
