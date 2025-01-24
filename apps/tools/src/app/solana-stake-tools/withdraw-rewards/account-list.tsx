@@ -1,4 +1,5 @@
 "use client";
+
 import {
   StakeAccountType,
   useUserStakeAccounts,
@@ -45,7 +46,7 @@ export function AccountList() {
 
   if (!publicKey) {
     return (
-      <Box className="mt-4">
+      <Box className="mt-4 max-w-2xl">
         <Button
           color="indigo"
           type="button"
@@ -59,11 +60,11 @@ export function AccountList() {
   }
 
   if (isLoading) {
-    return <Box className="mt-4">Loading...</Box>;
+    return <Box className="mt-4 max-w-2xl">Loading...</Box>;
   }
 
   if (error) {
-    return <Box className="mt-4">{error.message}</Box>;
+    return <Box className="mt-4 max-w-2xl">{error.message}</Box>;
   }
 
   return <AccountListForm stakeAccounts={data ?? []} />;
@@ -198,7 +199,7 @@ function AccountListForm({
 
   return (
     <>
-      <Box className="mt-4 max-w-full">
+      <Box className="mt-4 max-w-2xl">
         <Table className="w-full">
           <TableHead>
             <TableRow>
@@ -261,7 +262,7 @@ function AccountListForm({
           </tbody>
         </Table>
       </Box>
-      <Box className="mt-8 max-w-full sm:mt-4">
+      <Box className="mt-4 max-w-2xl">
         <Field className="grid grid-cols-[1fr_auto] items-center gap-x-8 gap-y-1 sm:grid-cols-[1fr_auto]">
           <Label className="font-semibold text-zinc-800">
             Modify reward recipient
