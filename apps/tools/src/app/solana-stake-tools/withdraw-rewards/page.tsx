@@ -13,8 +13,8 @@ export default function WithdrawRewards() {
           </h1>
           <p className="mt-4 text-sm text-gray-500">
             You can use this to withdraw any additional SOL on your stake
-            accounts which isn't delegated, except for the lamports which are
-            used for rent.
+            accounts which isn&apos;t delegated, except for the lamports which
+            are used for rent.
           </p>
           <p className="mt-4 text-sm text-gray-500">
             This is how MEV (Jito) rewards are distributed for non-JitoSOL{" "}
