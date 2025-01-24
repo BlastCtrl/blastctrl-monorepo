@@ -99,8 +99,7 @@ function AccountListForm({
   const isInvalid =
     modifyRecipient && recipient !== "" && !isPublicKey(recipient);
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     if (!publicKey || !sendTransaction) return;
 
     try {
