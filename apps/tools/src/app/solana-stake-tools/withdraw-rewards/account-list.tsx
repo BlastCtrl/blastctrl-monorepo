@@ -23,7 +23,7 @@ import {
 } from "@blastctrl/ui/table";
 import { compress, isPublicKey, lamportsToSol } from "@/lib/solana/common";
 import { Description, Field, Input, Label } from "@headlessui/react";
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 import {
   ComputeBudgetProgram,
   PublicKey,
@@ -262,7 +262,7 @@ function AccountListForm({
         </Table>
       </Box>
       <Box className="mt-8 max-w-full sm:mt-4">
-        <SwitchField>
+        <Field className="grid grid-cols-[1fr_auto] items-center gap-x-8 gap-y-1 sm:grid-cols-[1fr_auto]">
           <Label className="font-semibold text-zinc-800">
             Modify reward recipient
           </Label>
@@ -276,7 +276,7 @@ function AccountListForm({
             accounts. You can use this to set a different wallet as the
             recipient.
           </Description>
-        </SwitchField>
+        </Field>
 
         {modifyRecipient && (
           <Field className="mt-4 w-full">
