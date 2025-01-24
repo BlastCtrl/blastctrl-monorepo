@@ -37,6 +37,13 @@ export default function StakeAccounts() {
       description: "Merge two compatible stake accounts into one.",
       active: true,
     },
+    {
+      name: "Withdraw unclaimed MEV rewards",
+      href: "/solana-stake-tools/withdraw-rewards",
+      description:
+        "Harvest MEV rewards or any other additional SOL which isn't delegated from your stake accounts.",
+      active: true,
+    },
   ];
   return (
     <>
