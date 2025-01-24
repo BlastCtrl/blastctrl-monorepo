@@ -1,11 +1,16 @@
 "use client";
 
+import { notify } from "@/components/notification";
 import {
-  StakeAccountType,
-  useUserStakeAccounts,
-} from "@/state/queries/use-user-stake-accounts";
-import { Box } from "./box";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+  compress,
+  isPublicKey,
+  lamportsToSol,
+  lamportsToSolString,
+} from "@/lib/solana/common";
+import { retryWithBackoff } from "@/lib/utils";
+import type { StakeAccountType } from "@/state/queries/use-user-stake-accounts";
+import { useUserStakeAccounts } from "@/state/queries/use-user-stake-accounts";
+import { useValidatorData } from "@/state/queries/use-validator-data";
 import {
   Button,
   cn,
@@ -14,7 +19,6 @@ import {
   Switch,
   SwitchField,
 } from "@blastctrl/ui";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import {
   Table,
   TableCell,
@@ -22,20 +26,19 @@ import {
   TableHeader,
   TableRow,
 } from "@blastctrl/ui/table";
-import { compress, isPublicKey, lamportsToSol } from "@/lib/solana/common";
 import { Description, Field, Input, Label } from "@headlessui/react";
-import { useState } from "react";
+import { DocumentDuplicateIcon } from "@heroicons/react/20/solid";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import {
   ComputeBudgetProgram,
   PublicKey,
   StakeProgram,
   Transaction,
 } from "@solana/web3.js";
-import { DocumentDuplicateIcon } from "@heroicons/react/20/solid";
-import { useValidatorData } from "@/state/queries/use-validator-data";
-import { notify } from "@/components/notification";
-import { retryWithBackoff } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { Box } from "./box";
 
 export function AccountList() {
   const { publicKey } = useWallet();
@@ -225,7 +228,7 @@ function AccountListForm({
                   <TableCell>
                     <div className="flex flex-col gap-1">
                       <div className="font-semibold text-zinc-800">
-                        {unclaimedLamports} Lamports
+                        {lamportsToSolString(unclaimedLamports)} SOL
                       </div>
                       <div className="text-wrap text-sm text-zinc-500">
                         Total in account: {lamportsToSol(account.lamports)} SOL
@@ -307,7 +310,7 @@ function AccountListForm({
             {isConfirming && <SpinnerIcon className="size-3.5 animate-spin" />}
             {totalClaimLamports === 0
               ? "Confirm"
-              : `Claim ${totalClaimLamports} lamports`}
+              : `Claim ${lamportsToSolString(totalClaimLamports)} SOL`}
           </Button>
         </div>
       </Box>
