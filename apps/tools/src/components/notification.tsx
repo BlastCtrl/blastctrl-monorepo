@@ -108,7 +108,9 @@ export function NotificationWindow({
             <p className="text-lg font-semibold tracking-wide text-gray-50">
               {title}
             </p>
-            <div className="mt-1 text-sm text-gray-300">{description}</div>
+            <div className="mt-1 break-words text-sm text-gray-300">
+              {description}
+            </div>
             {txid && (
               <span className="block pb-3 pt-4 text-gray-200">{linkMemo}</span>
             )}
