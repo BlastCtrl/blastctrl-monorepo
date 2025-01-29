@@ -1,5 +1,5 @@
 import { cn } from "@blastctrl/ui";
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
 
 export function Box({
   children,

@@ -119,7 +119,7 @@ export default function Page() {
             Merge stake accounts
           </Link>
           <Link
-            href="/solana-stake-tools/withdraw-rewards"
+            href="/solana-stake-tools/mev-rewards"
             className="inline-flex items-center justify-center rounded-lg border-2 border-emerald-600 px-3 py-1.5 text-emerald-950 shadow hover:bg-emerald-50"
           >
             Withdraw MEV rewards

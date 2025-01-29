@@ -39,7 +39,7 @@ export default function StakeAccounts() {
     },
     {
       name: "Withdraw unclaimed MEV rewards",
-      href: "/solana-stake-tools/withdraw-rewards",
+      href: "/solana-stake-tools/mev-rewards",
       description:
         "Harvest MEV rewards or any other additional SOL which isn't delegated from your stake accounts.",
       active: true,

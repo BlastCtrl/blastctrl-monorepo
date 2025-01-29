@@ -61,7 +61,9 @@ export const Breadcrumbs = () => {
                 className="ml-4 text-sm font-medium uppercase tracking-wider text-gray-500 hover:text-gray-700"
                 aria-current={item.current ? "page" : undefined}
               >
-                {item.name}
+                {item.name === "mev rewards"
+                  ? "Withdraw MEV Rewards"
+                  : item.name}
               </Link>
             </div>
           </li>
