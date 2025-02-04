@@ -43,7 +43,7 @@ export default function NftFaucet() {
         <p className="text-zinc-500">
           Mint an NFT/Asset for yourself using any of the supported standards.
           Intended to be used for development testing purposes, but if you just
-          want to get an NFT, be my guest 😉
+          want to get an NFT, be our guest 😉
         </p>
       </div>
       <RadioGroup value={selected} onChange={setSelected}>
