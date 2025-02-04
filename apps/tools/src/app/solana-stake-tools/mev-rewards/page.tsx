@@ -12,9 +12,9 @@ export default function WithdrawRewards() {
             Withdraw MEV rewards
           </h1>
           <p className="mt-4 text-sm text-gray-500">
-            You can use this to withdraw any additional SOL on your stake
+            You can use this tool to withdraw any additional SOL on your stake
             accounts which isn&apos;t delegated, except for the lamports which
-            are used for rent. The withdrawn funds can be sent to any other
+            are used for rent. You can then send the withdrawn funds to any
             wallet.
           </p>
           <p className="mt-4 text-sm text-gray-500">
