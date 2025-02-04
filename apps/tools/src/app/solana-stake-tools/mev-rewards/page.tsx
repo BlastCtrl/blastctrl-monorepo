@@ -15,7 +15,7 @@ export default function WithdrawRewards() {
             You can use this tool to withdraw any additional SOL on your stake
             accounts which isn&apos;t delegated, except for the lamports which
             are used for rent. You can withdraw the funds to any wallet as long
-            as you sign with the owner of the stake account.
+            as you sign with the withdraw authority.
           </p>
           <p className="mt-4 text-sm text-gray-500">
             This is how MEV (Jito) rewards are distributed for non-JitoSOL{" "}
