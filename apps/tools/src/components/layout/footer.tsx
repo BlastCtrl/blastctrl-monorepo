@@ -95,7 +95,7 @@ export const Footer = () => {
         </a>
       </div>
       <p className="font-sans text-sm font-light text-gray-300">
-        Copyright &copy; 2024 &bull; BlastCtrl
+        Copyright &copy; 2025 &bull; BlastCtrl
       </p>
     </footer>
   );
