@@ -39,8 +39,8 @@ export const FormLeft = () => {
           </div>
           <span className="text-sm font-medium text-gray-600">
             {formatNumber.format(
-              Number(data?.[SOL_MINT]?.price) ?? 0,
-              getDecimalCount(Number(data?.[SOL_MINT]?.price ?? 0)),
+              Number(data ?? 0),
+              getDecimalCount(Number(data ?? 0)),
             )}
             {" BONK"}
           </span>
