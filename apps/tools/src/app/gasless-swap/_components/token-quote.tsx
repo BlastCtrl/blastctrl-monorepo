@@ -34,7 +34,7 @@ export const TokenQuote = ({ quoteToken }: Props) => {
 
       {data &&
         (() => {
-          const price = Number(data[SOL_MINT]?.price) ?? 0;
+          const price = Number(data ?? 0);
           const decimalCount = price > 1e6 ? 0 : price > 1e3 ? 2 : 3;
 
           return (
