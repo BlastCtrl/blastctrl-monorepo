@@ -18,7 +18,6 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "BlastTools",
     description: "A small toolbox for the adventuring Solana degen.",
-    images: ["https://cdn.blastctrl.com/bc/img/og_tools_image.png"],
   },
   openGraph: {
     type: "website",
@@ -26,7 +25,6 @@ export const metadata: Metadata = {
     description: "A small toolbox for the adventuring Solana degen.",
     url: "https://tools.blastctrl.com/",
     locale: "en_US",
-    images: ["https://cdn.blastctrl.com/bc/img/og_tools_image.png"],
   },
 };
 
