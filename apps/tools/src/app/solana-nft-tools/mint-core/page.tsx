@@ -2,7 +2,6 @@
 "use client";
 
 import { InputGroup } from "@/components";
-import type { JsonMetadata } from "@metaplex-foundation/js";
 import { useWallet } from "@solana/wallet-adapter-react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
@@ -131,7 +130,7 @@ export default function Mint() {
             : undefined;
 
         const { name, symbol, description, external_url } = data;
-        const json: JsonMetadata<string> = {
+        const json = {
           name,
           symbol,
           description,

@@ -23,7 +23,6 @@
     "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^3.9.0",
     "@irys/sdk": "^0.0.4",
-    "@metaplex-foundation/js": "^0.20.1",
     "@metaplex-foundation/mpl-candy-machine": "^6.0.1",
     "@metaplex-foundation/mpl-core": "^1.1.1",
     "@metaplex-foundation/mpl-token-metadata": "^3.2.1",

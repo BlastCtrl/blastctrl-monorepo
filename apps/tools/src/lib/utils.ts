@@ -19,6 +19,12 @@ export function chunk<T>(array: T[], size: number): T[][] {
   return result;
 }
 
+export const zipMap = <T, U, V>(
+  left: T[],
+  right: U[],
+  fn: (t: T, u: U | null, i: number) => V
+): V[] => left.map((t: T, index) => fn(t, right?.[index] ?? null, index));
+
 export async function fetcher<T>(url: string, options?: RequestInit) {
   const res = await fetch(url, options);
 

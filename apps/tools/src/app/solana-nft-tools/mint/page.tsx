@@ -7,11 +7,9 @@ import {
   QuestionMarkCircleIcon,
   XMarkIcon,
 } from "@heroicons/react/20/solid";
-import type { JsonMetadata } from "@metaplex-foundation/js";
 import { useWallet } from "@solana/wallet-adapter-react";
 import Link from "next/link";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
-
 import { InputMultiline, notify } from "@/components";
 import { IrysStorage } from "@/lib/irys";
 import { mimeTypeToCategory } from "@/lib/utils";
@@ -199,7 +197,7 @@ export default function Mint() {
             : undefined;
 
         const { name, symbol, description, attributes, external_url } = data;
-        const json: JsonMetadata<string> = {
+        const json = {
           name,
           symbol,
           description,
