@@ -1,6 +1,5 @@
 import { Dialog, Transition } from "@headlessui/react";
 import { CheckCircleIcon } from "@heroicons/react/20/solid";
-import { PublicKey, zipMap } from "@metaplex-foundation/js";
 import type { Mint, RawAccount } from "@solana/spl-token";
 import {
   AccountLayout,
@@ -9,7 +8,7 @@ import {
 } from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { Transaction } from "@solana/web3.js";
+import { Transaction, PublicKey } from "@solana/web3.js";
 import { notify } from "@/components";
 import { useSolBalance } from "@/state/queries/use-sol-balance";
 import { Fragment, useState } from "react";
@@ -24,6 +23,7 @@ import {
 } from "@/lib/solana/common";
 import { createRecoverNestedTokenAccountInstruction } from "@/lib/solana/token";
 import { cn, SpinnerIcon, Button } from "@blastctrl/ui";
+import { zipMap } from "@/lib/utils";
 
 type FormValues = {
   parentAta: string;
