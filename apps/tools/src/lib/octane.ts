@@ -11,7 +11,7 @@ export type TokenFee = {
   transferFeeBp?: number;
 };
 
-type WhirlpoolsQuote = {
+export type WhirlpoolsQuote = {
   estimatedAmountIn: string;
   estimatedAmountOut: string;
   estimatedEndTickIndex: number;

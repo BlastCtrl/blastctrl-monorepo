@@ -75,7 +75,7 @@ export async function cleanWallet(from: Keypair, to: Keypair) {
   transaction.recentBlockhash = newBlockhash;
 
   const signature = await sendAndConfirmTransaction(connection, transaction, [from, to]);
-  return { signature, solBalance, tokenBalance };
+  return { signature, lamports: solBalance, tokens: Number(tokenBalance) };
 }
 
 export async function sendTokensToWallet(from: Keypair, to: Keypair, amount: number) {
@@ -109,6 +109,24 @@ export async function sendTokensToWallet(from: Keypair, to: Keypair, amount: num
 
   const signature = await sendAndConfirmTransaction(connection, transaction, [from]);
   return signature;
+}
+
+export function getSolBalance(address: PublicKey): Promise<number> {
+  const connection = new Connection(CONFIG.rpcUrl, "confirmed");
+  return connection.getBalance(address);
+}
+
+export async function getTokenBalance(address: PublicKey, mint: PublicKey): Promise<number> {
+  const connection = new Connection(CONFIG.rpcUrl, "confirmed");
+  const tokenAccount = getAssociatedTokenAddressSync(mint, address);
+
+  try {
+    const balance = await connection.getTokenAccountBalance(tokenAccount);
+    return balance.value.uiAmount ?? 0;
+  } catch {
+    // Account does not exist
+    return 0;
+  }
 }
 
 export function formatNumber(value: number, maxDecimalPlaces: number): string {

@@ -8,7 +8,8 @@
     "playwright:test": "playwright test --ui",
     "playwright:install": "playwright install",
     "script:clear-wallet": "tsc && node dist/src/scripts/clear-wallet.js",
-    "script:webhook": "tsc && node dist/src/scripts/discord-webhook.js"
+    "script:webhook": "tsc && node dist/src/scripts/discord-webhook.js",
+    "script:swap": "tsc && node dist/src/scripts/ultra-swap.js"
   },
   "keywords": [],
   "author": "",

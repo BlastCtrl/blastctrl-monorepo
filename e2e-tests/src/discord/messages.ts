@@ -1,4 +1,5 @@
 import { formatNumber } from "../solana-lib.js";
+import { SwapStepData, type CleanupStepData } from "./test-reporter.js";
 
 export function createInitialTestMessage(data: {
   testId: string;
@@ -25,8 +26,6 @@ export function createInitialTestMessage(data: {
         color: 0x3498db, // Blue color
         thumbnail: {
           url: "https://s3.eu-central-1.amazonaws.com/blastctrl.com/android-chrome-192x192.png",
-          // url: "https://blastctrl.com/images/blast/BlastCtrl_Icon_Vector_Red.svg",
-          // url: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png", // USDC logo
         },
         fields: [
           {
@@ -36,12 +35,12 @@ export function createInitialTestMessage(data: {
           },
           {
             name: "💰 Funder",
-            value: `**${formattedFunderSol}** ◎\n**${formattedFunderUsdc}** $`,
+            value: `SOL: **${formattedFunderSol}** ◎  USDC: **${formattedFunderUsdc}** $`,
             inline: true,
           },
           {
             name: "🧪 Swapper",
-            value: `**${formattedSwapperSol}** ◎\n**${formattedSwapperUsdc}** $${hasSwapperBalance ? "\n\n⚠️ **WARNING:** Unexpected balance detected" : ""}`,
+            value: `SOL: **${formattedSwapperSol}** ◎  USDC: **${formattedSwapperUsdc}** $${hasSwapperBalance ? "\n\n⚠️ **WARNING:** Unexpected balance detected" : ""}`,
             inline: true,
           },
           { name: "", value: "\u200b", inline: false },
@@ -76,21 +75,8 @@ export function createComprehensiveTestReport(data: {
     duration: number;
     errorReason?: string;
   };
-  swapStatus: {
-    success: boolean;
-    swapAmount: number;
-    receivedAmount?: number;
-    duration: number;
-    transactionId?: string;
-    errorReason?: string;
-  };
-  cleanupStatus: {
-    success: boolean;
-    txId?: string;
-    returnedTokens: number;
-    returnedSol: number;
-    errorReason?: string;
-  };
+  swapStatus: SwapStepData;
+  cleanupStatus: CleanupStepData;
   overallSuccess: boolean;
 }) {
   const {
@@ -141,7 +127,7 @@ export function createComprehensiveTestReport(data: {
         // Swap phase
         {
           name: `${swapStatus.success ? "✅" : "❌"} 2. Gasless Swap Phase`,
-          value: `${swapStatus.success ? "Successfully" : "Failed to"} swap **${formatNumber(swapStatus.swapAmount, 6)} USDC** ${swapStatus.receivedAmount ? `for **${formatNumber(swapStatus.receivedAmount, 9)} SOL**` : ""} in ${swapStatus.duration.toFixed(2)}s
+          value: `${swapStatus.success ? "Successfully" : "Failed to"} swap **${formatNumber(swapStatus.swapAmount, 6)} USDC for SOL** in ${swapStatus.duration.toFixed(2)}s
           ${swapStatus.transactionId ? `[View Transaction](https://explorer.solana.com/tx/${swapStatus.transactionId})` : ""}
           ${swapStatus.errorReason ? `\n❌ **Error:** ${swapStatus.errorReason}` : ""}`,
           inline: false,
@@ -149,10 +135,16 @@ export function createComprehensiveTestReport(data: {
 
         // Cleanup phase
         {
-          name: `${cleanupStatus.success ? "✅" : "❌"} 3. Cleanup Phase`,
-          value: `${cleanupStatus.success ? "Successfully" : "Failed to"} return **${formatNumber(cleanupStatus.returnedTokens, 6)} USDC** and **${formatNumber(cleanupStatus.returnedSol, 9)} SOL**
-          ${cleanupStatus.txId ? `[View Transaction](https://explorer.solana.com/tx/${cleanupStatus.txId})` : ""}
-          ${cleanupStatus.errorReason ? `\n❌ **Error:** ${cleanupStatus.errorReason}` : ""}`,
+          name: `${cleanupStatus.success ? "✅" : "❌"} 3. Cleanup Transfer`,
+          value: `${cleanupStatus.success ? "Successfully" : "Failed to"} return **${formatNumber(cleanupStatus.tokensToReturn, 6)} USDC** and **${formatNumber(cleanupStatus.solToReturn, 9)} SOL**
+          ${cleanupStatus.transferTxid ? `[View Transaction](https://explorer.solana.com/tx/${cleanupStatus.transferTxid})` : ""}
+          ${cleanupStatus.transferErrorReason ? `\n❌ **Error:** ${cleanupStatus.transferErrorReason}` : ""}`,
+          inline: false,
+        },
+        {
+          name: `${cleanupStatus.success ? "✅" : "❌"} 4. Cleanup Swap`,
+          value: `Swap ${cleanupStatus.swapErrorReason ? "Failed" : "Successful"} ${cleanupStatus.swapTxid ? `[View Transaction](https://explorer.solana.com/tx/${cleanupStatus.swapTxid})` : ""}
+          ${cleanupStatus.swapErrorReason ? `\n❌ **Error:** ${cleanupStatus.swapErrorReason}` : ""}`,
           inline: false,
         },
       ],
@@ -164,14 +156,19 @@ export function createComprehensiveTestReport(data: {
       color: resultColor,
       fields: [
         {
+          name: "",
+          value: "\u200b", // Zero-width space to create a visual divider
+          inline: false,
+        },
+        {
           name: "💰 Funder Final Balances",
           value: `${formatNumber(finalBalances.funder.sol, 9)} ◎ (${solChange >= 0 ? "+" : ""}${formatNumber(solChange, 9)} ◎, ${solPercentChange >= 0 ? "+" : ""}${solPercentChange.toFixed(2)}%)\n${formatNumber(finalBalances.funder.usdc, 6)} $ (${usdcChange >= 0 ? "+" : ""}${formatNumber(usdcChange, 6)} $, ${usdcPercentChange >= 0 ? "+" : ""}${usdcPercentChange.toFixed(2)}%)`,
-          inline: false,
+          inline: true,
         },
         {
           name: "🧪 Swapper Final Balances",
           value: `${formatNumber(finalBalances.swapper.sol, 9)} ◎\n${formatNumber(finalBalances.swapper.usdc, 6)} $${swapperHasBalance ? "\n\n⚠️ **WARNING:** Leftover balance detected" : ""}`,
-          inline: false,
+          inline: true,
         },
       ],
       footer: {

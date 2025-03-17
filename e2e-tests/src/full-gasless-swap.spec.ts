@@ -1,110 +1,198 @@
-import { test, expect } from "./fixtures.js";
-import CONFIG from "./config.js";
-import { cleanWallet, sendTokensToWallet, sleep } from "./solana-lib.js";
-import { Page } from "@playwright/test";
-import { runJupiterUltraSwap } from "./jup-ultra-swap.js";
-
 // CI commands
 // pnpm install
 // channel chromium -> (skip installing headless shell or something?)
 // npx playwright install --with-deps --no-shell chromium
-// uninstall browsers
+// uninstall browser
 
-// TODO: package from playwright chrome
-// How to capture the error message from the test
-// How to send a message to a Discord channel
-// Create a format for the report messages in Discord
-//   - metadata for the test: pre balance for funder wallet, test wallet, post balance for funder wallet, test wallet
-//   - did swap succeed, duration it took, swap amount
-//
-// Full test logic
-//   - set up phantom wallet, load up keypair of test wallet
-//   - transfer tokens from funder to swapper, wait until balance is available
-//   - go to gasless-swap, execute swap, check for success toast
-//   - handle errors: read content of the error toast, save it, if possible read console logs
-//   - cleanup:
-//      - send all tokens from swapper to funder and close account, transferring the rent to funder
-//      - swap SOL back to the original token
-//      - return any leftover SOL to the funder wallet
-//
-//
+import { test, expect } from "./fixtures.js";
+import CONFIG from "./config.js";
+import { cleanWallet, sendTokensToWallet, sleep } from "./solana-lib.js";
+import { Page } from "@playwright/test";
+import { TestReporter } from "./discord/test-reporter.js";
+import { runJupiterUltraSwap } from "./jup-ultra-swap.js";
+
+// Get Discord webhook URL from environment variable
+const DISCORD_WEBHOOK_URL = CONFIG.discordWebhookUrl;
+const testReporter: TestReporter = new TestReporter(DISCORD_WEBHOOK_URL);
 
 test.beforeAll(async () => {
-  console.log("Transfer the tokens to be swapped to swapper wallet");
-  const amountToSend = 3e6;
-  const fundTxid = await sendTokensToWallet(CONFIG.funder, CONFIG.swapper, amountToSend);
-  console.log(`Funding succesful ${fundTxid}`);
+  await testReporter.init();
+
+  let fundingSuccess = false;
+  let fundStartTime = Date.now();
+  let fundTxid: string;
+  let fundDuration: number;
+
+  try {
+    console.log("Transfer the tokens to be swapped to swapper wallet");
+    const amountToSend = 3e6;
+    fundStartTime = Date.now();
+    fundTxid = await sendTokensToWallet(CONFIG.funder, CONFIG.swapper, amountToSend);
+    fundDuration = (Date.now() - fundStartTime) / 1000;
+    console.log(`Funding successful ${fundTxid}`);
+    fundingSuccess = true;
+  } catch (error) {
+    console.error("Funding failed:", error);
+    fundTxid = "";
+    fundDuration = (Date.now() - (fundStartTime || Date.now())) / 1000;
+
+    // Report failure and exit early - we can't continue without funds
+    testReporter.recordFundingStatus(false, {
+      transactionId: "",
+      amount: 3,
+      duration: fundDuration,
+      errorReason: error instanceof Error ? error.message : "Unknown error",
+    });
+
+    await testReporter.reportTestCompletion(false);
+    throw error;
+  }
+
+  // Record successful funding
+  testReporter.recordFundingStatus(fundingSuccess, {
+    transactionId: fundTxid,
+    amount: 3, // USDC
+    duration: fundDuration,
+  });
 });
 
 test.afterAll(async () => {
-  await sleep(5000);
-  const { signature, solBalance, tokenBalance } = await cleanWallet(CONFIG.swapper, CONFIG.funder);
+  let cleanupSuccess = false;
+  let transferTxid: string | undefined;
+  let transferErrorReason: string | undefined;
+  let swapTxid: string | undefined;
+  let swapErrorReason: string | undefined;
+  let solToTransfer = 0;
+  let tokenToTransfer = 0;
 
-  console.log({ signature, solBalance, tokenBalance: tokenBalance.toString() });
-  const executeResponse = await runJupiterUltraSwap(Number(tokenBalance));
-  console.log({ executeResponse });
+  await sleep(5000);
+  let cleanWalletResult;
+  try {
+    cleanWalletResult = await cleanWallet(CONFIG.swapper, CONFIG.funder);
+    transferTxid = cleanWalletResult.signature;
+    solToTransfer = cleanWalletResult.lamports / 1e9;
+    tokenToTransfer = cleanWalletResult.tokens / 1e6;
+  } catch (error) {
+    transferErrorReason = error instanceof Error ? error.message : JSON.stringify(error);
+  }
+
+  if (solToTransfer > 0) {
+    const executeResponse = await runJupiterUltraSwap(Number(solToTransfer));
+    if (executeResponse.status === "Success") {
+      swapTxid = executeResponse.signature;
+      cleanupSuccess = true;
+    } else {
+      swapTxid = executeResponse?.signature;
+      swapErrorReason = executeResponse.error;
+    }
+  }
+
+  testReporter.recordCleanupStatus(cleanupSuccess, {
+    solToReturn: solToTransfer,
+    tokensToReturn: tokenToTransfer,
+    transferTxid,
+    transferErrorReason,
+    swapTxid,
+    swapErrorReason,
+  });
+
+  // Always report the test completion, regardless of success/failure
+  // The overall success depends on the swap success, not the cleanup
+  // We'll get this from the test status
+  const overallSuccess = testReporter.swapStatus?.success || false;
+  await testReporter.reportTestCompletion(overallSuccess);
 });
 
 test("test swap", async ({ page, extensionId }) => {
-  const context = page.context();
-  const newPagePromise = context.waitForEvent("page");
-  await page.goto("https://tools.blastctrl.com/gasless-swap");
+  let swapSuccess = false;
+  let swapStartTime = Date.now();
+  let swapDuration: number;
 
-  // The extension should open a new tab automatically. Wait for it:
-  const extensionSetupPage = await newPagePromise;
-  await phantomOnboarding(extensionSetupPage);
+  try {
+    const context = page.context();
+    const newPagePromise = context.waitForEvent("page");
+    await page.goto("https://tools.blastctrl.com/gasless-swap");
 
-  await page.reload();
-  await page.bringToFront();
+    // The extension should open a new tab automatically. Wait for it:
+    const extensionSetupPage = await newPagePromise;
+    await phantomOnboarding(extensionSetupPage);
 
-  // FUUUUUUUUCKKKKK
-  // This closes the Phantom sidepanel. Thank god for this thread
-  // https://github.com/microsoft/playwright/issues/26693
-  const sidePanelPage: Page = page
-    .context()
-    .pages()
-    .find((value) => value.url().match(extensionId))!;
-  await sidePanelPage?.close({});
+    await page.reload();
+    await page.bringToFront();
 
-  await page.pause();
+    // Close the Phantom sidepanel
+    const sidePanelPage: Page = page
+      .context()
+      .pages()
+      .find((value) => value.url().match(extensionId))!;
+    await sidePanelPage?.close({});
 
-  await page
-    .getByRole("button")
-    .filter({ hasText: /Connect your wallet/i })
-    .click();
+    await page
+      .getByRole("button")
+      .filter({ hasText: /Connect your wallet/i })
+      .click();
 
-  const connectPromise = context.waitForEvent("page");
+    const connectPromise = context.waitForEvent("page");
 
-  await page.getByRole("dialog").locator("button", { hasText: "Phantom" }).click();
-  const phantomConnectWindow = await connectPromise;
+    await page.getByRole("dialog").locator("button", { hasText: "Phantom" }).click();
+    const phantomConnectWindow = await connectPromise;
 
-  await phantomConnectWindow.getByTestId("primary-button").filter({ hasText: "Connect" }).click();
+    await phantomConnectWindow.getByTestId("primary-button").filter({ hasText: "Connect" }).click();
 
-  const expectedElement = page.locator("a[href='https://station.jup.ag/docs']");
-  await expect(expectedElement).toBeVisible();
+    const expectedElement = page.locator("a[href='https://station.jup.ag/docs']");
+    await expect(expectedElement).toBeVisible();
 
-  await page.getByTestId("token-selector-popover-trigger").click();
-  await page.getByRole("button").filter({ hasText: "USDC" }).locator("img").click();
+    await page.getByTestId("token-selector-popover-trigger").click();
+    await page.getByRole("button").filter({ hasText: "USDC" }).locator("img").click();
 
-  await page.getByPlaceholder("0.00").fill("4");
+    const swapAmount = 3;
+    await page.getByPlaceholder("0.00").fill(swapAmount.toString());
 
-  const confirmPromise = context.waitForEvent("page");
-  await page.getByRole("button").filter({ hasText: "Submit" }).click();
-  const phantomConfirmWindow = await confirmPromise;
+    // Start timer for the swap
+    swapStartTime = Date.now();
 
-  const confirmButton = phantomConfirmWindow.getByTestId("primary-button");
-  const unsafeConfirmButton = phantomConfirmWindow.locator("p", {
-    hasText: "Confirm anyway",
-  });
-  await confirmButton.or(unsafeConfirmButton).first().click();
+    const confirmPromise = context.waitForEvent("page");
+    await page.getByRole("button").filter({ hasText: "Submit" }).click();
+    const phantomConfirmWindow = await confirmPromise;
 
-  await expect(page.getByTestId("swap-success-toast")).toBeVisible({
-    timeout: 60000,
-  });
+    const confirmButton = phantomConfirmWindow.getByTestId("primary-button");
+    const unsafeConfirmButton = phantomConfirmWindow.locator("p", {
+      hasText: "Confirm anyway",
+    });
+    await confirmButton.or(unsafeConfirmButton).first().click();
 
-  await page.close();
+    const successToast = page.getByTestId("swap-success-toast");
+    await expect(successToast).toBeVisible({
+      timeout: 60000,
+    });
+    // in the success toast, there is an <a> tag that links to the transaction on the blockchain explorer. extract the href, and then  the txid from it
+    const txLink = await successToast.locator("a").getAttribute("href");
+    const transactionId = txLink?.split("/").pop() || "";
 
-  // Success!
+    swapDuration = (Date.now() - swapStartTime) / 1000;
+    swapSuccess = true;
+
+    await page.close();
+
+    // Record swap status
+    testReporter.recordSwapStatus(true, {
+      swapAmount: swapAmount,
+      duration: swapDuration,
+      transactionId,
+    });
+  } catch (error) {
+    console.error("Swap failed:", error);
+    swapDuration = (Date.now() - swapStartTime) / 1000;
+
+    // Record swap failure
+    testReporter.recordSwapStatus(false, {
+      swapAmount: 4, // Default swap amount
+      duration: swapDuration,
+      errorReason: error instanceof Error ? error.message : "Unknown error",
+    });
+
+    throw error;
+  }
 });
 
 async function phantomOnboarding(extensionPage: Page) {

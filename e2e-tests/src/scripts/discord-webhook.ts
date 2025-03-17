@@ -26,9 +26,10 @@ const reportMessage = createComprehensiveTestReport({
   fundingStatus: { success: true, amount: 6, duration: 10 },
   cleanupStatus: {
     success: true,
-    returnedSol: 0.1214,
-    returnedTokens: 3,
-    txId: "1233123",
+    solToReturn: 0.1214,
+    tokensToReturn: 3,
+    swapTxid: "214135513",
+    transferTxid: "32531531"
   },
   swapStatus: {
     success: true,
