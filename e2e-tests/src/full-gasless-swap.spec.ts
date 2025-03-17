@@ -76,8 +76,8 @@ test.afterAll(async () => {
     transferErrorReason = error instanceof Error ? error.message : JSON.stringify(error);
   }
 
-  if (solToTransfer > 0) {
-    const executeResponse = await runJupiterUltraSwap(Number(solToTransfer));
+  if (cleanWalletResult?.lamports && cleanWalletResult.lamports > 0) {
+    const executeResponse = await runJupiterUltraSwap(cleanWalletResult.lamports);
     if (executeResponse.status === "Success") {
       swapTxid = executeResponse.signature;
       cleanupSuccess = true;
