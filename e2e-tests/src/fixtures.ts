@@ -13,6 +13,8 @@ if (!fs.existsSync(pathToExtension)) {
   await downloadAndExtractExtension(PHANTOM_EXTENSION_ID, PHANTOM_EXTENSION_ID);
 }
 
+process.env.PW_CHROMIUM_ATTACH_TO_OTHER = "1";
+
 export const test = base.extend<{
   context: BrowserContext;
   extensionId: string;
