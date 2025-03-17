@@ -2,3 +2,4 @@ packages:
   - "packages/*"
   - "apps/*"
   - "tooling/*"
+  - "e2e-tests"
