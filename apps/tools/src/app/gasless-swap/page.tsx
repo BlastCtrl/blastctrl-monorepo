@@ -79,6 +79,7 @@ export default function GaslessSwap() {
     );
 
     let transaction: VersionedTransaction;
+    let quote: Octane.WhirlpoolsQuote;
 
     setIsSwapping(true);
     try {
@@ -90,6 +91,7 @@ export default function GaslessSwap() {
       );
 
       transaction = swap.transaction;
+      quote = swap.quote;
     } catch (err: any) {
       setIsSwapping(false);
       if (err instanceof WalletSignTransactionError) return;
@@ -119,7 +121,7 @@ export default function GaslessSwap() {
       notify(
         {
           type: "success",
-          title: `${selectToken.name} Swap Success`,
+          title: `${selectToken.name} Swap Success -- receiving ${quote.estimatedAmountOut}`,
           txid: signature,
           testId: "swap-success-toast",
         },

@@ -1,0 +1,33 @@
+{
+  "name": "e2e-tests",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "playwright:test": "playwright test --ui",
+    "playwright:install": "playwright install",
+    "script:clear-wallet": "tsc && node dist/src/scripts/clear-wallet.js",
+    "script:webhook": "tsc && node dist/src/scripts/discord-webhook.js",
+    "script:swap": "tsc && node dist/src/scripts/ultra-swap.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.6.2",
+  "prettier": {
+    "printWidth": 100
+  },
+  "dependencies": {
+    "@playwright/test": "^1.51.0",
+    "@solana/spl-token": "^0.4.12",
+    "@solana/web3.js": "^1.98.0",
+    "dotenv": "^16.4.7",
+    "unzipper": "^0.12.3"
+  },
+  "devDependencies": {
+    "@types/bs58": "^4.0.1",
+    "@types/node": "^22.13.10",
+    "@types/unzipper": "^0.10.11"
+  }
+}
