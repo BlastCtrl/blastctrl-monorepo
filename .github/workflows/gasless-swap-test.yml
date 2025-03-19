@@ -13,6 +13,9 @@ defaults:
 jobs:
   test_gasless_swap:
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.51.1-noble
+      options: --user 1001
     env:
       SWAPPER_PRIVATE_KEY: ${{ secrets.SWAPPER_PRIVATE_KEY }}
       FUNDER_PRIVATE_KEY: ${{ secrets.FUNDER_PRIVATE_KEY }}
@@ -33,7 +36,7 @@ jobs:
           pnpm install
           pnpm exec playwright install --with-deps chromium
       - name: Run the Playwright Test
-        run: pnpm exec playwright test
+        run: xvfb-run pnpm exec playwright test
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
