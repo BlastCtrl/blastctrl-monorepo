@@ -118,10 +118,14 @@ export default function GaslessSwap() {
         throw Error("Error while confirming swap");
       }
 
+      const amountOut = quote.estimatedAmountOut
+        ? `- ${quote.estimatedAmountOut}`
+        : "";
+
       notify(
         {
           type: "success",
-          title: `${selectToken.name} Swap Success -- receiving ${quote.estimatedAmountOut}`,
+          title: `${selectToken.name} Swap Success ${amountOut}`,
           txid: signature,
           testId: "swap-success-toast",
         },
