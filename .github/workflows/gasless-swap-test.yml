@@ -15,12 +15,12 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.51.1-noble
-      options: --user 1001
     env:
       SWAPPER_PRIVATE_KEY: ${{ secrets.SWAPPER_PRIVATE_KEY }}
       FUNDER_PRIVATE_KEY: ${{ secrets.FUNDER_PRIVATE_KEY }}
       RPC_URL: ${{ secrets.RPC_URL }}
       DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      DISCORD_NO_LOGS: ${{ secrets.DISCORD_NO_LOGS }}
       PW_CHROMIUM_ATTACH_TO_OTHER: ${{ secrets.PW_CHROMIUM_ATTACH_TO_OTHER }}
     steps:
       - uses: actions/checkout@v4

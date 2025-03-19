@@ -1,3 +1,5 @@
+import config from "../config.js";
+
 export class DiscordWebhookClient {
   private webhookUrl: string;
   private lastMessageId: string | null = null;
@@ -10,6 +12,7 @@ export class DiscordWebhookClient {
    * Send a new message to the Discord webhook
    */
   async sendMessage(message: any): Promise<void> {
+    if (config.disableDiscordLogs) return;
     try {
       const response = await fetch(this.webhookUrl, {
         method: "POST",
@@ -30,6 +33,7 @@ export class DiscordWebhookClient {
   }
 
   async sendFinalReport(message: any): Promise<void> {
+    if (config.disableDiscordLogs) return;
     try {
       const response = await fetch(this.webhookUrl, {
         method: "POST",

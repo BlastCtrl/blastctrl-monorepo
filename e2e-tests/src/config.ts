@@ -18,6 +18,7 @@ const SWAPPER_PRIVATE_KEY = getPrivateKeyArray(process.env.SWAPPER_PRIVATE_KEY);
 const FUNDER_PRIVATE_KEY = getPrivateKeyArray(process.env.FUNDER_PRIVATE_KEY);
 const RPC_URL = process.env.RPC_URL;
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
+const DISCORD_NO_LOGS = process.env.DISCORD_NO_LOGS === "true";
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
 const swapper = loadWallet(SWAPPER_PRIVATE_KEY);
@@ -36,5 +37,6 @@ export default {
   funder,
   rpcUrl: RPC_URL,
   discordWebhookUrl: DISCORD_WEBHOOK_URL,
+  disableDiscordLogs: DISCORD_NO_LOGS,
   usdcMint: new PublicKey(USDC_MINT),
 };
