@@ -33,7 +33,7 @@ jobs:
           cache: "pnpm"
       - name: Install dependencies
         run: |
-          pnpm install
+          pnpm -F e2e-tests install
           pnpm exec playwright install --with-deps chromium
       - name: Run the Playwright Test
         run: xvfb-run pnpm exec playwright test

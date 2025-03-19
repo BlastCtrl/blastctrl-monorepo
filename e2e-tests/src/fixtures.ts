@@ -22,7 +22,6 @@ export const test = base.extend<{
   context: async ({}, use) => {
     const context = await chromium.launchPersistentContext("", {
       headless: false,
-      channel: "chrome",
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`,
