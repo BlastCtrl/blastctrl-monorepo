@@ -119,7 +119,7 @@ export default function GaslessSwap() {
       }
 
       const amountOut = quote.estimatedAmountOut
-        ? `- ${quote.estimatedAmountOut}`
+        ? `- receiving ${quote.estimatedAmountOut} SOL`
         : "";
 
       notify(
