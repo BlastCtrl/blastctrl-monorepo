@@ -65,10 +65,13 @@ test.afterAll(async () => {
   let solToTransfer = 0;
   let tokenToTransfer = 0;
 
+  console.log("Cleanup for swapper wallet starting...");
+
   await sleep(5000);
   let cleanWalletResult;
   try {
     cleanWalletResult = await cleanWallet(CONFIG.swapper, CONFIG.funder);
+    console.log(`Tokens transfer success: ${cleanWalletResult.signature}`);
     transferTxid = cleanWalletResult.signature;
     solToTransfer = cleanWalletResult.lamports / 1e9;
     tokenToTransfer = cleanWalletResult.tokens / 1e6;
@@ -79,9 +82,11 @@ test.afterAll(async () => {
   if (cleanWalletResult?.lamports && cleanWalletResult.lamports > 0) {
     const executeResponse = await runJupiterUltraSwap(cleanWalletResult.lamports);
     if (executeResponse.status === "Success") {
+      console.log(`Swap success: ${executeResponse.signature}`);
       swapTxid = executeResponse.signature;
       cleanupSuccess = true;
     } else {
+      console.log(`Swap failure: ${executeResponse.error}`);
       swapTxid = executeResponse?.signature;
       swapErrorReason = executeResponse.error;
     }
