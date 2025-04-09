@@ -7,6 +7,7 @@
 import { test, expect } from "./fixtures.js";
 import CONFIG from "./config.js";
 import { cleanWallet, sendTokensToWallet, sleep } from "./solana-lib.js";
+// @ts-expect-error not installed
 import { Page } from "@playwright/test";
 import { TestReporter } from "./discord/test-reporter.js";
 import { runJupiterUltraSwap } from "./jup-ultra-swap.js";
@@ -108,6 +109,7 @@ test.afterAll(async () => {
   await testReporter.reportTestCompletion(overallSuccess);
 });
 
+// @ts-expect-error not installed
 test("test swap", async ({ page, extensionId }) => {
   let swapSuccess = false;
   let swapStartTime = Date.now();
@@ -129,6 +131,7 @@ test("test swap", async ({ page, extensionId }) => {
     const sidePanelPage: Page = page
       .context()
       .pages()
+      // @ts-expect-error not installed
       .find((value) => value.url().match(extensionId))!;
     await sidePanelPage?.close({});
 
