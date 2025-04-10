@@ -60,7 +60,6 @@ export default function AirdropDetails({
     return Math.round((confirmedBatches / data.transactions.length) * 100);
   };
 
-  // Handlers
   const handleStartAirdrop = () => {
     if (!data) {
       return;
@@ -68,11 +67,6 @@ export default function AirdropDetails({
     mutate({
       airdropId: data.id,
     });
-  };
-
-  const handleRetry = (batchId: string) => {
-    alert(`Retrying batch ${batchId}`);
-    // Implementation would go here
   };
 
   const progress = calculateProgress();

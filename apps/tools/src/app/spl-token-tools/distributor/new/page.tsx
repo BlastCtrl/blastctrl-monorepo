@@ -3,6 +3,7 @@
 import React from "react";
 import SolaceAirdropper from "./airdrop-start";
 import SolaceAirdropReview from "./airdrop-review";
+import { useSolBalance } from "@/state/queries/use-sol-balance";
 
 // Define types
 type Recipient = {
@@ -20,6 +21,7 @@ interface AirdropDetails {
 }
 
 export default function CreateNewFlow() {
+  const { data: balance } = useSolBalance();
   const [step, setStep] = React.useState<number>(1);
   const [airdropDetails, setAirdropDetails] = React.useState<AirdropDetails>({
     airdropType: "same",
@@ -27,7 +29,7 @@ export default function CreateNewFlow() {
     recipients: [],
   });
 
-  const handleSubmitFirstStep = (data: AirdropDetails): void => {
+  const handleSubmitFirstStep = async (data: AirdropDetails): Promise<void> => {
     setAirdropDetails(data);
     setStep(2);
   };
@@ -42,6 +44,7 @@ export default function CreateNewFlow() {
 
       {step === 2 && (
         <SolaceAirdropReview
+          balance={balance ?? 0}
           airdropType={airdropDetails.airdropType}
           amount={airdropDetails.amount}
           recipients={airdropDetails.recipients}

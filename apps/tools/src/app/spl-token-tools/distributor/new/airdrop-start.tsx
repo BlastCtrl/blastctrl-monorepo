@@ -4,6 +4,7 @@ import React, { useState, useRef, ChangeEvent } from "react";
 import Papa from "papaparse";
 import { Button } from "@blastctrl/ui";
 import { Box } from "../box";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 type Recipient = {
   address: string;
@@ -42,6 +43,7 @@ interface SolaceAirdropperProps {
 }
 
 const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
+  const { publicKey } = useWallet();
   const [airdropType, setAirdropType] = useState<AirdropType>("same");
   const [amount, setAmount] = useState<string>("");
   const [recipients, setRecipients] = useState<Recipient[]>([
@@ -56,7 +58,6 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
     csv: "",
   });
 
-  const recipientsPerPage = 10;
   const maxRecipients = 200;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
