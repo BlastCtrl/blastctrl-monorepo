@@ -43,7 +43,6 @@ interface SolaceAirdropperProps {
 }
 
 const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
-  const { publicKey } = useWallet();
   const [airdropType, setAirdropType] = useState<AirdropType>("same");
   const [amount, setAmount] = useState<string>("");
   const [recipients, setRecipients] = useState<Recipient[]>([
