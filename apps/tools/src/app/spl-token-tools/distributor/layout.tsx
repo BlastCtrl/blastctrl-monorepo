@@ -1,13 +1,21 @@
 import { Box } from "./box";
 import type { ReactNode } from "react";
+import dynamic from "next/dynamic";
+
+const DynamicSolaceProvider = dynamic(
+  () => import("./solace-provider").then((mod) => mod.SolaceProvider),
+  {
+    ssr: false,
+  },
+);
 
 export default function Distributor({ children }: { children: ReactNode }) {
   return (
-    <div className="p-4 max-w-5xl mx-auto">
+    <div className="mx-auto max-w-5xl p-4">
       <Box className="mb-6">
-        <h1 className="font-display text-3xl font-semibold flex items-center">
+        <h1 className="font-display flex items-center text-3xl font-semibold">
           Solace Airdropper
-          <span className="ml-2 text-sm text-gray-500 align-middle flex items-center">
+          <span className="ml-2 flex items-center align-middle text-sm text-gray-500">
             <span className="italic">/soʊlɑː.tʃe/</span>
           </span>
         </h1>
@@ -22,7 +30,7 @@ export default function Distributor({ children }: { children: ReactNode }) {
           </p>
         </div>
       </Box>
-      {children}
+      <DynamicSolaceProvider>{children}</DynamicSolaceProvider>
     </div>
   );
 }
