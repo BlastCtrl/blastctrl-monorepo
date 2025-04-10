@@ -1,4 +1,4 @@
-import { cn } from "@blastctrl/ui";
+import clsx from "clsx";
 import { ReactNode } from "react";
 
 export function Box({
@@ -10,7 +10,7 @@ export function Box({
 }) {
   return (
     <div
-      className={cn(
+      className={clsx(
         "overflow-visible bg-white ring-black/5 sm:rounded-lg sm:p-6 sm:pb-5 sm:shadow sm:ring-1",
         className,
       )}

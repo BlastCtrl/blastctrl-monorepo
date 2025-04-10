@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import SolaceAirdropper from "./airdrop-start";
 import SolaceAirdropReview from "./airdrop-review";
@@ -17,7 +19,7 @@ interface AirdropDetails {
   totalSol?: string;
 }
 
-const SolaceAirdropFlow: React.FC = () => {
+export default function CreateNewFlow() {
   const [step, setStep] = useState<number>(1);
   const [airdropDetails, setAirdropDetails] = useState<AirdropDetails>({
     airdropType: "same",
@@ -57,6 +59,4 @@ const SolaceAirdropFlow: React.FC = () => {
       )}
     </div>
   );
-};
-
-export default SolaceAirdropFlow;
+}

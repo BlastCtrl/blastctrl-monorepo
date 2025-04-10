@@ -24,7 +24,14 @@ const config = {
       },
     ],
   },
-  // typescript: { ignoreBuildErrors: true },
+  async rewrites() {
+    return [
+      {
+        source: "/blast-api/:path*",
+        destination: "http://localhost:3001/:path*",
+      },
+    ]
+  }
 };
 
 export default config;
