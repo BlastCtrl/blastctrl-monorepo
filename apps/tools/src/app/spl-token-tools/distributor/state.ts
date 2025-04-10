@@ -4,6 +4,9 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { SolaceError } from "./common";
 import {
   GetAirdropsIdResponseOK,
+  PostAirdropsAirdropIdRetryBatchBatchIdRequest,
+  PostAirdropsAirdropIdRetryBatchBatchIdResponses,
+  PostAirdropsAirdropIdRetryBatchBatchIdResponseUnauthorized,
   PostAirdropsIdStartResponseOK,
   PostAirdropsResponseCreated,
   type PostAirdropsRequest,
@@ -116,6 +119,23 @@ export function useStartAirdrop() {
       if ("error" in response) {
         throw new SolaceError(response);
       }
+      return response;
+    },
+  });
+}
+
+export function useRetryTransaction() {
+  const sdk = useSolace();
+
+  return useMutation({
+    mutationKey: ["retry"],
+    mutationFn: async (data: PostAirdropsAirdropIdRetryBatchBatchIdRequest) => {
+      const response = await sdk.postAirdropsAirdropIdRetryBatchBatchId(data);
+
+      if ("error" in response) {
+        throw new Error(JSON.stringify(response.body));
+      }
+
       return response;
     },
   });

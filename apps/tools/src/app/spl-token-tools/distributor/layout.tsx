@@ -15,9 +15,9 @@ export default function Distributor({ children }: { children: ReactNode }) {
       <Box className="mb-6">
         <h1 className="font-display flex items-center text-3xl font-semibold">
           Solace Airdropper
-          <span className="ml-2 flex items-center align-middle text-sm text-gray-500">
+          {/* <span className="ml-2 flex items-center align-middle text-sm text-gray-500">
             <span className="italic">/soʊlɑː.tʃe/</span>
-          </span>
+          </span> */}
         </h1>
         <div className="mt-3 text-sm text-gray-500">
           <p>

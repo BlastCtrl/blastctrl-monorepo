@@ -1,14 +1,25 @@
 "use client";
 
 import React from "react";
-import { Button } from "@blastctrl/ui";
+import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { Box } from "../box";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+import {
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  SystemProgram,
+  Transaction,
+} from "@solana/web3.js";
 import clsx from "clsx";
 import { useFadeIn, formatDate } from "../common";
 import type { GetAirdropsIdResponseOK } from "@blastctrl/solace";
 import { compress } from "@/lib/solana";
-import { useGetAirdropById, useStartAirdrop } from "../state";
+import {
+  useGetAirdropById,
+  useRetryTransaction,
+  useStartAirdrop,
+} from "../state";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { notify } from "@/components";
 
 type TransactionStatus =
   GetAirdropsIdResponseOK["transactions"][number]["status"];
@@ -22,20 +33,7 @@ export default function AirdropDetails({
   const isVisible = useFadeIn();
   const { mutate, data: startData } = useStartAirdrop();
   const hasStarted = !!startData;
-  const { data } = useGetAirdropById(params.airdropId, hasStarted);
-
-  const getStatusBadgeStyle = (status: TransactionStatus) => {
-    switch (status) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "confirmed":
-        return "bg-green-100 text-green-800";
-      case "failed":
-        return "bg-red-100 text-red-800";
-      case "expired":
-        return "bg-rose-100 text-rose-800";
-    }
-  };
+  const { data, refetch } = useGetAirdropById(params.airdropId, hasStarted);
 
   const getAirdropStatusBadgeStyle = (status: AirdropStatus): string => {
     switch (status) {
@@ -207,80 +205,13 @@ export default function AirdropDetails({
               <div className="max-h-96 overflow-y-auto rounded border">
                 <div className="divide-y">
                   {data.transactions.map((batch, i) => (
-                    <div key={batch.id} className="p-3">
-                      <div className="mb-2 flex items-center justify-between">
-                        <div className="flex items-center">
-                          <span className="mr-2 font-mono text-xs">
-                            transaction {i + 1}
-                          </span>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeStyle(batch.status)}`}
-                          >
-                            {batch.status}
-                          </span>
-                        </div>
-
-                        {/* Show retry button for failed batches */}
-                        {batch.status === "failed" && (
-                          <Button
-                            onClick={() => handleRetry(batch.id.toString())}
-                            color="indigo"
-                            className="!px-3 py-1 text-xs"
-                          >
-                            Retry
-                          </Button>
-                        )}
-
-                        {/* Show spinner for processing batches */}
-                        {batch.status === "pending" && (
-                          <div className="h-5 w-5 animate-spin rounded-full border-2 border-b-indigo-200 border-l-indigo-200 border-r-indigo-200 border-t-indigo-600"></div>
-                        )}
-                      </div>
-
-                      <div className="mb-2 text-xs text-gray-500">
-                        <div className="flex justify-between">
-                          <span>Created: {formatDate(batch.createdAt)}</span>
-                        </div>
-                      </div>
-
-                      {!!batch.signature && (
-                        <div className="mt-1 text-xs">
-                          <span className="text-gray-500">Signature: </span>
-                          <a
-                            href={`https://explorer.solana.com/tx/${batch.signature}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-mono text-indigo-600 hover:text-indigo-800"
-                          >
-                            {compress(batch.signature, 6)}
-                          </a>
-                        </div>
-                      )}
-
-                      {/* Collapsible recipients list */}
-                      <div className="mt-2">
-                        <details className="text-xs">
-                          <summary className="cursor-pointer text-indigo-600 hover:text-indigo-800">
-                            Show Recipients ({batch.recipients.length})
-                          </summary>
-                          <div className="mt-2 border-l-2 border-gray-200 pl-2">
-                            {batch.recipients.map((recipient, i) => (
-                              <div
-                                key={i}
-                                className="mb-1 flex justify-between"
-                              >
-                                <span className="font-mono">
-                                  {recipient.walletAddress}
-                                </span>
-                                <span>
-                                  {recipient.lamports / LAMPORTS_PER_SOL} SOL
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </details>
-                      </div>
-                    </div>
+                    <Batch
+                      key={batch.id}
+                      index={i}
+                      batch={batch}
+                      airdropId={data.id}
+                      refetchAirdrop={refetch}
+                    />
                   ))}
                 </div>
               </div>
@@ -288,6 +219,149 @@ export default function AirdropDetails({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function Batch({
+  batch,
+  index,
+  airdropId,
+  refetchAirdrop,
+}: {
+  batch: GetAirdropsIdResponseOK["transactions"][number];
+  airdropId: string;
+  refetchAirdrop: () => Promise<unknown>;
+  index: number;
+}) {
+  const { connection } = useConnection();
+  const { publicKey, signTransaction } = useWallet();
+  const { mutate, isPending, error } = useRetryTransaction();
+  const getStatusBadgeStyle = (status: TransactionStatus) => {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      case "confirmed":
+        return "bg-green-100 text-green-800";
+      case "failed":
+        return "bg-red-100 text-red-800";
+      case "expired":
+        return "bg-rose-100 text-rose-800";
+    }
+  };
+
+  const handleRetry = async () => {
+    if (!publicKey || !signTransaction) {
+      notify({
+        type: "error",
+        description: "Sign transaction feature not available",
+      });
+      return;
+    }
+    const { context, value } =
+      await connection.getLatestBlockhashAndContext("confirmed");
+    const transaction = new Transaction({ ...value, feePayer: publicKey }).add(
+      ...batch.recipients.map((r) =>
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: new PublicKey(r.walletAddress),
+          lamports: r.lamports,
+        }),
+      ),
+    );
+    const signed = await signTransaction(transaction);
+
+    mutate(
+      {
+        airdropId,
+        batchId: batch.id.toString(),
+        ...value,
+        minContextSlot: context.slot,
+        batch: {
+          tx_hash: signed.serialize().toString("base64"),
+          recipients: batch.recipients.map((r) => ({
+            lamports: r.lamports,
+            address: r.walletAddress,
+          })),
+        },
+      },
+      {
+        onSuccess: async () => {
+          await refetchAirdrop();
+        },
+      },
+    );
+  };
+
+  return (
+    <div key={batch.id} className="p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center">
+          <span className="mr-2 font-mono text-xs">
+            transaction {index + 1}
+          </span>
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeStyle(batch.status)}`}
+          >
+            {batch.status}
+          </span>
+        </div>
+
+        {batch.status === "expired" && (
+          <Button
+            onClick={() => handleRetry()}
+            disabled={isPending}
+            color="indigo"
+            className="!px-3 text-xs"
+          >
+            {isPending && <SpinnerIcon className="size-4" />}
+            Retry
+          </Button>
+        )}
+        {error && <div className="text-sm text-rose-500">{error.message}</div>}
+
+        {/* Show spinner for processing batches */}
+        {batch.status === "pending" && (
+          <div className="size-5 animate-spin rounded-full border-2 border-b-indigo-200 border-l-indigo-200 border-r-indigo-200 border-t-indigo-600"></div>
+        )}
+      </div>
+
+      <div className="mb-2 text-xs text-gray-500">
+        <div className="flex justify-between">
+          <span>Created: {formatDate(batch.createdAt)}</span>
+        </div>
+      </div>
+
+      {!!batch.signature && (
+        <div className="mt-1 text-xs">
+          <span className="text-gray-500">Signature: </span>
+          <a
+            href={`https://explorer.solana.com/tx/${batch.signature}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono text-indigo-600 hover:text-indigo-800"
+          >
+            {compress(batch.signature, 6)}
+          </a>
+        </div>
+      )}
+
+      {/* Collapsible recipients list */}
+      <div className="mt-2">
+        <details className="text-xs">
+          <summary className="cursor-pointer text-indigo-600 hover:text-indigo-800">
+            Show Recipients ({batch.recipients.length})
+          </summary>
+          <div className="mt-2 border-l-2 border-gray-200 pl-2">
+            {batch.recipients.map((recipient, i) => (
+              <div key={i} className="mb-1 flex justify-between">
+                <span className="font-mono">{recipient.walletAddress}</span>
+                <span>{recipient.lamports / LAMPORTS_PER_SOL} SOL</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      </div>
     </div>
   );
 }
