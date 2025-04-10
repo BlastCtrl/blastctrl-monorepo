@@ -1,8 +1,7 @@
 import React from "react";
 import { Button } from "@blastctrl/ui";
-import { Box } from "./box";
+import { Box } from "../box";
 
-// Define types
 type Recipient = {
   address: string;
   amount: string;

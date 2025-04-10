@@ -3,7 +3,7 @@
 import React, { useState, useRef, ChangeEvent } from "react";
 import Papa from "papaparse";
 import { Button } from "@blastctrl/ui";
-import { Box } from "./box";
+import { Box } from "../box";
 // Define types for the component
 
 type Recipient = {
@@ -51,7 +51,6 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
   const [inputMethod, setInputMethod] = useState<InputMethod>("manual");
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvData, setCsvData] = useState<Recipient[]>([]);
-  const [currentPage, setCurrentPage] = useState<number>(1);
   const [errors, setErrors] = useState<Errors>({
     amount: "",
     recipients: [{ address: "", amount: "" }],
