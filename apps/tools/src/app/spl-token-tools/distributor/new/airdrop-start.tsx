@@ -4,7 +4,6 @@ import React, { useState, useRef, ChangeEvent } from "react";
 import Papa from "papaparse";
 import { Button } from "@blastctrl/ui";
 import { Box } from "../box";
-// Define types for the component
 
 type Recipient = {
   address: string;
@@ -61,7 +60,6 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
   const maxRecipients = 200;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Validation functions
   const validateSolAddress = (address: string): boolean => {
     // Basic validation - Solana addresses are 32-44 characters
     return address.length >= 32 && address.length <= 44;
@@ -71,7 +69,6 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
     return !isNaN(Number(amount)) && parseFloat(amount) > 0;
   };
 
-  // Calculate total SOL to be sent
   const calculateTotalSol = (): string => {
     if (airdropType === "same") {
       const recipientCount =
@@ -79,7 +76,6 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
       const amountValue = parseFloat(amount) || 0;
       return (recipientCount * amountValue).toFixed(4);
     } else {
-      // For different amounts, sum up all the amounts in the CSV data
       return csvData
         .reduce((total, recipient) => {
           const recipientAmount = parseFloat(recipient.amount) || 0;
@@ -317,30 +313,14 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
   };
 
   return (
-    <div className="p-4 max-w-5xl mx-auto">
-      <Box className="mb-6">
-        <h1 className="font-display text-3xl font-semibold">
-          Solace Airdropper
-        </h1>
-        <div className="mt-3 text-sm text-gray-500">
-          <p>
-            Distribute SOL to many wallets using this tool. We will not ask you
-            to transfer the SOL initially to our service, all the SOL will be
-            sent from your wallet directly. Due to the nature of Solana
-            transactions having a chance of not being included in the block or
-            expiring, you might need to resign transactions so that the transfer
-            can be retried if they are not confirmed.
-          </p>
-        </div>
-      </Box>
-
+    <div>
       {/* Airdrop Type Selection */}
       <Box className="mb-6">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex space-x-2">
             <button
               onClick={() => handleAirdropTypeChange("same")}
-              className={`px-3 py-1.5 text-sm rounded-md ${
+              className={`rounded-md px-3 py-1.5 text-sm ${
                 airdropType === "same"
                   ? "bg-indigo-600 text-white"
                   : "bg-gray-200 text-gray-800"
@@ -350,7 +330,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
             </button>
             <button
               onClick={() => handleAirdropTypeChange("different")}
-              className={`px-3 py-1.5 text-sm rounded-md ${
+              className={`rounded-md px-3 py-1.5 text-sm ${
                 airdropType === "different"
                   ? "bg-indigo-600 text-white"
                   : "bg-gray-200 text-gray-800"
@@ -362,39 +342,38 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
 
           {airdropType === "same" && (
             <div className="flex items-center">
-              <label className="text-sm font-medium mr-2">Amount:</label>
+              <label className="mr-2 text-sm font-medium">Amount:</label>
               <div className="flex w-32">
                 <input
                   type="text"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="p-1.5 text-sm border rounded-l w-full"
+                  className="w-full rounded-l border p-1.5 text-sm"
                   placeholder="0.1"
                 />
-                <span className="bg-gray-100 px-2 py-1.5 text-sm border border-l-0 rounded-r flex items-center">
+                <span className="flex items-center rounded-r border border-l-0 bg-gray-100 px-2 py-1.5 text-sm">
                   SOL
                 </span>
               </div>
               {errors.amount && (
-                <p className="text-red-500 text-xs ml-2">{errors.amount}</p>
+                <p className="ml-2 text-xs text-red-500">{errors.amount}</p>
               )}
             </div>
           )}
         </div>
       </Box>
-
       {/* Recipients Input Section */}
       <Box className="mb-6">
-        <div className="flex justify-between items-center mb-3">
+        <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Recipients</h2>
-          <div className="text-sm bg-indigo-100 text-indigo-800 px-2 py-1 rounded-full flex items-center">
-            <span className="font-medium mr-1">Total:</span>{" "}
+          <div className="flex items-center rounded-full bg-indigo-100 px-2 py-1 text-sm text-indigo-800">
+            <span className="mr-1 font-medium">Total:</span>{" "}
             {calculateTotalSol()} SOL
           </div>
         </div>
 
         {airdropType === "different" && (
-          <div className="mb-3 px-3 py-2 bg-indigo-50 text-indigo-800 text-sm rounded-md">
+          <div className="mb-3 rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-800">
             Different amounts mode requires uploading a CSV with addresses and
             amounts
           </div>
@@ -405,7 +384,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
             <div className="flex space-x-3">
               <button
                 onClick={() => setInputMethod("manual")}
-                className={`px-3 py-1.5 text-sm rounded-md ${
+                className={`rounded-md px-3 py-1.5 text-sm ${
                   inputMethod === "manual"
                     ? "bg-indigo-600 text-white"
                     : "bg-gray-200 text-gray-800"
@@ -415,7 +394,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
               </button>
               <button
                 onClick={() => setInputMethod("csv")}
-                className={`px-3 py-1.5 text-sm rounded-md ${
+                className={`rounded-md px-3 py-1.5 text-sm ${
                   inputMethod === "csv"
                     ? "bg-indigo-600 text-white"
                     : "bg-gray-200 text-gray-800"
@@ -429,11 +408,11 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
 
         {airdropType === "same" && inputMethod === "manual" ? (
           <div>
-            <div className="max-h-64 overflow-y-auto border rounded mb-3">
+            <div className="mb-3 max-h-64 overflow-y-auto rounded border">
               {recipients.map((recipient, index) => (
                 <div
                   key={index}
-                  className="flex space-x-2 p-2 border-b last:border-b-0"
+                  className="flex space-x-2 border-b p-2 last:border-b-0"
                 >
                   <div className="flex-grow">
                     <input
@@ -442,11 +421,11 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                       onChange={(e) =>
                         handleRecipientChange(index, "address", e.target.value)
                       }
-                      className="p-1.5 text-sm border rounded w-full"
+                      className="w-full rounded border p-1.5 text-sm"
                       placeholder="Recipient wallet address"
                     />
                     {errors.recipients[index]?.address && (
-                      <p className="text-red-500 text-xs mt-1">
+                      <p className="mt-1 text-xs text-red-500">
                         {errors.recipients[index].address}
                       </p>
                     )}
@@ -454,7 +433,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
 
                   <button
                     onClick={() => removeRecipient(index)}
-                    className="p-1.5 bg-gray-200 rounded hover:bg-gray-300 h-8 w-8 flex items-center justify-center"
+                    className="flex h-8 w-8 items-center justify-center rounded bg-gray-200 p-1.5 hover:bg-gray-300"
                     disabled={recipients.length === 1}
                   >
                     ✕
@@ -466,7 +445,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
             <div className="flex justify-between">
               <button
                 onClick={addRecipient}
-                className="px-3 py-1.5 text-sm bg-gray-200 rounded-md hover:bg-gray-300"
+                className="rounded-md bg-gray-200 px-3 py-1.5 text-sm hover:bg-gray-300"
               >
                 + Add Recipient
               </button>
@@ -479,7 +458,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
           </div>
         ) : (
           <div>
-            <div className="flex justify-between items-center mb-3">
+            <div className="mb-3 flex items-center justify-between">
               <div>
                 <input
                   type="file"
@@ -491,7 +470,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                 <div className="flex items-center">
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-3 py-1.5 text-sm bg-gray-200 rounded-md hover:bg-gray-300"
+                    className="rounded-md bg-gray-200 px-3 py-1.5 text-sm hover:bg-gray-300"
                   >
                     {csvFile ? "Change CSV File" : "Choose CSV File"}
                   </button>
@@ -500,7 +479,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                       <span className="ml-2 text-sm">{csvFile.name}</span>
                       <button
                         onClick={clearCsvFile}
-                        className="ml-2 p-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 h-6 w-6 flex items-center justify-center text-xs"
+                        className="ml-2 flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 p-1 text-xs text-gray-700 hover:bg-gray-300"
                         title="Remove CSV file"
                       >
                         ✕
@@ -517,13 +496,13 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
             </div>
 
             {errors.csv && (
-              <p className="text-red-500 text-xs mb-2">{errors.csv}</p>
+              <p className="mb-2 text-xs text-red-500">{errors.csv}</p>
             )}
 
-            <div className="bg-gray-50 p-2 rounded border mb-3 text-xs">
+            <div className="mb-3 rounded border bg-gray-50 p-2 text-xs">
               {airdropType === "same" ? (
                 <>
-                  <p className="text-gray-600 mb-1">
+                  <p className="mb-1 text-gray-600">
                     Format: One wallet address per line
                   </p>
                   <p className="text-gray-600">
@@ -532,7 +511,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                 </>
               ) : (
                 <>
-                  <p className="text-gray-600 mb-1">
+                  <p className="mb-1 text-gray-600">
                     Format: "address,amount" (each on a new line)
                   </p>
                   <p className="text-gray-600">
@@ -544,7 +523,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
 
             {csvData.length > 0 && (
               <div>
-                <div className="max-h-64 overflow-y-auto border rounded">
+                <div className="max-h-64 overflow-y-auto rounded border">
                   <table className="min-w-full">
                     <thead className="bg-gray-100">
                       <tr>
@@ -552,7 +531,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                           Address
                         </th>
                         {airdropType === "different" && (
-                          <th className="p-1.5 text-left text-xs font-medium w-32">
+                          <th className="w-32 p-1.5 text-left text-xs font-medium">
                             Amount (SOL)
                           </th>
                         )}
@@ -561,7 +540,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                     <tbody className="text-sm">
                       {csvData.slice(0, 10).map((row, index) => (
                         <tr key={index} className="border-t">
-                          <td className="p-1.5 truncate max-w-md">
+                          <td className="max-w-md truncate p-1.5">
                             {row.address}
                           </td>
                           {airdropType === "different" && (
@@ -573,7 +552,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                         <tr className="border-t">
                           <td
                             colSpan={airdropType === "different" ? 2 : 1}
-                            className="p-1.5 text-gray-500 text-center text-xs"
+                            className="p-1.5 text-center text-xs text-gray-500"
                           >
                             ... and {csvData.length - 10} more recipients
                           </td>
@@ -593,7 +572,6 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
           </div>
         )}
       </Box>
-
       {/* Next Button */}
       <div className="flex justify-end">
         <Button

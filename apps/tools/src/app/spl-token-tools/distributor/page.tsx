@@ -6,18 +6,18 @@ import { Box } from "./box";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Button } from "@blastctrl/ui";
 import base58 from "bs58";
-import build, { GetAirdropsResponseOK } from "@blastctrl/solace";
+import type { GetAirdropsResponseOK } from "@blastctrl/solace";
 import { useState, useCallback, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { SolaceError } from "./common";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-
-const solace = build("/blast-api");
+import { useSolace } from "./solace-provider";
+import { useGetAirdrops } from "./state";
+import { formatDate } from "./common";
 
 export default function Overview() {
   const { publicKey, signMessage } = useWallet();
   const { setVisible } = useWalletModal();
+  const solace = useSolace();
   const [authToken, setAuthToken] = useLocalStorageState<{
     token: string;
     expiresAt: number;
@@ -112,33 +112,20 @@ export default function Overview() {
     );
   }
 
-  return <SolaceAirdropDashboard authToken={authToken?.token!} />;
+  return <SolaceAirdropDashboard />;
 }
 
 type AirdropStatus = GetAirdropsResponseOK[number]["status"];
 
-const SolaceAirdropDashboard = ({ authToken }: { authToken: string }) => {
+const SolaceAirdropDashboard = () => {
+  const solace = useSolace();
+  const { publicKey } = useWallet();
   const [visible, setVisible] = useState<boolean>(false);
   const [selectedAirdropId, setSelectedAirdropId] = useState<string | null>(
     null,
   );
 
-  const {
-    data: airdrops,
-    isLoading,
-    isError,
-  } = useQuery({
-    queryKey: ["airdrops", authToken],
-    queryFn: async () => {
-      const response = await solace.getAirdrops({
-        authorization: `Bearer ${authToken}`,
-      });
-      if ("error" in response) {
-        throw new SolaceError(response);
-      }
-      return response;
-    },
-  });
+  const { data: airdrops, isLoading, isError } = useGetAirdrops();
 
   // Get the selected airdrop details
   const selectedAirdrop =
@@ -152,18 +139,6 @@ const SolaceAirdropDashboard = ({ authToken }: { authToken: string }) => {
 
     return () => clearTimeout(timer);
   }, []);
-
-  // Format date
-  const formatDate = (timestamp: number): string => {
-    const date = new Date(timestamp * 1000);
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(date);
-  };
 
   // Get status badge style
   const getStatusBadgeStyle = (status: AirdropStatus): string => {
@@ -182,11 +157,11 @@ const SolaceAirdropDashboard = ({ authToken }: { authToken: string }) => {
   return (
     <div
       className={`transform transition-all duration-300 ease-out ${
-        visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+        visible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
       }`}
     >
       <Box className="mb-4">
-        <div className="flex justify-between gap-4 flex-wrap mb-3">
+        <div className="mb-3 flex flex-wrap justify-between gap-4">
           <h2 className="text-base font-semibold">Your Airdrops</h2>
           <Button
             color="indigo"
@@ -199,13 +174,13 @@ const SolaceAirdropDashboard = ({ authToken }: { authToken: string }) => {
 
         {isLoading && (
           <div className="py-8 text-center">
-            <div className="w-8 h-8 border-4 border-t-indigo-600 border-r-indigo-200 border-b-indigo-200 border-l-indigo-200 rounded-full animate-spin mx-auto mb-3"></div>
-            <p className="text-gray-500 text-sm">Loading your airdrops...</p>
+            <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-b-indigo-200 border-l-indigo-200 border-r-indigo-200 border-t-indigo-600"></div>
+            <p className="text-sm text-gray-500">Loading your airdrops...</p>
           </div>
         )}
 
         {isError && (
-          <div className="bg-red-50 text-red-700 p-3 rounded text-center">
+          <div className="rounded bg-red-50 p-3 text-center text-red-700">
             Failed to load airdrops. Please try again later.
           </div>
         )}
@@ -215,7 +190,7 @@ const SolaceAirdropDashboard = ({ authToken }: { authToken: string }) => {
             <p>You haven't created any airdrops yet.</p>
             <Link
               href="/airdrop/new"
-              className="text-indigo-600 hover:text-indigo-800 mt-2 inline-block"
+              className="mt-2 inline-block text-indigo-600 hover:text-indigo-800"
             >
               Create your first airdrop
             </Link>
@@ -223,25 +198,25 @@ const SolaceAirdropDashboard = ({ authToken }: { authToken: string }) => {
         )}
 
         {!isLoading && !isError && airdrops && airdrops.length > 0 && (
-          <div className="overflow-hidden border rounded max-h-[300px] overflow-y-auto">
+          <div className="max-h-[300px] overflow-hidden overflow-y-auto rounded border">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Date
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Token
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Recipients
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Status
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-200 bg-white">
                 {airdrops.map((airdrop) => (
                   <tr
                     key={airdrop.id}
@@ -252,16 +227,16 @@ const SolaceAirdropDashboard = ({ authToken }: { authToken: string }) => {
                       )
                     }
                   >
-                    <td className="px-3 py-2 whitespace-nowrap text-sm">
+                    <td className="whitespace-nowrap px-3 py-2 text-sm">
                       {formatDate(airdrop.createdAt)}
                     </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-sm">SOL</td>
-                    <td className="px-3 py-2 whitespace-nowrap text-sm">
+                    <td className="whitespace-nowrap px-3 py-2 text-sm">SOL</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-sm">
                       {airdrop.recipientCount}
                     </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-sm">
+                    <td className="whitespace-nowrap px-3 py-2 text-sm">
                       <span
-                        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeStyle(airdrop.status)}`}
+                        className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold leading-5 ${getStatusBadgeStyle(airdrop.status)}`}
                       >
                         {airdrop.status}
                       </span>
@@ -277,17 +252,17 @@ const SolaceAirdropDashboard = ({ authToken }: { authToken: string }) => {
       {/* Selected Airdrop Details */}
       {selectedAirdrop && (
         <Box className="mb-4">
-          <div className="flex justify-between items-center mb-3">
+          <div className="mb-3 flex items-center justify-between">
             <h2 className="text-base font-semibold">Airdrop Details</h2>
             <Link
-              href={`/distributor/${selectedAirdrop.id}`}
-              className="text-indigo-600 hover:text-indigo-800 text-sm"
+              href={`/spl-token-tools/distributor/${selectedAirdrop.id}`}
+              className="text-sm text-indigo-600 hover:text-indigo-800"
             >
               View Full Details →
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <div className="space-y-2">
                 <div className="flex justify-between py-1 text-sm">
@@ -322,7 +297,7 @@ const SolaceAirdropDashboard = ({ authToken }: { authToken: string }) => {
 
           {/* Recipients Table */}
           <div className="mt-4">
-            <div className="flex justify-between items-center mb-2">
+            <div className="mb-2 flex items-center justify-between">
               <h3 className="text-sm font-medium">Recipients</h3>
               <span className="text-xs text-gray-500">
                 Showing {Math.min(5, selectedAirdrop.recipients.length)} of{" "}
@@ -330,14 +305,14 @@ const SolaceAirdropDashboard = ({ authToken }: { authToken: string }) => {
               </span>
             </div>
 
-            <div className="max-h-48 overflow-y-auto border rounded">
+            <div className="max-h-48 overflow-y-auto rounded border">
               <table className="min-w-full">
                 <thead className="bg-gray-100">
                   <tr>
                     <th className="p-1.5 text-left text-xs font-medium">
                       Address
                     </th>
-                    <th className="p-1.5 text-right text-xs font-medium w-32">
+                    <th className="w-32 p-1.5 text-right text-xs font-medium">
                       Amount (SOL)
                     </th>
                   </tr>
@@ -347,7 +322,7 @@ const SolaceAirdropDashboard = ({ authToken }: { authToken: string }) => {
                     .slice(0, 5)
                     .map((recipient, index) => (
                       <tr key={index} className="border-t">
-                        <td className="p-1.5 truncate max-w-md font-mono">
+                        <td className="max-w-md truncate p-1.5 font-mono">
                           {recipient.walletAddress}
                         </td>
                         <td className="p-1.5 text-right">
@@ -359,7 +334,7 @@ const SolaceAirdropDashboard = ({ authToken }: { authToken: string }) => {
                     <tr className="border-t">
                       <td
                         colSpan={2}
-                        className="p-1.5 text-gray-500 text-center text-xs"
+                        className="p-1.5 text-center text-xs text-gray-500"
                       >
                         ... and {selectedAirdrop.recipientCount - 5} more
                         recipients
