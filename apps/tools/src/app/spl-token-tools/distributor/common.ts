@@ -39,7 +39,7 @@ export function useFadeIn() {
 }
 
 export function formatDate(timestamp: number): string {
-  const date = new Date(timestamp * 1000);
+  const date = new Date(timestamp);
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
