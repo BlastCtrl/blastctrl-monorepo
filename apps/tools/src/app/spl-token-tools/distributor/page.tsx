@@ -131,8 +131,6 @@ export default function Overview() {
 type AirdropStatus = GetAirdropsResponseOK[number]["status"];
 
 const SolaceAirdropDashboard = () => {
-  const solace = useSolace();
-  const { publicKey } = useWallet();
   const [visible, setVisible] = useState<boolean>(false);
   const [selectedAirdropId, setSelectedAirdropId] = useState<string | null>(
     null,
