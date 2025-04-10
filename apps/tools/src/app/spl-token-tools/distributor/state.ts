@@ -5,8 +5,6 @@ import { SolaceError } from "./common";
 import {
   GetAirdropsIdResponseOK,
   PostAirdropsAirdropIdRetryBatchBatchIdRequest,
-  PostAirdropsAirdropIdRetryBatchBatchIdResponses,
-  PostAirdropsAirdropIdRetryBatchBatchIdResponseUnauthorized,
   PostAirdropsIdStartResponseOK,
   PostAirdropsResponseCreated,
   type PostAirdropsRequest,
