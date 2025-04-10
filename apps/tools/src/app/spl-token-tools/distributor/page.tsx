@@ -12,7 +12,7 @@ import Link from "next/link";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { useSolace } from "./solace-provider";
 import { useGetAirdrops } from "./state";
-import { formatDate } from "./common";
+import { formatDate, useFadeIn } from "./common";
 import { jwtDecode } from "jwt-decode";
 
 export default function Overview() {
@@ -131,7 +131,8 @@ export default function Overview() {
 type AirdropStatus = GetAirdropsResponseOK[number]["status"];
 
 const SolaceAirdropDashboard = () => {
-  const [visible, setVisible] = useState<boolean>(false);
+  const visible = useFadeIn();
+  const { publicKey } = useWallet();
   const [selectedAirdropId, setSelectedAirdropId] = useState<string | null>(
     null,
   );
@@ -142,16 +143,6 @@ const SolaceAirdropDashboard = () => {
   const selectedAirdrop =
     airdrops?.find((airdrop) => airdrop.id === selectedAirdropId) || null;
 
-  useEffect(() => {
-    // Small delay to ensure the animation plays after the component mounts
-    const timer = setTimeout(() => {
-      setVisible(true);
-    }, 10);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Get status badge style
   const getStatusBadgeStyle = (status: AirdropStatus): string => {
     switch (status) {
       case "created":
@@ -199,17 +190,11 @@ const SolaceAirdropDashboard = () => {
         {!isLoading && !isError && airdrops?.length === 0 && (
           <div className="py-6 text-center text-gray-500">
             <p>You haven't created any airdrops yet.</p>
-            <Link
-              href="/airdrop/new"
-              className="mt-2 inline-block text-indigo-600 hover:text-indigo-800"
-            >
-              Create your first airdrop
-            </Link>
           </div>
         )}
 
         {!isLoading && !isError && airdrops && airdrops.length > 0 && (
-          <div className="max-h-[300px] overflow-hidden overflow-y-auto rounded border">
+          <div className="max-h-[500px] overflow-hidden overflow-y-auto rounded border">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>

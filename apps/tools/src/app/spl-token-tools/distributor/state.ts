@@ -77,6 +77,7 @@ export function useGetAirdropById(airdropId: string, hasStarted?: boolean) {
       }
       return response;
     },
+    retry: 1,
     select: getAirdropByIdTransformer,
   });
 }

@@ -2,6 +2,9 @@
 
 import React from "react";
 import build, { PlatformaticFrontendClient } from "@blastctrl/solace";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 const SolaceContext = React.createContext<PlatformaticFrontendClient>(
   null as unknown as PlatformaticFrontendClient,
@@ -12,6 +15,10 @@ export function useSolace() {
 }
 
 export function SolaceProvider({ children }: { children: React.ReactNode }) {
+  const { publicKey } = useWallet();
+  const { push } = useRouter();
+  const queryClient = useQueryClient();
+
   const [instance, setInstance] = React.useState(() => {
     if (typeof window !== "undefined") {
       const authToken = window.localStorage.getItem("authToken");
@@ -52,6 +59,12 @@ export function SolaceProvider({ children }: { children: React.ReactNode }) {
                   },
                 }),
               );
+
+              void queryClient.refetchQueries({
+                queryKey: ["airdrops"],
+                type: "all",
+                exact: false,
+              });
             } catch {
               setInstance(build("/blast-api"));
             }
@@ -62,6 +75,22 @@ export function SolaceProvider({ children }: { children: React.ReactNode }) {
       return () => window.removeEventListener("storage", callback);
     }
   }, []);
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const authToken = window.localStorage.getItem("authToken");
+      console.log("condition met to redirect user back to start");
+      if (authToken && publicKey === null) {
+        void queryClient.removeQueries({
+          queryKey: ["airdrops"],
+          type: "all",
+          exact: false,
+        });
+        push("/spl-token-tools/distributor");
+        // redirect the user back to start
+      }
+    }
+  }, [publicKey]);
 
   return (
     <SolaceContext.Provider value={instance}>{children}</SolaceContext.Provider>
