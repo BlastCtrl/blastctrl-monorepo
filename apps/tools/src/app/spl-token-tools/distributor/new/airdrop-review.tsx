@@ -1,6 +1,16 @@
 import React from "react";
-import { Button } from "@blastctrl/ui";
+import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { Box } from "../box";
+import { useCreateAirdrop, useStartAirdrop } from "../state";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import {
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  SystemProgram,
+  Transaction,
+} from "@solana/web3.js";
+import { notify } from "@/components";
+import { useRouter } from "next/navigation";
 
 type Recipient = {
   address: string;
@@ -14,7 +24,6 @@ interface SolaceAirdropReviewProps {
   amount: string;
   recipients: Recipient[];
   onBack: () => void;
-  onConfirm: () => void;
 }
 
 const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
@@ -22,8 +31,12 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
   amount,
   recipients,
   onBack,
-  onConfirm,
 }) => {
+  const { publicKey } = useWallet();
+  const { connection } = useConnection();
+  const { signAllTransactions } = useWallet();
+  const { mutate, isPending, error } = useCreateAirdrop();
+  const router = useRouter();
   // Constants
   const BATCH_SIZE = 6;
   const COST_PER_BATCH = 0.000005;
@@ -48,8 +61,63 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
     CURRENT_BALANCE - totalDistribution - transactionFee;
   const hasInsufficientFunds: boolean = finalBalance < 0;
 
+  const startAirdrop = async () => {
+    if (!publicKey || !signAllTransactions) {
+      notify({
+        type: "error",
+        description: "Sign all transactions feature is unavailable",
+      });
+      return;
+    }
+
+    const { value, context } =
+      await connection.getLatestBlockhashAndContext("confirmed");
+    const groups: Recipient[][] = [];
+    for (let i = 0; i < recipients.length; i += 6) {
+      groups.push(recipients.slice(i, i + 6));
+    }
+
+    const transactions: Transaction[] = groups.map((b) => {
+      const tx = new Transaction({ ...value, feePayer: publicKey }).add(
+        ...b.map((r) =>
+          SystemProgram.transfer({
+            lamports: Number(r.amount) * LAMPORTS_PER_SOL,
+            fromPubkey: publicKey,
+            toPubkey: new PublicKey(r.address),
+          }),
+        ),
+      );
+      return tx;
+    });
+
+    const signedTransactions = await signAllTransactions(transactions);
+    const batches = signedTransactions.map((signedTx, i) => ({
+      tx_hash: signedTx
+        .serialize({ requireAllSignatures: true, verifySignatures: true })
+        .toString("base64"),
+      recipients:
+        groups[i]?.map((g) => ({
+          address: g.address,
+          lamports: Number(g.amount) * LAMPORTS_PER_SOL,
+        })) ?? [],
+    }));
+
+    mutate(
+      {
+        ...value,
+        minContextSlot: context.slot,
+        batches,
+      },
+      {
+        onSuccess: (res) => {
+          router.push(`/spl-token-tools/distributor/${res.id}`);
+        },
+      },
+    );
+  };
+
   return (
-    <div className="p-4 max-w-5xl mx-auto">
+    <div className="mx-auto max-w-5xl p-4">
       <Box className="mb-4">
         <h1 className="font-display text-2xl font-semibold">
           Review Your Airdrop
@@ -60,12 +128,12 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
       </Box>
 
       {/* Distribution Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* Summary Section */}
         <Box className="h-full">
-          <h2 className="text-base font-semibold mb-3">Distribution Summary</h2>
+          <h2 className="mb-3 text-base font-semibold">Distribution Summary</h2>
 
-          <div className="flex justify-between items-center py-1.5 text-sm">
+          <div className="flex items-center justify-between py-1.5 text-sm">
             <span className="text-gray-600">Distribution Method</span>
             <span className="font-medium">
               {airdropType === "same" ? "Same amount" : "Different amounts"}
@@ -73,24 +141,24 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
           </div>
 
           {airdropType === "same" && (
-            <div className="flex justify-between items-center py-1.5 text-sm">
+            <div className="flex items-center justify-between py-1.5 text-sm">
               <span className="text-gray-600">Amount per recipient</span>
               <span className="font-medium">{amount} SOL</span>
             </div>
           )}
 
-          <div className="flex justify-between items-center py-1.5 text-sm">
+          <div className="flex items-center justify-between py-1.5 text-sm">
             <span className="text-gray-600">Recipients</span>
             <span className="font-medium">{recipientsCount}</span>
           </div>
 
-          <div className="flex justify-between items-center py-1.5 text-sm">
+          <div className="flex items-center justify-between py-1.5 text-sm">
             <span className="text-gray-600">Transaction batches</span>
             <span className="font-medium">{batchesNeeded}</span>
           </div>
 
-          <div className="flex justify-between items-center py-1.5 text-sm pt-2 border-t mt-1">
-            <span className="text-gray-800 font-medium">
+          <div className="mt-1 flex items-center justify-between border-t py-1.5 pt-2 text-sm">
+            <span className="font-medium text-gray-800">
               Total SOL to distribute
             </span>
             <span className="font-semibold">
@@ -104,25 +172,25 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
           {/* Cost Breakdown */}
           <Box className="h-full">
             <div className="flex justify-between">
-              <h2 className="text-base font-semibold mb-3">Cost Breakdown</h2>
-              <div className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded flex items-center">
+              <h2 className="mb-3 text-base font-semibold">Cost Breakdown</h2>
+              <div className="flex items-center rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
                 {batchesNeeded} batches × {COST_PER_BATCH} SOL fee
               </div>
             </div>
 
             <div className="space-y-2">
-              <div className="flex justify-between items-center py-1 text-sm">
+              <div className="flex items-center justify-between py-1 text-sm">
                 <span className="text-gray-600">Distribution amount</span>
                 <span>{totalDistribution.toFixed(4)} SOL</span>
               </div>
 
-              <div className="flex justify-between items-center py-1 text-sm">
+              <div className="flex items-center justify-between py-1 text-sm">
                 <span className="text-gray-600">Transaction fee</span>
                 <span>{transactionFee.toFixed(6)} SOL</span>
               </div>
 
-              <div className="flex justify-between items-center py-1.5 text-sm pt-2 border-t mt-1">
-                <span className="text-gray-800 font-medium">Total cost</span>
+              <div className="mt-1 flex items-center justify-between border-t py-1.5 pt-2 text-sm">
+                <span className="font-medium text-gray-800">Total cost</span>
                 <span className="font-semibold">
                   {(totalDistribution + transactionFee).toFixed(4)} SOL
                 </span>
@@ -132,22 +200,22 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
 
           {/* Balance Summary */}
           <Box className="h-full">
-            <h2 className="text-base font-semibold mb-3">Your Balance</h2>
+            <h2 className="mb-3 text-base font-semibold">Your Balance</h2>
 
             <div className="space-y-2">
-              <div className="flex justify-between items-center py-1 text-sm">
+              <div className="flex items-center justify-between py-1 text-sm">
                 <span className="text-gray-600">Current balance</span>
                 <span>{CURRENT_BALANCE.toFixed(4)} SOL</span>
               </div>
 
-              <div className="flex justify-between items-center py-1.5 text-sm pt-2 border-t mt-1">
-                <span className="text-gray-800 font-medium">Final balance</span>
+              <div className="mt-1 flex items-center justify-between border-t py-1.5 pt-2 text-sm">
+                <span className="font-medium text-gray-800">Final balance</span>
                 <span
                   className={`font-semibold ${hasInsufficientFunds ? "text-red-600" : ""}`}
                 >
                   {finalBalance.toFixed(4)} SOL
                   {hasInsufficientFunds && (
-                    <span className="ml-2 text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">
+                    <span className="ml-2 rounded-full bg-red-100 px-1.5 py-0.5 text-xs text-red-600">
                       Insufficient
                     </span>
                   )}
@@ -160,19 +228,19 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
 
       {/* Recipient List Preview */}
       <Box className="mb-4">
-        <div className="flex justify-between items-center mb-2">
+        <div className="mb-2 flex items-center justify-between">
           <h2 className="text-base font-semibold">Recipients</h2>
           <span className="text-xs text-gray-500">
             Showing {Math.min(5, recipientsCount)} of {recipientsCount}
           </span>
         </div>
 
-        <div className="max-h-48 overflow-y-auto border rounded">
+        <div className="max-h-48 overflow-y-auto rounded border">
           <table className="min-w-full">
             <thead className="bg-gray-100">
               <tr>
                 <th className="p-1.5 text-left text-xs font-medium">Address</th>
-                <th className="p-1.5 text-right text-xs font-medium w-32">
+                <th className="w-32 p-1.5 text-right text-xs font-medium">
                   Amount (SOL)
                 </th>
               </tr>
@@ -180,7 +248,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
             <tbody className="text-xs">
               {recipients.slice(0, 5).map((recipient, index) => (
                 <tr key={index} className="border-t">
-                  <td className="p-1.5 truncate max-w-md">
+                  <td className="max-w-md truncate p-1.5">
                     {recipient.address}
                   </td>
                   <td className="p-1.5 text-right">
@@ -192,7 +260,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
                 <tr className="border-t">
                   <td
                     colSpan={2}
-                    className="p-1.5 text-gray-500 text-center text-xs"
+                    className="p-1.5 text-center text-xs text-gray-500"
                   >
                     ... and {recipientsCount - 5} more recipients
                   </td>
@@ -209,18 +277,24 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
           Back
         </Button>
         <Button
-          onClick={onConfirm}
+          onClick={startAirdrop}
           disabled={hasInsufficientFunds}
           color="indigo"
           className="!px-6"
         >
+          {isPending && <SpinnerIcon className="size-5" />}
           Confirm Airdrop
         </Button>
       </div>
 
       {hasInsufficientFunds && (
-        <div className="mt-2 text-center text-red-600 text-xs">
+        <div className="mt-2 text-center text-xs text-red-600">
           You don't have enough SOL to complete this airdrop.
+        </div>
+      )}
+      {error && (
+        <div className="mt-2 text-center text-xs text-red-600">
+          {error.error}: {error.message}
         </div>
       )}
     </div>

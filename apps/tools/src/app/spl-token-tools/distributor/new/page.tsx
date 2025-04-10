@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import SolaceAirdropper from "./airdrop-start";
 import SolaceAirdropReview from "./airdrop-review";
 
@@ -20,8 +20,8 @@ interface AirdropDetails {
 }
 
 export default function CreateNewFlow() {
-  const [step, setStep] = useState<number>(1);
-  const [airdropDetails, setAirdropDetails] = useState<AirdropDetails>({
+  const [step, setStep] = React.useState<number>(1);
+  const [airdropDetails, setAirdropDetails] = React.useState<AirdropDetails>({
     airdropType: "same",
     amount: "",
     recipients: [],
@@ -29,19 +29,11 @@ export default function CreateNewFlow() {
 
   const handleSubmitFirstStep = (data: AirdropDetails): void => {
     setAirdropDetails(data);
-    console.log("first step submit");
     setStep(2);
   };
 
   const handleBack = (): void => {
     setStep(1);
-  };
-
-  const handleConfirm = (): void => {
-    // Here you would implement the actual transaction logic
-    console.log("Airdrop confirmed with details:", airdropDetails);
-    // For demo purposes we could show a success message or redirect
-    alert("Airdrop initiated!");
   };
 
   return (
@@ -54,7 +46,6 @@ export default function CreateNewFlow() {
           amount={airdropDetails.amount}
           recipients={airdropDetails.recipients}
           onBack={handleBack}
-          onConfirm={handleConfirm}
         />
       )}
     </div>

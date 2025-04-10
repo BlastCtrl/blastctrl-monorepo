@@ -8,23 +8,11 @@ import clsx from "clsx";
 import { useFadeIn, formatDate } from "../common";
 import type { GetAirdropsIdResponseOK } from "@blastctrl/solace";
 import { compress } from "@/lib/solana";
-import { useGetAirdropById } from "../state";
+import { useGetAirdropById, useStartAirdrop } from "../state";
 
 type TransactionStatus =
   GetAirdropsIdResponseOK["transactions"][number]["status"];
 type AirdropStatus = GetAirdropsIdResponseOK["status"];
-
-interface Batch {
-  id: string;
-  status: TransactionStatus;
-  recipients: {
-    address: string;
-    amount: number;
-  }[];
-  signature?: string;
-  createdAt: number;
-  updatedAt: number;
-}
 
 export default function AirdropDetails({
   params,
@@ -32,7 +20,9 @@ export default function AirdropDetails({
   params: { airdropId: string };
 }) {
   const isVisible = useFadeIn();
-  const { data } = useGetAirdropById(params.airdropId);
+  const { mutate, data: startData } = useStartAirdrop();
+  const hasStarted = !!startData;
+  const { data } = useGetAirdropById(params.airdropId, hasStarted);
 
   const getStatusBadgeStyle = (status: TransactionStatus) => {
     switch (status) {
@@ -74,8 +64,12 @@ export default function AirdropDetails({
 
   // Handlers
   const handleStartAirdrop = () => {
-    alert("Starting airdrop. This would trigger the actual transactions.");
-    // Implementation would go here
+    if (!data) {
+      return;
+    }
+    mutate({
+      airdropId: data.id,
+    });
   };
 
   const handleRetry = (batchId: string) => {
@@ -136,12 +130,14 @@ export default function AirdropDetails({
                   </span>
                 </div>
 
-                {/* {mockAirdrop.type === "same" && (
+                {data.type === "same" && (
                   <div className="flex items-center justify-between py-1 text-sm">
                     <span className="text-gray-600">Amount per recipient</span>
-                    <span>{mockAirdrop.amount} SOL</span>
+                    <span>
+                      {(data?.lamportsPerUser ?? 0) / LAMPORTS_PER_SOL} SOL
+                    </span>
                   </div>
-                )} */}
+                )}
 
                 <div className="flex items-center justify-between py-1 text-sm">
                   <span className="text-gray-600">Total Amount</span>
@@ -210,12 +206,12 @@ export default function AirdropDetails({
               {/* Batch list */}
               <div className="max-h-96 overflow-y-auto rounded border">
                 <div className="divide-y">
-                  {data.transactions.map((batch) => (
+                  {data.transactions.map((batch, i) => (
                     <div key={batch.id} className="p-3">
                       <div className="mb-2 flex items-center justify-between">
                         <div className="flex items-center">
                           <span className="mr-2 font-mono text-xs">
-                            {batch.id}
+                            transaction {i + 1}
                           </span>
                           <span
                             className={`rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeStyle(batch.status)}`}

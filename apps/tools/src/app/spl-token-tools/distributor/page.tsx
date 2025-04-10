@@ -13,6 +13,7 @@ import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { useSolace } from "./solace-provider";
 import { useGetAirdrops } from "./state";
 import { formatDate } from "./common";
+import { jwtDecode } from "jwt-decode";
 
 export default function Overview() {
   const { publicKey, signMessage } = useWallet();
@@ -51,6 +52,18 @@ export default function Overview() {
       return () => clearTimeout(timeoutId);
     }
   }, [authToken?.expiresAt, refreshAccessToken]);
+
+  useEffect(() => {
+    if (publicKey === null) return;
+    if (authToken === null) return;
+    if (authToken) {
+      const decoded = jwtDecode(authToken.token);
+      if (publicKey.toString() !== decoded.sub) {
+        // we signed in with a different pubkey, wipe the auth token
+        setAuthToken(null);
+      }
+    }
+  }, [publicKey]);
 
   const handleRequestAuth = async () => {
     if (!publicKey || !signMessage) {
