@@ -20,6 +20,7 @@ type Recipient = {
 type AirdropType = "same" | "different";
 
 interface SolaceAirdropReviewProps {
+  balance: number;
   airdropType: AirdropType;
   amount: string;
   recipients: Recipient[];
@@ -28,6 +29,7 @@ interface SolaceAirdropReviewProps {
 
 const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
   airdropType,
+  balance,
   amount,
   recipients,
   onBack,
@@ -40,7 +42,6 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
   // Constants
   const BATCH_SIZE = 6;
   const COST_PER_BATCH = 0.000005;
-  const CURRENT_BALANCE = 10; // Mock user balance in SOL
 
   // Calculate totals
   const recipientsCount: number = recipients.length;
@@ -57,8 +58,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
         );
 
   // Calculate final balance
-  const finalBalance: number =
-    CURRENT_BALANCE - totalDistribution - transactionFee;
+  const finalBalance: number = balance - totalDistribution - transactionFee;
   const hasInsufficientFunds: boolean = finalBalance < 0;
 
   const startAirdrop = async () => {
@@ -117,7 +117,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
   };
 
   return (
-    <div className="mx-auto max-w-5xl p-4">
+    <div>
       <Box className="mb-4">
         <h1 className="font-display text-2xl font-semibold">
           Review Your Airdrop
@@ -205,7 +205,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
             <div className="space-y-2">
               <div className="flex items-center justify-between py-1 text-sm">
                 <span className="text-gray-600">Current balance</span>
-                <span>{CURRENT_BALANCE.toFixed(4)} SOL</span>
+                <span>{balance.toFixed(4)} SOL</span>
               </div>
 
               <div className="mt-1 flex items-center justify-between border-t py-1.5 pt-2 text-sm">
