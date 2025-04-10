@@ -33,6 +33,7 @@ export default function AirdropDetails({
   const isVisible = useFadeIn();
   const { mutate, data: startData } = useStartAirdrop();
   const hasStarted = !!startData;
+  const [showOnlyPending, setShowOnlyPending] = React.useState(false);
   const { data, refetch } = useGetAirdropById(params.airdropId, hasStarted);
 
   const getAirdropStatusBadgeStyle = (status: AirdropStatus): string => {
@@ -176,7 +177,7 @@ export default function AirdropDetails({
                   </div>
                   <div className="h-2.5 w-full rounded-full bg-gray-200">
                     <div
-                      className="h-2.5 rounded-full bg-indigo-600"
+                      className="h-2.5 animate-[width] rounded-full bg-indigo-600 duration-200 ease-in-out"
                       style={{ width: `${progress}%` }}
                     ></div>
                   </div>
@@ -190,23 +191,50 @@ export default function AirdropDetails({
             <Box className="h-full">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-base font-semibold">Transaction Batches</h2>
-                <span className="text-xs text-gray-500">
-                  {data.transactions.length} batches
-                </span>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => setShowOnlyPending(!showOnlyPending)}
+                    className={`rounded-md px-2 py-1 text-xs transition-colors ${
+                      showOnlyPending
+                        ? "border border-indigo-200 bg-indigo-100 text-indigo-800"
+                        : "border border-gray-200 bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    {showOnlyPending ? "Show All" : "Show Pending Only"}
+                  </button>
+                  <span className="text-xs text-gray-500">
+                    {data.transactions.length} batches
+                  </span>
+                </div>
               </div>
 
               {/* Batch list */}
               <div className="max-h-96 overflow-y-auto rounded border">
                 <div className="divide-y">
-                  {data.transactions.map((batch, i) => (
-                    <Batch
-                      key={batch.id}
-                      index={i}
-                      batch={batch}
-                      airdropId={data.id}
-                      refetchAirdrop={refetch}
-                    />
-                  ))}
+                  {data.transactions.filter(
+                    (batch) => !showOnlyPending || batch.status !== "confirmed",
+                  ).length === 0 ? (
+                    <div className="p-6 text-center text-gray-500">
+                      <p>
+                        No {showOnlyPending ? "pending" : ""} batches to display
+                      </p>
+                    </div>
+                  ) : (
+                    data.transactions
+                      .filter(
+                        (batch) =>
+                          !showOnlyPending || batch.status !== "confirmed",
+                      )
+                      .map((batch, i) => (
+                        <Batch
+                          key={batch.id}
+                          index={i}
+                          batch={batch}
+                          airdropId={data.id}
+                          refetchAirdrop={refetch}
+                        />
+                      ))
+                  )}
                 </div>
               </div>
             </Box>
