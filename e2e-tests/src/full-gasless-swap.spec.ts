@@ -101,9 +101,9 @@ test.afterAll(async () => {
     swapErrorReason,
   });
 
-  // Always report the test completion, regardless of success/failure
-  // The overall success depends on the swap success, not the cleanup
-  // We'll get this from the test status
+  // Always report the test completion, regardless of success/failure.
+  // The overall success depends on the swap success, not the cleanup.
+  // We'll get this from the test status.
   const overallSuccess = testReporter.swapStatus?.success || false;
   await testReporter.reportTestCompletion(overallSuccess);
 });

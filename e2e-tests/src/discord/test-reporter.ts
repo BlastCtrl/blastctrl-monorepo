@@ -1,6 +1,6 @@
 import { createInitialTestMessage, createComprehensiveTestReport } from "./messages.js";
 import { DiscordWebhookClient } from "./webhook-client.js";
-import { getSolBalance, getTokenBalance, formatNumber } from "../solana-lib.js";
+import { getSolBalance, getTokenBalance, formatNumber, sleep } from "../solana-lib.js";
 import CONFIG from "../config.js";
 
 export type CleanupStepData = {
@@ -168,7 +168,8 @@ export class TestReporter {
    */
   async reportTestCompletion(success: boolean): Promise<void> {
     try {
-      // Get final balances
+      // wait 5 seconds before getting the final balances
+      await sleep(5000);
       const finalFunderSol = (await getSolBalance(CONFIG.funder.publicKey)) / 1e9;
       const finalFunderUsdc = await getTokenBalance(CONFIG.funder.publicKey, CONFIG.usdcMint);
       const finalSwapperSol = (await getSolBalance(CONFIG.swapper.publicKey)) / 1e9;
