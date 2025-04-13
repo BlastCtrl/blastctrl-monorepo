@@ -1,5 +1,13 @@
 packages:
-  - "packages/*"
-  - "apps/*"
-  - "tooling/*"
-  - "e2e-tests"
+  - packages/*
+  - apps/*
+  - tooling/*
+  - e2e-tests
+ignoredBuiltDependencies:
+  - esbuild
+  - keccak
+  - secp256k1
+  - utf-8-validate
+onlyBuiltDependencies:
+  - bigint-buffer
+  - bufferutil
