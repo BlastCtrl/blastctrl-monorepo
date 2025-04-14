@@ -15,15 +15,11 @@ import { Box } from "./box";
 import { Field, Label } from "@headlessui/react";
 import * as Slider from "@radix-ui/react-slider";
 import { retryWithBackoff } from "@/lib/utils";
-import {
-  ComputeBudgetProgram,
-  Keypair,
-  StakeProgram,
-  Transaction,
-} from "@solana/web3.js";
+import { Keypair, StakeProgram, Transaction } from "@solana/web3.js";
 import { notify } from "@/components/notification";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { PickerDialog } from "./picker-dialog";
+import { useRentQuery } from "./rent-query";
 
 export function SplitGraphicForm() {
   const { publicKey } = useWallet();
@@ -96,6 +92,7 @@ function SplitFormInner({
   const [formSuccess, setFormSuccess] = useState("");
   const { publicKey, sendTransaction } = useWallet();
   const { setVisible } = useWalletModal();
+  const { data: rentExemption, refetch } = useRentQuery(StakeProgram.space);
 
   // multiply the lamports by the percent
   // check for error => percent is >= 100 or <= 0
@@ -144,9 +141,13 @@ function SplitFormInner({
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!publicKey || !sendTransaction || !selectedAccount) return;
+    if (!publicKey || !sendTransaction || !selectedAccount) {
+      throw Error("publicKey || sendTransaction unsupported");
+    }
     if (inputError) return;
+
     try {
+      await refetch({ throwOnError: true });
       const { context, value } = await retryWithBackoff(() =>
         connection.getLatestBlockhashAndContext("confirmed"),
       );
@@ -159,7 +160,7 @@ function SplitFormInner({
       ).toFixed(0);
 
       tx.add(
-        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1e6 }),
+        // ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1e6 }),
         StakeProgram.split(
           {
             authorizedPubkey: publicKey,
@@ -167,7 +168,7 @@ function SplitFormInner({
             splitStakePubkey: stakeAccount.publicKey,
             lamports: newAccountBalanceLamports,
           },
-          0,
+          rentExemption ?? 0,
         ),
       );
 
