@@ -64,17 +64,31 @@ export function useGetAirdropById(airdropId: string, hasStarted?: boolean) {
 
   return useQuery({
     refetchInterval: (query) => {
+      if (!query.state) {
+        if (hasStarted) return 1000;
+        else return false;
+      }
+      if (query.state.data?.status === "processing") {
+        return 1000;
+      }
+      if (query.state.data) {
+        // Check if any transaction has 'confirming' status
+        const anyConfirming = query.state.data.transactions?.some(
+          (transaction) => transaction.status === "confirming",
+        );
+
+        if (anyConfirming) {
+          return 1000;
+        }
+      }
+
       if (
-        query?.state?.data?.status === "failed" ||
-        query?.state?.data?.status === "completed"
+        query.state.data?.status === "failed" ||
+        query.state.data?.status === "completed"
       ) {
         return false;
       }
-      if (query?.state?.data?.status === "processing" || hasStarted) {
-        return 1000;
-      } else {
-        return false;
-      }
+      return false;
     },
     queryKey: ["airdrops", "single", airdropId],
     queryFn: async () => {
