@@ -149,7 +149,9 @@ export default function AirdropDetails({
 
                 <div className="flex items-center justify-between py-1 text-sm">
                   <span className="text-gray-600">ID</span>
-                  <span className="font-mono text-xs">{data.id}</span>
+                  <span className="truncate text-right font-mono text-xs">
+                    {data.id}
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between py-1 text-sm">
@@ -162,7 +164,7 @@ export default function AirdropDetails({
                 {data.type === "same" && (
                   <div className="flex items-center justify-between py-1 text-sm">
                     <span className="text-gray-600">Amount per recipient</span>
-                    <span>
+                    <span className="text-right">
                       {(data?.lamportsPerUser ?? 0) / LAMPORTS_PER_SOL} SOL
                     </span>
                   </div>
@@ -170,24 +172,28 @@ export default function AirdropDetails({
 
                 <div className="flex items-center justify-between py-1 text-sm">
                   <span className="text-gray-600">Total Amount</span>
-                  <span className="font-medium">
+                  <span className="text-right font-medium">
                     {data.totalAmount / LAMPORTS_PER_SOL} SOL
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between py-1 text-sm">
                   <span className="text-gray-600">Recipients</span>
-                  <span>{data.recipientCount}</span>
+                  <span className="text-right">{data.recipientCount}</span>
                 </div>
 
                 <div className="flex items-center justify-between py-1 text-sm">
                   <span className="text-gray-600">Created</span>
-                  <span>{formatDate(data.createdAt)}</span>
+                  <span className="text-right">
+                    {formatDate(data.createdAt)}
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between py-1 text-sm">
                   <span className="text-gray-600">Last Updated</span>
-                  <span>{formatDate(data.updatedAt)}</span>
+                  <span className="text-right">
+                    {formatDate(data.updatedAt)}
+                  </span>
                 </div>
               </div>
 
@@ -369,7 +375,7 @@ function Batch({
             onClick={() => handleRetry()}
             disabled={isPending}
             color="indigo"
-            className="!px-3 text-xs"
+            className="!px-3 text-xs !leading-4"
           >
             {isPending && <SpinnerIcon className="size-4" />}
             Retry
@@ -411,9 +417,14 @@ function Batch({
           </summary>
           <div className="mt-2 border-l-2 border-gray-200 pl-2">
             {batch.recipients.map((recipient, i) => (
-              <div key={i} className="mb-1 flex justify-between">
-                <span className="font-mono">{recipient.address}</span>
-                <span>{recipient.lamports / LAMPORTS_PER_SOL} SOL</span>
+              <div
+                key={i}
+                className="mb-1 flex max-w-full justify-between gap-4"
+              >
+                <span className="break-all font-mono">{recipient.address}</span>
+                <span className="whitespace-nowrap">
+                  {recipient.lamports / LAMPORTS_PER_SOL} SOL
+                </span>
               </div>
             ))}
           </div>
