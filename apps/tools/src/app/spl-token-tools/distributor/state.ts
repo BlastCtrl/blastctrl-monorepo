@@ -65,29 +65,15 @@ export function useGetAirdropById(airdropId: string, hasStarted?: boolean) {
   return useQuery({
     refetchInterval: (query) => {
       if (!query.state) {
-        if (hasStarted) return 1000;
-        else return false;
+        return hasStarted ? 1000 : false;
       }
-      if (query.state.data?.status === "processing") {
+
+      const data = query.state.data;
+      // Refresh if processing or any transactions confirming
+      if (data?.transactions?.some((tx) => tx.status === "confirming")) {
         return 1000;
       }
-      if (query.state.data) {
-        // Check if any transaction has 'confirming' status
-        const anyConfirming = query.state.data.transactions?.some(
-          (transaction) => transaction.status === "confirming",
-        );
 
-        if (anyConfirming) {
-          return 1000;
-        }
-      }
-
-      if (
-        query.state.data?.status === "failed" ||
-        query.state.data?.status === "completed"
-      ) {
-        return false;
-      }
       return false;
     },
     queryKey: ["airdrops", "single", airdropId],
@@ -143,7 +129,7 @@ export function useRetryTransaction(airdropId: string, batchId: string) {
   const sdk = useSolace();
 
   return useMutation({
-    mutationKey: ["retry"],
+    mutationKey: ["retry", airdropId, batchId],
     mutationFn: async (data: PostAirdropsAirdropIdRetryBatchBatchIdBody) => {
       const response = await sdk.api.postAirdropsAirdropIdRetryBatchBatchId(
         airdropId,
