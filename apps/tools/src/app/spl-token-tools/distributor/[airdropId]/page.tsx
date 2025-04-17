@@ -261,10 +261,10 @@ export default function AirdropDetails({
                         (batch) =>
                           !showOnlyPending || batch.status !== "confirmed",
                       )
-                      .map((batch, i) => (
+                      .map((batch) => (
                         <Batch
                           key={batch.id}
-                          index={i}
+                          index={batch.counter}
                           batch={batch}
                           airdropId={data.id}
                           refetchAirdrop={refetch}

@@ -40,8 +40,17 @@ function getAirdropByIdTransformer(data: GetAirdropsId200) {
     type = amounts.size === 1 ? "same" : "different";
   }
 
+  // Add counter property to each transaction
+  const transactionsWithCounter = data.transactions.map(
+    (transaction, index) => ({
+      ...transaction,
+      counter: index,
+    }),
+  );
+
   return {
     ...data,
+    transactions: transactionsWithCounter,
     type,
     lamportsPerUser:
       type === "same"

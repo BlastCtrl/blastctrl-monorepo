@@ -4,7 +4,6 @@ import React, { useState, useRef, ChangeEvent } from "react";
 import Papa from "papaparse";
 import { Button } from "@blastctrl/ui";
 import { Box } from "../box";
-import { useWallet } from "@solana/wallet-adapter-react";
 
 type Recipient = {
   address: string;
@@ -57,7 +56,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
     csv: "",
   });
 
-  const maxRecipients = 200;
+  const maxRecipients = 600;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validateSolAddress = (address: string): boolean => {
