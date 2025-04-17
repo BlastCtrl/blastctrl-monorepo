@@ -13,12 +13,12 @@ export class SolaceError extends Error {
     statusCode,
   }: {
     error: string;
-    message: string;
+    message?: string;
     statusCode: number;
   }) {
     super(message);
     this.error = error;
-    this.message = message;
+    this.message = message ?? "";
     this.statusCode = statusCode;
     this.name = "SolaceError";
     Object.setPrototypeOf(this, SolaceError.prototype);

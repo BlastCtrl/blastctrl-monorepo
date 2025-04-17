@@ -6,14 +6,18 @@ import { Box } from "./box";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Button } from "@blastctrl/ui";
 import base58 from "bs58";
-import type { GetAirdropsResponseOK } from "@blastctrl/solace";
+import type {
+  GetAirdrops200Item,
+  GetAirdropsId200,
+} from "@blastctrl/solace-sdk";
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { useSolace } from "./solace-provider";
 import { useGetAirdrops } from "./state";
-import { formatDate, useFadeIn } from "./common";
+import { formatDate, SolaceError, useFadeIn } from "./common";
 import { jwtDecode } from "jwt-decode";
+import { notify } from "@/components/notification";
 
 export default function Overview() {
   const { publicKey, signMessage } = useWallet();
@@ -27,16 +31,17 @@ export default function Overview() {
 
   const refreshAccessToken = useCallback(async () => {
     if (!authToken?.refreshToken || !publicKey) return;
-    const response = await solace.postAuthRefresh({
+    const response = await solace.api.postAuthRefresh({
       address: publicKey?.toString(),
       refreshToken: authToken.refreshToken,
     });
 
-    if ("error" in response) {
-      console.log(response.error, response.message);
+    if (response.status !== 200) {
+      console.log(response.data);
       return;
     }
-    setAuthToken(response);
+
+    setAuthToken(response.data);
   }, [publicKey, authToken?.refreshToken]);
 
   useEffect(() => {
@@ -66,33 +71,38 @@ export default function Overview() {
   }, [publicKey]);
 
   const handleRequestAuth = async () => {
-    if (!publicKey || !signMessage) {
-      throw new Error("wallet cannot sign");
+    try {
+      if (!publicKey || !signMessage) {
+        throw new Error("wallet cannot sign");
+      }
+
+      let challenge = await solace.api.getAuthChallenge({
+        address: publicKey.toString(),
+      });
+      if (challenge.status !== 200) {
+        throw new Error("Auth challenge error", { cause: challenge.data });
+      }
+      const msgUint8 = new TextEncoder().encode(challenge.data.message);
+      const signature = await signMessage(msgUint8);
+
+      const authResp = await solace.api.postAuthVerify({
+        address: publicKey?.toString(),
+        signature: base58.encode(signature),
+      });
+
+      if (authResp.status !== 200) {
+        throw new Error(authResp.data.message);
+      }
+
+      setAuthToken(authResp.data);
+    } catch (error) {
+      console.log(error);
+      const [title, message] =
+        error instanceof Error
+          ? [error.name, error.message]
+          : [undefined, "Unknown error happened, check console"];
+      notify({ type: "error", title, description: message });
     }
-
-    let challenge = await solace.getAuthChallenge({
-      address: publicKey.toString(),
-    });
-    if ("error" in challenge) {
-      throw new Error(challenge.message);
-    }
-    const msgUint8 = new TextEncoder().encode(challenge.message);
-    const signature = await signMessage(msgUint8);
-
-    const authResp = await solace.postAuthVerify({
-      address: publicKey?.toString(),
-      signature: base58.encode(signature),
-    });
-
-    if ("error" in authResp) {
-      throw new Error(authResp.message);
-    }
-
-    setAuthToken({
-      token: authResp.token,
-      expiresAt: authResp.expiresAt,
-      refreshToken: authResp.refreshToken,
-    });
   };
 
   if (!publicKey) {
@@ -128,11 +138,10 @@ export default function Overview() {
   return <SolaceAirdropDashboard />;
 }
 
-type AirdropStatus = GetAirdropsResponseOK[number]["status"];
+type AirdropStatus = GetAirdropsId200["status"];
 
 const SolaceAirdropDashboard = () => {
   const visible = useFadeIn();
-  const { publicKey } = useWallet();
   const [selectedAirdropId, setSelectedAirdropId] = useState<string | null>(
     null,
   );
@@ -319,7 +328,7 @@ const SolaceAirdropDashboard = () => {
                     .map((recipient, index) => (
                       <tr key={index} className="border-t">
                         <td className="max-w-md truncate p-1.5 font-mono">
-                          {recipient.walletAddress}
+                          {recipient.address}
                         </td>
                         <td className="p-1.5 text-right">
                           {recipient.lamports / LAMPORTS_PER_SOL}

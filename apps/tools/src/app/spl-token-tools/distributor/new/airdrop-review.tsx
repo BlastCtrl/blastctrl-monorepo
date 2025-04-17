@@ -1,16 +1,11 @@
-import React from "react";
-import { Button, SpinnerIcon } from "@blastctrl/ui";
-import { Box } from "../box";
-import { useCreateAirdrop, useStartAirdrop } from "../state";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import {
-  LAMPORTS_PER_SOL,
-  PublicKey,
-  SystemProgram,
-  Transaction,
-} from "@solana/web3.js";
 import { notify } from "@/components";
+import { Button, SpinnerIcon } from "@blastctrl/ui";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { useRouter } from "next/navigation";
+import React from "react";
+import { Box } from "../box";
+import { useCreateAirdrop } from "../state";
 
 type Recipient = {
   address: string;
@@ -35,8 +30,6 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
   onBack,
 }) => {
   const { publicKey } = useWallet();
-  const { connection } = useConnection();
-  const { signAllTransactions } = useWallet();
   const { mutate, isPending, error } = useCreateAirdrop();
   const router = useRouter();
   // Constants
@@ -61,8 +54,8 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
   const finalBalance: number = balance - totalDistribution - transactionFee;
   const hasInsufficientFunds: boolean = finalBalance < 0;
 
-  const startAirdrop = async () => {
-    if (!publicKey || !signAllTransactions) {
+  const startAirdrop = () => {
+    if (!publicKey) {
       notify({
         type: "error",
         description: "Sign all transactions feature is unavailable",
@@ -70,44 +63,20 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
       return;
     }
 
-    const { value, context } =
-      await connection.getLatestBlockhashAndContext("confirmed");
-    const groups: Recipient[][] = [];
+    // const { value, context } =
+    //   await connection.getLatestBlockhashAndContext("confirmed");
+    const batches: Array<Array<{ address: string; lamports: number }>> = [];
     for (let i = 0; i < recipients.length; i += 6) {
-      groups.push(recipients.slice(i, i + 6));
+      batches.push(
+        recipients.slice(i, i + 6).map((r) => ({
+          address: r.address,
+          lamports: Number(r.amount) * LAMPORTS_PER_SOL,
+        })),
+      );
     }
 
-    const transactions: Transaction[] = groups.map((b) => {
-      const tx = new Transaction({ ...value, feePayer: publicKey }).add(
-        ...b.map((r) =>
-          SystemProgram.transfer({
-            lamports: Number(r.amount) * LAMPORTS_PER_SOL,
-            fromPubkey: publicKey,
-            toPubkey: new PublicKey(r.address),
-          }),
-        ),
-      );
-      return tx;
-    });
-
-    const signedTransactions = await signAllTransactions(transactions);
-    const batches = signedTransactions.map((signedTx, i) => ({
-      tx_hash: signedTx
-        .serialize({ requireAllSignatures: true, verifySignatures: true })
-        .toString("base64"),
-      recipients:
-        groups[i]?.map((g) => ({
-          address: g.address,
-          lamports: Number(g.amount) * LAMPORTS_PER_SOL,
-        })) ?? [],
-    }));
-
     mutate(
-      {
-        ...value,
-        minContextSlot: context.slot,
-        batches,
-      },
+      { batches },
       {
         onSuccess: (res) => {
           router.push(`/spl-token-tools/distributor/${res.id}`);

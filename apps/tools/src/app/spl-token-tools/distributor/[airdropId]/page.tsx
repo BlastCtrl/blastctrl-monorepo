@@ -1,8 +1,10 @@
 "use client";
 
-import React from "react";
+import { notify } from "@/components";
+import { compress } from "@/lib/solana";
+import type { GetAirdropsId200 } from "@blastctrl/solace-sdk";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
-import { Box } from "../box";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import {
   LAMPORTS_PER_SOL,
   PublicKey,
@@ -10,20 +12,17 @@ import {
   Transaction,
 } from "@solana/web3.js";
 import clsx from "clsx";
-import { useFadeIn, formatDate } from "../common";
-import type { GetAirdropsIdResponseOK } from "@blastctrl/solace";
-import { compress } from "@/lib/solana";
+import React from "react";
+import { Box } from "../box";
+import { formatDate, useFadeIn } from "../common";
 import {
   useGetAirdropById,
   useRetryTransaction,
   useStartAirdrop,
 } from "../state";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { notify } from "@/components";
 
-type TransactionStatus =
-  GetAirdropsIdResponseOK["transactions"][number]["status"];
-type AirdropStatus = GetAirdropsIdResponseOK["status"];
+type TransactionStatus = GetAirdropsId200["transactions"][number]["status"];
+type AirdropStatus = GetAirdropsId200["status"];
 
 export default function AirdropDetails({
   params,
@@ -31,12 +30,14 @@ export default function AirdropDetails({
   params: { airdropId: string };
 }) {
   const isVisible = useFadeIn();
-  const { mutate, data: startData } = useStartAirdrop();
+  const { connection } = useConnection();
+  const { publicKey, signAllTransactions } = useWallet();
+  const { mutate, data: startData } = useStartAirdrop(params.airdropId);
   const hasStarted = !!startData;
   const [showOnlyPending, setShowOnlyPending] = React.useState(false);
   const { data, refetch } = useGetAirdropById(params.airdropId, hasStarted);
 
-  const getAirdropStatusBadgeStyle = (status: AirdropStatus): string => {
+  const getAirdropStatusBadgeStyle = (status: AirdropStatus) => {
     switch (status) {
       case "created":
         return "bg-yellow-100 text-yellow-800";
@@ -61,13 +62,48 @@ export default function AirdropDetails({
     return Math.round((confirmedBatches / data.transactions.length) * 100);
   };
 
-  const handleStartAirdrop = () => {
-    if (!data) {
+  const handleStartAirdrop = async () => {
+    if (!publicKey) return;
+    if (!data) return;
+    if (!signAllTransactions) {
+      notify({
+        type: "error",
+        description: "Sign all transactions not supported",
+      });
       return;
     }
-    mutate({
-      airdropId: data.id,
+
+    const { value, context } =
+      await connection.getLatestBlockhashAndContext("confirmed");
+    const transactions = data.transactions.map((txBatch) => {
+      const tx = new Transaction({ ...value, feePayer: publicKey }).add(
+        ...txBatch.recipients.map((r) =>
+          SystemProgram.transfer({
+            lamports: r.lamports,
+            fromPubkey: publicKey,
+            toPubkey: new PublicKey(r.address),
+          }),
+        ),
+      );
+      tx.recentBlockhash = value.blockhash;
+      tx.lastValidBlockHeight = context.slot;
+      return tx;
     });
+
+    const signedTransactions = await signAllTransactions(
+      transactions.map((tx) => tx),
+    );
+
+    mutate(
+      signedTransactions.map((tx, i) => ({
+        batchId: data.transactions[i]!.id,
+        minContextSlot: context.slot,
+        txBase64: tx
+          .serialize({ requireAllSignatures: true, verifySignatures: true })
+          .toString("base64"),
+        ...value,
+      })),
+    );
   };
 
   const progress = calculateProgress();
@@ -251,18 +287,23 @@ function Batch({
   airdropId,
   refetchAirdrop,
 }: {
-  batch: GetAirdropsIdResponseOK["transactions"][number];
+  batch: GetAirdropsId200["transactions"][number];
   airdropId: string;
   refetchAirdrop: () => Promise<unknown>;
   index: number;
 }) {
   const { connection } = useConnection();
   const { publicKey, signTransaction } = useWallet();
-  const { mutate, isPending, error } = useRetryTransaction();
+  const { mutate, isPending, error } = useRetryTransaction(
+    airdropId,
+    batch.id.toString(),
+  );
   const getStatusBadgeStyle = (status: TransactionStatus) => {
     switch (status) {
       case "pending":
         return "bg-yellow-100 text-yellow-800";
+      case "confirming":
+        return "bg-blue-100 text-blue-800";
       case "confirmed":
         return "bg-green-100 text-green-800";
       case "failed":
@@ -286,7 +327,7 @@ function Batch({
       ...batch.recipients.map((r) =>
         SystemProgram.transfer({
           fromPubkey: publicKey,
-          toPubkey: new PublicKey(r.walletAddress),
+          toPubkey: new PublicKey(r.address),
           lamports: r.lamports,
         }),
       ),
@@ -295,17 +336,11 @@ function Batch({
 
     mutate(
       {
-        airdropId,
-        batchId: batch.id.toString(),
         ...value,
         minContextSlot: context.slot,
-        batch: {
-          tx_hash: signed.serialize().toString("base64"),
-          recipients: batch.recipients.map((r) => ({
-            lamports: r.lamports,
-            address: r.walletAddress,
-          })),
-        },
+        txBase64: signed
+          .serialize({ requireAllSignatures: true, verifySignatures: true })
+          .toString("base64"),
       },
       {
         onSuccess: async () => {
@@ -343,7 +378,7 @@ function Batch({
         {error && <div className="text-sm text-rose-500">{error.message}</div>}
 
         {/* Show spinner for processing batches */}
-        {batch.status === "pending" && (
+        {batch.status === "confirming" && (
           <div className="size-5 animate-spin rounded-full border-2 border-b-indigo-200 border-l-indigo-200 border-r-indigo-200 border-t-indigo-600"></div>
         )}
       </div>
@@ -377,7 +412,7 @@ function Batch({
           <div className="mt-2 border-l-2 border-gray-200 pl-2">
             {batch.recipients.map((recipient, i) => (
               <div key={i} className="mb-1 flex justify-between">
-                <span className="font-mono">{recipient.walletAddress}</span>
+                <span className="font-mono">{recipient.address}</span>
                 <span>{recipient.lamports / LAMPORTS_PER_SOL} SOL</span>
               </div>
             ))}
