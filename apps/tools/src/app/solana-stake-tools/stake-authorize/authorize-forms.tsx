@@ -177,7 +177,7 @@ function AuthorizeTransactionBuilder({
   const { setVisible } = useWalletModal();
   const [authority, setAuthority] = useState("");
   const [withdrawCheckbox, setWithdrawCheckbox] = useState(true);
-  const [stakeCheckbox, setStakeCheckbox] = useState(false);
+  const [stakeCheckbox, setStakeCheckbox] = useState(true);
   const [isConfirming, setIsConfirming] = useState(false);
 
   const { refetch } = useStakeAccount(stakePubkey.toString());
