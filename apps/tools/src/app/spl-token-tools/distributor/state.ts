@@ -2,13 +2,14 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useSolace } from "./solace-provider";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { SolaceError } from "./common";
-import {
-  GetAirdropsIdResponseOK,
-  PostAirdropsAirdropIdRetryBatchBatchIdRequest,
-  PostAirdropsIdStartResponseOK,
-  PostAirdropsResponseCreated,
-  type PostAirdropsRequest,
-} from "@blastctrl/solace";
+import type {
+  PostAirdrops201,
+  PostAirdropsAirdropIdRetryBatchBatchIdBody,
+  PostAirdropsBody,
+  PostAirdropsIdStart200,
+  PostAirdropsIdStartBodyItem,
+  GetAirdropsId200,
+} from "@blastctrl/solace-sdk";
 
 export function useGetAirdrops() {
   const sdk = useSolace();
@@ -19,16 +20,16 @@ export function useGetAirdrops() {
     enabled: !!publicKey,
     queryKey: ["airdrops", "all", publicKey?.toString()],
     queryFn: async () => {
-      const response = await sdk.getAirdrops({});
-      if ("error" in response) {
-        throw new SolaceError(response);
+      const response = await sdk.api.getAirdrops();
+      if (response.status !== 200) {
+        throw new SolaceError(response.data);
       }
-      return response;
+      return response.data;
     },
   });
 }
 
-function getAirdropByIdTransformer(data: GetAirdropsIdResponseOK) {
+function getAirdropByIdTransformer(data: GetAirdropsId200) {
   let type: "same" | "different";
   const recipients = data.transactions.flatMap((t) => t.recipients);
 
@@ -68,14 +69,12 @@ export function useGetAirdropById(airdropId: string, hasStarted?: boolean) {
     },
     queryKey: ["airdrops", "single", airdropId],
     queryFn: async () => {
-      const response = await sdk.getAirdropsId({
-        id: airdropId,
-      });
+      const response = await sdk.api.getAirdropsId(airdropId);
 
-      if ("error" in response) {
-        throw new SolaceError(response);
+      if (response.status !== 200) {
+        throw new SolaceError(response.data);
       }
-      return response;
+      return response.data;
     },
     retry: 1,
     select: getAirdropByIdTransformer,
@@ -85,57 +84,55 @@ export function useGetAirdropById(airdropId: string, hasStarted?: boolean) {
 export function useCreateAirdrop() {
   const sdk = useSolace();
 
-  return useMutation<
-    PostAirdropsResponseCreated,
-    SolaceError,
-    Omit<PostAirdropsRequest, "authorization">
-  >({
+  return useMutation<PostAirdrops201, SolaceError, PostAirdropsBody>({
     mutationKey: ["createAirdrop"],
     mutationFn: async (data) => {
-      const response = await sdk.postAirdrops(data);
-      if ("error" in response) {
-        throw new SolaceError(response);
+      const response = await sdk.api.postAirdrops(data);
+      if (response.status !== 201) {
+        throw new SolaceError(response.data);
       }
-      return response;
+      return response.data;
     },
   });
 }
 
-export function useStartAirdrop() {
+export function useStartAirdrop(airdropId: string) {
   const sdk = useSolace();
 
   return useMutation<
-    PostAirdropsIdStartResponseOK,
+    PostAirdropsIdStart200,
     SolaceError,
-    { airdropId: string }
+    PostAirdropsIdStartBodyItem[]
   >({
     mutationKey: ["startAirdrop"],
     mutationFn: async (data) => {
-      const response = await sdk.postAirdropsIdStart({
-        id: data.airdropId,
-      });
+      const response = await sdk.api.postAirdropsIdStart(airdropId, data);
 
-      if ("error" in response) {
-        throw new SolaceError(response);
+      if (response.status !== 200) {
+        throw new SolaceError(response.data);
       }
-      return response;
+      return response.data;
     },
   });
 }
 
-export function useRetryTransaction() {
+export function useRetryTransaction(airdropId: string, batchId: string) {
   const sdk = useSolace();
 
   return useMutation({
     mutationKey: ["retry"],
-    mutationFn: async (data: PostAirdropsAirdropIdRetryBatchBatchIdRequest) => {
-      const response = await sdk.postAirdropsAirdropIdRetryBatchBatchId(data);
+    mutationFn: async (data: PostAirdropsAirdropIdRetryBatchBatchIdBody) => {
+      const response = await sdk.api.postAirdropsAirdropIdRetryBatchBatchId(
+        airdropId,
+        batchId,
+        data,
+      );
 
-      if ("error" in response) {
-        throw new Error(JSON.stringify(response.body));
+      if (response.status !== 200) {
+        throw new SolaceError(response.data);
       }
 
-      return response;
+      return response.data;
     },
   });
 }

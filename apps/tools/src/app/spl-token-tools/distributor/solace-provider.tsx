@@ -1,13 +1,13 @@
 "use client";
 
 import React from "react";
-import build, { PlatformaticFrontendClient } from "@blastctrl/solace";
+import build, { SolaceSDK } from "@blastctrl/solace-sdk";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 
-const SolaceContext = React.createContext<PlatformaticFrontendClient>(
-  null as unknown as PlatformaticFrontendClient,
+const SolaceContext = React.createContext<SolaceSDK>(
+  null as unknown as SolaceSDK,
 );
 
 export function useSolace() {
@@ -26,9 +26,7 @@ export function SolaceProvider({ children }: { children: React.ReactNode }) {
         try {
           const token = JSON.parse(authToken).token;
           const sdk = build("/blast-api", {
-            headers: {
-              authorization: `Bearer ${token}`,
-            },
+            authorization: `Bearer ${token}`,
           });
           return sdk;
         } catch {
@@ -54,9 +52,7 @@ export function SolaceProvider({ children }: { children: React.ReactNode }) {
               const token = JSON.parse(authToken).token;
               setInstance(
                 build("/blast-api", {
-                  headers: {
-                    authorization: `Bearer ${token}`,
-                  },
+                  authorization: `Bearer ${token}`,
                 }),
               );
 
@@ -79,7 +75,7 @@ export function SolaceProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     if (typeof window !== "undefined") {
       const authToken = window.localStorage.getItem("authToken");
-      console.log("condition met to redirect user back to start");
+
       if (authToken && publicKey === null) {
         void queryClient.removeQueries({
           queryKey: ["airdrops"],
