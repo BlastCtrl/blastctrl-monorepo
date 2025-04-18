@@ -212,7 +212,7 @@ export default function BonkSwap() {
                 placeholder="0.00"
                 className={cn(
                   "block grow rounded-md border-none border-transparent bg-gray-200 text-right font-medium text-gray-600",
-                  "rounded-md placeholder:font-medium placeholder:text-gray-400",
+                  "rounded-md px-3 py-2 placeholder:font-medium placeholder:text-gray-400",
                   "focus:outline-none focus:ring-0 sm:text-base",
                 )}
               />

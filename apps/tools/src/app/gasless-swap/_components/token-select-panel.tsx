@@ -95,7 +95,7 @@ export function TokenSelectPanel({
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Search for tokens"
-          className="w-full border-x-0 border-b-2 border-t-0 border-gray-400 pl-9 placeholder:text-gray-400 focus:border-b-2 focus:border-indigo-600 focus:ring-0"
+          className="w-full border-x-0 border-b-2 border-t-0 border-gray-400 px-3 py-2 pl-9 placeholder:text-gray-400 focus:border-b-2 focus:border-indigo-600 focus:ring-0"
         />
       </div>
 

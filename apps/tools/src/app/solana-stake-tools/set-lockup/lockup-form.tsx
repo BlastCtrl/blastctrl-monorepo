@@ -494,7 +494,7 @@ function StyledInput({ className, ...props }: InputProps) {
     <Input
       className={cn(
         "grow items-stretch data-[focus]:z-10",
-        "rounded-none rounded-l-lg border-0 py-1.5 text-zinc-900 ring-1 ring-inset ring-gray-300 sm:text-sm/6",
+        "rounded-none rounded-l-lg border-0 px-3 py-1.5 text-zinc-900 ring-1 ring-inset ring-gray-300 sm:text-sm/6",
         "focus:outline-none data-[focus]:ring-2 data-[focus]:ring-inset data-[focus]:ring-indigo-600",
         "data-[disabled]:bg-zinc-100 data-[disabled]:text-zinc-500",
         "data-[invalid]:border-red-600 data-[invalid]:text-red-600",

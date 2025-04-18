@@ -236,7 +236,7 @@ export default function GaslessSwap() {
                 },
               })}
               placeholder="0.00"
-              className="min-w-0 grow rounded-md border-transparent bg-gray-200 text-right font-medium text-gray-600 placeholder:text-gray-400 focus:outline-none focus:ring-0"
+              className="min-w-0 grow rounded-md border-transparent bg-gray-200 px-3 py-2 text-right font-medium text-gray-600 placeholder:text-gray-400 focus:outline-none focus:ring-0"
             />
           </div>
           <span className="text-sm text-red-600">

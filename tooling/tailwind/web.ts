@@ -47,5 +47,10 @@ export default {
       },
     },
   },
-  plugins: [animate, forms],
+  plugins: [
+    animate,
+    forms({
+      strategy: "class",
+    }),
+  ],
 } satisfies Config;
