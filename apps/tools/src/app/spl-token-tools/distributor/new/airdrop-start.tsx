@@ -56,7 +56,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
     csv: "",
   });
 
-  const maxRecipients = 600;
+  const maxRecipients = 1000;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validateSolAddress = (address: string): boolean => {

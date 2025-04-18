@@ -6,18 +6,16 @@ import { Box } from "./box";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Button } from "@blastctrl/ui";
 import base58 from "bs58";
-import type {
-  GetAirdrops200Item,
-  GetAirdropsId200,
-} from "@blastctrl/solace-sdk";
+import type { GetAirdropsId200 } from "@blastctrl/solace-sdk";
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { useSolace } from "./solace-provider";
-import { useGetAirdrops } from "./state";
-import { formatDate, SolaceError, useFadeIn } from "./common";
+import { useDeleteAirdrop, useGetAirdrops } from "./state";
+import { formatDate, useFadeIn } from "./common";
 import { jwtDecode } from "jwt-decode";
 import { notify } from "@/components/notification";
+import { TrashIcon } from "@heroicons/react/16/solid";
 
 export default function Overview() {
   const { publicKey, signMessage } = useWallet();
@@ -147,6 +145,7 @@ const SolaceAirdropDashboard = () => {
   );
 
   const { data: airdrops, isLoading, isError } = useGetAirdrops();
+  const { mutate, isPending } = useDeleteAirdrop();
 
   // Get the selected airdrop details
   const selectedAirdrop =
@@ -219,13 +218,16 @@ const SolaceAirdropDashboard = () => {
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Status
                   </th>
+                  <th className="">
+                    <span className="sr-only">Delete</span>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
                 {airdrops.map((airdrop) => (
                   <tr
                     key={airdrop.id}
-                    className={`cursor-pointer hover:bg-gray-50 ${selectedAirdropId === airdrop.id ? "bg-indigo-50" : ""}`}
+                    className={`group cursor-pointer hover:bg-gray-50 ${selectedAirdropId === airdrop.id ? "bg-indigo-50" : ""}`}
                     onClick={() =>
                       setSelectedAirdropId(
                         selectedAirdropId === airdrop.id ? null : airdrop.id,
@@ -245,6 +247,29 @@ const SolaceAirdropDashboard = () => {
                       >
                         {airdrop.status}
                       </span>
+                    </td>
+                    <td className="whitespace-nowrap">
+                      <div className="flex items-center justify-center">
+                        {airdrop.status === "created" && (
+                          <button
+                            disabled={isPending}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (
+                                window.confirm(
+                                  "Are you sure you want to delete this airdrop?",
+                                )
+                              ) {
+                                mutate({ id: airdrop.id });
+                              }
+                            }}
+                            className="group rounded-md p-2 hover:bg-gray-200"
+                          >
+                            <span className="sr-only">Delete</span>
+                            <TrashIcon className="size-4 text-gray-400 group-hover:text-gray-600" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
