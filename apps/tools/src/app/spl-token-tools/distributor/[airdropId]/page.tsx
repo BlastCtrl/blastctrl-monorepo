@@ -33,7 +33,11 @@ export default function AirdropDetails({
   const isVisible = useFadeIn();
   const { connection } = useConnection();
   const { publicKey, signAllTransactions } = useWallet();
-  const { mutate, data: startData } = useStartAirdrop(params.airdropId);
+  const {
+    mutate,
+    isPending,
+    data: startData,
+  } = useStartAirdrop(params.airdropId);
   const hasStarted = !!startData;
   const [showOnlyPending, setShowOnlyPending] = React.useState(false);
   const { data, refetch } = useGetAirdropById(params.airdropId, hasStarted);
@@ -106,6 +110,11 @@ export default function AirdropDetails({
           .toString("base64"),
         ...value,
       })),
+      {
+        onSuccess: () => {
+          void refetch();
+        },
+      },
     );
   };
 
@@ -205,6 +214,7 @@ export default function AirdropDetails({
                 <div className="mt-4">
                   <Button
                     onClick={handleStartAirdrop}
+                    disabled={isPending}
                     color="indigo"
                     className="w-full"
                   >

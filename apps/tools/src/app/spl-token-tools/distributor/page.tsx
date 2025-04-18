@@ -248,7 +248,7 @@ const SolaceAirdropDashboard = () => {
                         {airdrop.status}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap">
+                    <td className="w-16 whitespace-nowrap">
                       <div className="flex items-center justify-center">
                         {airdrop.status === "created" && (
                           <button

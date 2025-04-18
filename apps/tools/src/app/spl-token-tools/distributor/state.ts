@@ -11,6 +11,7 @@ import type {
   GetAirdropsId200,
 } from "@blastctrl/solace-sdk";
 import { notify } from "@/components/notification";
+import { withMinimumTime } from "@/lib/utils";
 
 export function useGetAirdrops() {
   const sdk = useSolace();
@@ -97,7 +98,7 @@ export function useCreateAirdrop() {
   return useMutation<PostAirdrops201, SolaceError, PostAirdropsBody>({
     mutationKey: ["createAirdrop"],
     mutationFn: async (data) => {
-      const response = await sdk.api.postAirdrops(data);
+      const response = await withMinimumTime(sdk.api.postAirdrops(data), 500);
       if (response.status !== 201) {
         throw new SolaceError(response.data);
       }
