@@ -80,14 +80,32 @@ export function StakeMergeForm() {
               .map((stake) => (
                 <button
                   key={stake.accountId.toString()}
-                  className="w-full flex-col items-start justify-between rounded-md bg-gray-50 p-4 ring-2 ring-black/10 hover:ring-2 hover:ring-indigo-600"
+                  className="grid w-full grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-y-1 rounded-md bg-gray-50 p-4 ring-2 ring-black/10 hover:ring-2 hover:ring-indigo-600"
                   onClick={() => handlePrimarySelection(stake)}
                 >
-                  <div className="flex w-full justify-between">
-                    <span>{compress(stake.accountId.toString(), 4)}</span>
-                    <span>{lamportsToSol(stake.lamports)} SOL</span>
+                  <span className="justify-self-start">
+                    {compress(stake.accountId.toString(), 4)}
+                  </span>
+                  <span className="justify-self-end text-right">
+                    {lamportsToSol(stake.lamports)} SOL
+                  </span>
+                  <div className="justify-self-start">
+                    <ValidatorInfo account={stake} />
                   </div>
-                  <ValidatorInfo account={stake} />
+                  <div className="flex flex-wrap items-start justify-end gap-1 justify-self-end">
+                    {stake.data.info.meta.authorized.withdrawer ===
+                      publicKey?.toString() && (
+                      <span className="rounded border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold uppercase text-gray-700">
+                        Withdrawer
+                      </span>
+                    )}
+                    {stake.data.info.meta.authorized.staker ===
+                      publicKey?.toString() && (
+                      <span className="rounded border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold uppercase text-gray-700">
+                        Staker
+                      </span>
+                    )}
+                  </div>
                 </button>
               ))}
           </div>
@@ -114,14 +132,32 @@ export function StakeMergeForm() {
             {stakeAccounts.map((stake) => (
               <button
                 key={stake.accountId.toString()}
-                className="w-full flex-col items-start justify-between rounded-md bg-gray-50 p-4 shadow ring-1 ring-black/5 hover:ring-2 hover:ring-indigo-600"
+                className="grid w-full grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-y-1 rounded-md bg-gray-50 p-4 ring-2 ring-black/10 hover:ring-2 hover:ring-indigo-600"
                 onClick={() => handleSecondarySelection(stake)}
               >
-                <div className="flex w-full justify-between">
-                  <span>{compress(stake.accountId.toString(), 4)}</span>
-                  <span>{lamportsToSol(stake.lamports)} SOL</span>
+                <span className="justify-self-start">
+                  {compress(stake.accountId.toString(), 4)}
+                </span>
+                <span className="justify-self-end text-right">
+                  {lamportsToSol(stake.lamports)} SOL
+                </span>
+                <div className="justify-self-start">
+                  <ValidatorInfo account={stake} />
                 </div>
-                <ValidatorInfo account={stake} />
+                <div className="flex flex-wrap items-start justify-end gap-1 justify-self-end">
+                  {stake.data.info.meta.authorized.withdrawer ===
+                    publicKey?.toString() && (
+                    <span className="rounded border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold uppercase text-gray-700">
+                      Withdrawer
+                    </span>
+                  )}
+                  {stake.data.info.meta.authorized.staker ===
+                    publicKey?.toString() && (
+                    <span className="rounded border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold uppercase text-gray-700">
+                      Staker
+                    </span>
+                  )}
+                </div>
               </button>
             ))}
           </div>
@@ -226,7 +262,7 @@ function ValidatorInfo({ account }: { account: StakeAccountType }) {
 
   if (account.data.info.stake === null) {
     return (
-      <div className="mt-3 text-left text-sm">
+      <div className="text-left text-sm">
         This stake account isn&apos;t delegated
       </div>
     );
@@ -234,7 +270,7 @@ function ValidatorInfo({ account }: { account: StakeAccountType }) {
 
   if (isPending) {
     return (
-      <div className="mt-3 h-8 w-full animate-pulse rounded-md bg-indigo-200" />
+      <div className="h-8 w-full animate-pulse rounded-md bg-indigo-200" />
     );
   }
 
@@ -247,7 +283,7 @@ function ValidatorInfo({ account }: { account: StakeAccountType }) {
   }
 
   return (
-    <div className="mt-3 flex items-center space-x-2">
+    <div className="flex items-start space-x-2 text-pretty text-left">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={data.image}
