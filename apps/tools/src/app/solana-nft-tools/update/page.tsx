@@ -453,7 +453,7 @@ export default function Update() {
                     valueAsNumber: true,
                   })}
                   className={cn(
-                    "block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
+                    "block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
                     errors?.sellerFeeBasisPoints &&
                       "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:outline-none focus:ring-red-500",
                   )}

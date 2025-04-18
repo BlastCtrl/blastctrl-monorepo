@@ -80,7 +80,7 @@ export const AccountList = ({
                   checked={checkboxState === "checked"}
                   onChange={toggleAll}
                   type="checkbox"
-                  className="mx-auto rounded accent-blue-600"
+                  className="form-checkbox mx-auto rounded accent-blue-600"
                 />
               </div>
             </TableHeader>
@@ -123,7 +123,7 @@ export const AccountList = ({
                             : selectedAccounts.filter((a) => a !== account),
                         )
                       }
-                      className="rounded accent-blue-600"
+                      className="form-checkbox rounded accent-blue-600"
                     />
                   </div>
                 </TableCell>

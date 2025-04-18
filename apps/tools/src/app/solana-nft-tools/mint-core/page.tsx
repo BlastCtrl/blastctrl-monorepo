@@ -230,7 +230,7 @@ export default function Mint() {
                   onChange={() => {
                     setCreateJson((prev) => !prev);
                   }}
-                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="form-checkbox size-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />
               </div>
               <div className="ml-3 text-sm">
