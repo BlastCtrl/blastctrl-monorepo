@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSolace } from "./solace-provider";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { SolaceError } from "./common";
@@ -10,6 +10,7 @@ import type {
   PostAirdropsIdStartBodyItem,
   GetAirdropsId200,
 } from "@blastctrl/solace-sdk";
+import { notify } from "@/components/notification";
 
 export function useGetAirdrops() {
   const sdk = useSolace();
@@ -142,6 +143,38 @@ export function useRetryTransaction(airdropId: string, batchId: string) {
       }
 
       return response.data;
+    },
+  });
+}
+
+export function useDeleteAirdrop() {
+  const sdk = useSolace();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationKey: ["delete"],
+    mutationFn: async ({ id }: { id: string }) => {
+      const response = await sdk.api.deleteAirdropsId(id);
+
+      if (response.status !== 204) {
+        throw new SolaceError(response.data);
+      }
+
+      return response.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["airdrops"],
+        exact: false,
+        type: "all",
+      });
+    },
+    onError: (error) => {
+      const [title, message] =
+        error instanceof SolaceError
+          ? [error.error, error.message]
+          : [undefined, error.message];
+      notify({ type: "error", title, description: message });
     },
   });
 }

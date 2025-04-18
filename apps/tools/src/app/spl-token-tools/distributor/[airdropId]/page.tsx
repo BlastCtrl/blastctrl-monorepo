@@ -6,6 +6,7 @@ import type { GetAirdropsId200 } from "@blastctrl/solace-sdk";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import {
+  ComputeBudgetProgram,
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
@@ -77,6 +78,8 @@ export default function AirdropDetails({
       await connection.getLatestBlockhashAndContext("confirmed");
     const transactions = data.transactions.map((txBatch) => {
       const tx = new Transaction({ ...value, feePayer: publicKey }).add(
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 10_000 }),
         ...txBatch.recipients.map((r) =>
           SystemProgram.transfer({
             lamports: r.lamports,

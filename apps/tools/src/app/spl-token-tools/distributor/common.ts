@@ -2,6 +2,8 @@
 
 import React from "react";
 
+export const BATCH_SIZE = 20;
+
 export class SolaceError extends Error {
   error: string;
   message: string;

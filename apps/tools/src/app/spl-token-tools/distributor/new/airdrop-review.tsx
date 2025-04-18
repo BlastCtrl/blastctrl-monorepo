@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import React from "react";
 import { Box } from "../box";
 import { useCreateAirdrop } from "../state";
+import { BATCH_SIZE } from "../common";
 
 type Recipient = {
   address: string;
@@ -33,7 +34,6 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
   const { mutate, isPending, error } = useCreateAirdrop();
   const router = useRouter();
   // Constants
-  const BATCH_SIZE = 6;
   const COST_PER_BATCH = 0.000005;
 
   // Calculate totals
@@ -66,9 +66,9 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
     // const { value, context } =
     //   await connection.getLatestBlockhashAndContext("confirmed");
     const batches: Array<Array<{ address: string; lamports: number }>> = [];
-    for (let i = 0; i < recipients.length; i += 6) {
+    for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
       batches.push(
-        recipients.slice(i, i + 6).map((r) => ({
+        recipients.slice(i, i + BATCH_SIZE).map((r) => ({
           address: r.address,
           lamports: Number(r.amount) * LAMPORTS_PER_SOL,
         })),
