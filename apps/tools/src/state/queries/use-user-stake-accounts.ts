@@ -13,8 +13,8 @@ const META_AUTHORIZED_WITHDRAWER_OFFSET = 44;
 
 export function userStakeAccountsQuery(
   connection: Connection,
-  staker?: PublicKey,
   withdrawer?: PublicKey,
+  staker?: PublicKey,
 ) {
   withdrawer ??= staker;
   return queryOptions({
@@ -77,41 +77,41 @@ export function userStakeAccountsQuery(
 }
 
 export function useUserStakeAccounts(
-  staker?: PublicKey,
   withdrawer?: PublicKey,
+  staker?: PublicKey,
 ) {
   const { connection } = useConnection();
-  withdrawer ??= staker;
+  // withdrawer ??= staker;
 
   return useQuery({
-    enabled: !!staker,
+    enabled: !!withdrawer,
     staleTime: Infinity,
     retry: 1,
     retryOnMount: false,
     queryKey: [
       "user-stake-accounts",
-      staker?.toString(),
       withdrawer?.toString(),
+      staker?.toString(),
     ],
     queryFn: async () => {
-      if (!staker) {
+      if (!withdrawer) {
         throw Error("Missing publicKey");
       }
 
       const filters: GetProgramAccountsFilter[] = [];
-      if (staker) {
-        filters.push({
-          memcmp: {
-            offset: META_AUTHORIZED_STAKER_OFFSET,
-            bytes: staker.toBase58(),
-          },
-        });
-      }
       if (withdrawer) {
         filters.push({
           memcmp: {
             offset: META_AUTHORIZED_WITHDRAWER_OFFSET,
             bytes: withdrawer.toBase58(),
+          },
+        });
+      }
+      if (staker) {
+        filters.push({
+          memcmp: {
+            offset: META_AUTHORIZED_STAKER_OFFSET,
+            bytes: staker.toBase58(),
           },
         });
       }

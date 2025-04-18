@@ -15,6 +15,7 @@ import {
   ArrowTopRightOnSquareIcon,
   ChevronUpDownIcon,
 } from "@heroicons/react/16/solid";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 import { useState } from "react";
 
@@ -30,6 +31,7 @@ export function PickerDialog({
   setSelectedAccount,
 }: PickerDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const { publicKey } = useWallet();
 
   return (
     <>
@@ -79,7 +81,23 @@ export function PickerDialog({
                       }}
                     >
                       <div className="flex w-full justify-between">
-                        <span>{compress(stake.accountId.toString(), 4)}</span>
+                        <div className="flex flex-wrap items-center gap-y-1">
+                          <span className="mr-1.5">
+                            {compress(stake.accountId.toString(), 4)}
+                          </span>
+                          {stake.data.info.meta.authorized.withdrawer ===
+                            publicKey?.toString() && (
+                            <span className="mr-0.5 rounded border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold uppercase text-gray-700">
+                              Withdrawer
+                            </span>
+                          )}
+                          {stake.data.info.meta.authorized.staker ===
+                            publicKey?.toString() && (
+                            <span className="rounded border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold uppercase text-gray-700">
+                              Staker
+                            </span>
+                          )}
+                        </div>
                         <span>{lamportsToSol(stake.lamports)} SOL</span>
                       </div>
                       <ValidatorInfo account={stake} />
