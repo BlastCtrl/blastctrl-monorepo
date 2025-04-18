@@ -146,6 +146,14 @@ function SplitFormInner({
     }
     if (inputError) return;
 
+    if (
+      selectedAccount.data.info.meta.authorized.staker !== publicKey.toString()
+    ) {
+      window.alert(
+        'Your wallet doesn\'t have the "staker" authority over this staking account. This action will likely fail.',
+      );
+    }
+
     try {
       await refetch({ throwOnError: true });
       const { context, value } = await retryWithBackoff(() =>
