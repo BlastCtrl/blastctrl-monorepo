@@ -9,6 +9,7 @@ import type {
   PostAirdropsIdStart200,
   PostAirdropsIdStartBodyItem,
   GetAirdropsId200,
+  GetAirdrops200Item,
 } from "@blastctrl/solace-sdk";
 import { notify } from "@/components/notification";
 import { withMinimumTime } from "@/lib/utils";
@@ -17,7 +18,7 @@ export function useGetAirdrops() {
   const sdk = useSolace();
   const { publicKey } = useWallet();
 
-  return useQuery({
+  return useQuery<GetAirdrops200Item[], SolaceError>({
     retry: 1,
     enabled: !!publicKey,
     queryKey: ["airdrops", "all", publicKey?.toString()],

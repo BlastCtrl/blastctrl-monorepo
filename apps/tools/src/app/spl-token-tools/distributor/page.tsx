@@ -35,7 +35,10 @@ export default function Overview() {
     });
 
     if (response.status !== 200) {
-      console.log(response.data);
+      console.error(
+        "Auth refresh failed: %s",
+        response?.data?.message ?? JSON.stringify(response.data),
+      );
       return;
     }
 
@@ -144,7 +147,8 @@ const SolaceAirdropDashboard = () => {
     null,
   );
 
-  const { data: airdrops, isLoading, isError } = useGetAirdrops();
+  const { disconnect } = useWallet();
+  const { data: airdrops, isLoading, isError, error } = useGetAirdrops();
   const { mutate, isPending } = useDeleteAirdrop();
 
   // Get the selected airdrop details
@@ -190,8 +194,21 @@ const SolaceAirdropDashboard = () => {
         )}
 
         {isError && (
-          <div className="rounded bg-red-50 p-3 text-center text-red-700">
-            Failed to load airdrops. Please try again later.
+          <div className="space-y-2 rounded bg-red-50 p-3 text-center text-red-700">
+            Failed to load airdrops.
+            {error.error === "FST_AUTHENTICATION_ERROR" && (
+              <>
+                <div>Authentication error, sign out and try again.</div>
+                <Button
+                  className="block"
+                  onClick={() => {
+                    void disconnect();
+                  }}
+                >
+                  Sign out
+                </Button>
+              </>
+            )}
           </div>
         )}
 
