@@ -8,7 +8,7 @@
     "dev": "pnpm run --parallel dev",
     "format": "pnpm run --recursive format",
     "lint": "pnpm run --recursive lint",
-    "build": "pnpm -F tools build"
+    "build": "pnpm -F solace-sdk build && -F tools build"
   },
   "license": "MIT",
   "devDependencies": {
