@@ -30,15 +30,19 @@ export const customFetch = async <T>(
 
   const response = await fetch(requestUrl, requestInit)
 
-  if (!response.ok) {
-    throw Error(await response.text())
-  }
+  // if (!response.ok) {
+  //   // TODO: we need to check contentType here AND set it correctly in the backend too!
+    
+  //   throw Error(await response.json())
+  // }
 
   let data
   const contentType = response.headers.get('content-type')
 
   if (contentType?.includes('application/json')) {
     data = await response.json()
+  } else {
+    data = await response.text()
   }
 
   return { data, status: response.status, headers: response.headers } as T
