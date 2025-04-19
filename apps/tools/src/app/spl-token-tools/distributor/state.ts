@@ -180,3 +180,37 @@ export function useDeleteAirdrop() {
     },
   });
 }
+
+export function useSetLabel(airdropId: string) {
+  const sdk = useSolace();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationKey: ["set-label"],
+    mutationFn: async (label: string) => {
+      const response = await sdk.api.postAirdropsAirdropIdSetLabel(airdropId, {
+        label,
+      });
+
+      if (response.status !== 200) {
+        throw new SolaceError(response.data);
+      }
+
+      return response.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["airdrops"],
+        exact: false,
+        type: "all",
+      });
+    },
+    onError: (error) => {
+      const [title, message] =
+        error instanceof SolaceError
+          ? [error.error, error.message]
+          : [undefined, error.message];
+      notify({ type: "error", title, description: message });
+    },
+  });
+}
