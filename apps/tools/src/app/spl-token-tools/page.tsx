@@ -25,6 +25,12 @@ export default function Tokens() {
         "Attempt to close your empty token accounts, recovering the SOL used to open them.",
       active: true,
     },
+    {
+      name: "Distributor",
+      href: "/spl-token-tools/distributor",
+      description: "Send SOL to many wallets",
+      active: true,
+    },
   ];
   return (
     <>

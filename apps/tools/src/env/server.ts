@@ -17,6 +17,7 @@ export const env = createEnv({
         (amount) => !isNaN(amount),
         "Octane platform fee must be a number",
       ),
+    BLAST_BACKEND_URL: z.string().url(),
   },
   runtimeEnv: process.env,
 });

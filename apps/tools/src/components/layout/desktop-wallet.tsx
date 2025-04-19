@@ -190,7 +190,7 @@ const NetworkPicker = () => {
             type="text"
             value={customRpc}
             onChange={({ target }) => setCustomRpc(target.value)}
-            className="w-36 min-w-0 rounded border border-zinc-300 py-1 text-sm/6"
+            className="w-36 min-w-0 rounded border border-zinc-300 px-2.5 py-1 text-sm/6"
           />
         </Field>
         <Button
