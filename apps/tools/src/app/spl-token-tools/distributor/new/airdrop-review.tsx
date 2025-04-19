@@ -33,6 +33,8 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
   const { publicKey } = useWallet();
   const { mutate, isPending, error } = useCreateAirdrop();
   const router = useRouter();
+  const [searchTerm, setSearchTerm] = React.useState("");
+
   // Constants
   const COST_PER_BATCH = 0.000005;
 
@@ -53,6 +55,13 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
   // Calculate final balance
   const finalBalance: number = balance - totalDistribution - transactionFee;
   const hasInsufficientFunds: boolean = finalBalance < 0;
+
+  // Search
+  const searchResults = recipients.filter((r) => r.address === searchTerm);
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(event.target.value);
+  };
+  const clearSearch = () => void setSearchTerm("");
 
   const startAirdrop = () => {
     if (!publicKey) {
@@ -200,8 +209,30 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-base font-semibold">Recipients</h2>
           <span className="text-xs text-gray-500">
-            Showing {Math.min(5, recipientsCount)} of {recipientsCount}
+            {!searchTerm
+              ? `Showing ${Math.min(5, recipientsCount)} of ${recipientsCount}`
+              : `Found ${searchResults.length} matching addresses`}
           </span>
+        </div>
+
+        {/* Search Input */}
+        <div className="mb-2 flex">
+          <div className="relative flex-grow">
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              placeholder="Search for an address..."
+              className="w-full rounded-l border p-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+          <button
+            onClick={clearSearch}
+            className={`rounded-r bg-gray-200 px-2 py-1.5 text-xs hover:bg-gray-300 ${!searchTerm ? "cursor-not-allowed opacity-50" : ""}`}
+            disabled={!searchTerm}
+          >
+            Clear
+          </button>
         </div>
 
         <div className="max-h-48 overflow-y-auto rounded border">
@@ -215,23 +246,32 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
               </tr>
             </thead>
             <tbody className="text-xs">
-              {recipients.slice(0, 5).map((recipient, index) => (
-                <tr key={index} className="border-t">
-                  <td className="max-w-md truncate p-1.5">
-                    {recipient.address}
-                  </td>
-                  <td className="p-1.5 text-right">
-                    {airdropType === "same" ? amount : recipient.amount}
-                  </td>
-                </tr>
-              ))}
-              {recipientsCount > 5 && (
+              {(searchTerm ? searchResults : recipients.slice(0, 5)).map(
+                (recipient, index) => (
+                  <tr key={index} className="border-t">
+                    <td className="max-w-md truncate p-1.5">
+                      {recipient.address}
+                    </td>
+                    <td className="p-1.5 text-right">
+                      {airdropType === "same" ? amount : recipient.amount}
+                    </td>
+                  </tr>
+                ),
+              )}
+              {!searchTerm && recipientsCount > 5 && (
                 <tr className="border-t">
                   <td
                     colSpan={2}
                     className="p-1.5 text-center text-xs text-gray-500"
                   >
                     ... and {recipientsCount - 5} more recipients
+                  </td>
+                </tr>
+              )}
+              {searchTerm && searchResults.length === 0 && (
+                <tr>
+                  <td colSpan={2} className="p-3 text-center text-gray-500">
+                    No addresses found matching "{searchTerm}"
                   </td>
                 </tr>
               )}
