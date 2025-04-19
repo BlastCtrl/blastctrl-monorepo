@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@blastctrl/solace-sdk",
+  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "prebuild": "rm -rf ./dist",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "orval": "^7.8.0",
+    "typescript": "^5.8.3"
+  }
+}
