@@ -16,8 +16,10 @@ import { formatDate, useFadeIn } from "./common";
 import { jwtDecode } from "jwt-decode";
 import { notify } from "@/components/notification";
 import { TrashIcon } from "@heroicons/react/16/solid";
+import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
 
 export default function Overview() {
+  const { network } = useNetworkConfigurationStore();
   const { publicKey, signMessage } = useWallet();
   const { setVisible } = useWalletModal();
   const solace = useSolace();
@@ -105,6 +107,15 @@ export default function Overview() {
       notify({ type: "error", title, description: message });
     }
   };
+
+  if (network === "devnet" || network === "testnet") {
+    return (
+      <Box className="flex justify-center text-sm/6">
+        This tool is currently only available on mainnet. Switch your network
+        with the menu on the top right.
+      </Box>
+    );
+  }
 
   if (!publicKey) {
     return (
