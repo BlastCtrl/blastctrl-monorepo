@@ -6,17 +6,23 @@ import { Box } from "./box";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Button } from "@blastctrl/ui";
 import base58 from "bs58";
-import type { GetAirdropsId200 } from "@blastctrl/solace-sdk";
-import { useState, useCallback, useEffect } from "react";
+import type {
+  GetAirdrops200Item,
+  GetAirdropsId200,
+} from "@blastctrl/solace-sdk";
+import { useState, useCallback, useEffect, useRef, KeyboardEvent } from "react";
 import Link from "next/link";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { useSolace } from "./solace-provider";
-import { useDeleteAirdrop, useGetAirdrops } from "./state";
+import { useDeleteAirdrop, useGetAirdrops, useSetLabel } from "./state";
 import { formatDate, useFadeIn } from "./common";
 import { jwtDecode } from "jwt-decode";
 import { notify } from "@/components/notification";
 import { TrashIcon } from "@heroicons/react/16/solid";
 import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
+import { Input } from "@headlessui/react";
+import { flushSync } from "react-dom";
+import clsx from "clsx";
 
 export default function Overview() {
   const { network } = useNetworkConfigurationStore();
@@ -235,6 +241,9 @@ const SolaceAirdropDashboard = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Name
+                  </th>
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Date
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
@@ -255,13 +264,17 @@ const SolaceAirdropDashboard = () => {
                 {airdrops.map((airdrop) => (
                   <tr
                     key={airdrop.id}
-                    className={`group cursor-pointer hover:bg-gray-50 ${selectedAirdropId === airdrop.id ? "bg-indigo-50" : ""}`}
+                    className={`cursor-pointer hover:bg-gray-50 ${selectedAirdropId === airdrop.id ? "bg-indigo-50" : ""}`}
                     onClick={() =>
                       setSelectedAirdropId(
                         selectedAirdropId === airdrop.id ? null : airdrop.id,
                       )
                     }
                   >
+                    <td className="whitespace-nowrap px-3 py-2 text-sm">
+                      <AirdropName airdrop={airdrop} />
+                      {/* <span className="font-mono">{airdrop.id}</span> */}
+                    </td>
                     <td className="whitespace-nowrap px-3 py-2 text-sm">
                       {formatDate(airdrop.createdAt)}
                     </td>
@@ -408,3 +421,88 @@ const SolaceAirdropDashboard = () => {
     </div>
   );
 };
+
+function AirdropName({ airdrop }: { airdrop: GetAirdrops200Item }) {
+  const [state, setState] = useState<"edit" | "view">("view");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const { mutate } = useSetLabel(airdrop.id);
+
+  useEffect(() => {
+    // fucking typescript
+    function handleEscapePress(event: globalThis.KeyboardEvent) {
+      if (event.code === "Escape") {
+        setState("view");
+      }
+    }
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(event.target as Node) &&
+        state === "edit"
+      ) {
+        setState("view");
+      }
+    }
+
+    document.addEventListener("keydown", handleEscapePress);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscapePress);
+    };
+  }, [state]);
+
+  return (
+    <div
+      ref={wrapperRef}
+      className={clsx(
+        "w-full max-w-44 overflow-hidden rounded bg-zinc-50 px-2 py-0.5 ring-1 ring-zinc-300",
+        "focus-within:ring-2 focus-within:ring-indigo-500",
+      )}
+    >
+      {state === "view" ? (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            flushSync(() => {
+              setState("edit");
+            });
+            inputRef?.current?.select();
+          }}
+          className="w-full truncate text-left"
+        >
+          <span className="select-none font-mono text-xs/4 font-medium text-zinc-700">
+            {airdrop.label || airdrop.id}
+          </span>
+        </button>
+      ) : (
+        <form
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (inputRef.current) {
+              mutate(inputRef.current?.value.trim(), {
+                onSettled: () => {
+                  setState("view");
+                },
+              });
+            }
+          }}
+        >
+          <Input
+            ref={inputRef}
+            defaultValue={airdrop.label || airdrop.id}
+            maxLength={16}
+            className={clsx(
+              "w-full px-1 py-px font-mono text-xs/4 font-medium text-zinc-700",
+              "bg-transparent focus:outline-none",
+            )}
+          />
+        </form>
+      )}
+    </div>
+  );
+}

@@ -15,6 +15,8 @@ import type {
   PostAirdrops201,
   PostAirdropsAirdropIdRetryBatchBatchId200,
   PostAirdropsAirdropIdRetryBatchBatchIdBody,
+  PostAirdropsAirdropIdSetLabel200,
+  PostAirdropsAirdropIdSetLabelBody,
   PostAirdropsBody,
   PostAirdropsIdStart200,
   PostAirdropsIdStartBodyItem,
@@ -384,6 +386,45 @@ export const postAirdropsAirdropIdRetryBatchBatchId = async (airdropId: string,
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
       postAirdropsAirdropIdRetryBatchBatchIdBody,)
+  }
+);}
+
+
+
+export type postAirdropsAirdropIdSetLabelResponse200 = {
+  data: PostAirdropsAirdropIdSetLabel200
+  status: 200
+}
+
+export type postAirdropsAirdropIdSetLabelResponse400 = {
+  data: Def1
+  status: 400
+}
+    
+export type postAirdropsAirdropIdSetLabelResponseComposite = postAirdropsAirdropIdSetLabelResponse200 | postAirdropsAirdropIdSetLabelResponse400;
+    
+export type postAirdropsAirdropIdSetLabelResponse = postAirdropsAirdropIdSetLabelResponseComposite & {
+  headers: Headers;
+}
+
+export const getPostAirdropsAirdropIdSetLabelUrl = (airdropId: string,) => {
+
+
+  
+
+  return `/airdrops/${airdropId}/set-label`
+}
+
+export const postAirdropsAirdropIdSetLabel = async (airdropId: string,
+    postAirdropsAirdropIdSetLabelBody: PostAirdropsAirdropIdSetLabelBody, options?: RequestInit): Promise<postAirdropsAirdropIdSetLabelResponse> => {
+  
+  return customFetch<postAirdropsAirdropIdSetLabelResponse>(getPostAirdropsAirdropIdSetLabelUrl(airdropId),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      postAirdropsAirdropIdSetLabelBody,)
   }
 );}
 

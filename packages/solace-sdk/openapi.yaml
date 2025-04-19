@@ -219,7 +219,7 @@ paths:
                   items:
                     type: array
                     minItems: 1
-                    maxItems: 6
+                    maxItems: 20
                     items:
                       type: object
                       required:
@@ -291,6 +291,7 @@ paths:
                     - totalAmount
                     - recipientCount
                     - status
+                    - label
                     - createdAt
                     - updatedAt
                     - recipients
@@ -308,6 +309,8 @@ paths:
                         - processing
                         - completed
                         - failed
+                    label:
+                      type: string
                     createdAt:
                       type: number
                     updatedAt:
@@ -391,6 +394,7 @@ paths:
                   - status
                   - recipientCount
                   - totalAmount
+                  - label
                   - transactions
                   - createdAt
                   - updatedAt
@@ -408,6 +412,8 @@ paths:
                     type: integer
                   totalAmount:
                     type: integer
+                  label:
+                    type: string
                   createdAt:
                     type: integer
                   updatedAt:
@@ -629,6 +635,61 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/def-1"
+  /airdrops/{airdropId}/set-label:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - label
+              properties:
+                label:
+                  type: string
+                  maxLength: 16
+        required: true
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: airdropId
+          required: true
+        - schema:
+            $ref: "#/components/schemas/def-0/properties/authorization"
+          in: header
+          name: authorization
+          required: false
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                properties:
+                  success:
+                    type: boolean
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/def-1"
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/def-1"
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/def-1"
   /health:
     get:
       responses:
@@ -640,8 +701,3 @@ paths:
 servers:
   - url: http://localhost:3000
     description: Development server
-tags:
-  - name: user
-    description: User related end-points
-  - name: code
-    description: Code related end-points

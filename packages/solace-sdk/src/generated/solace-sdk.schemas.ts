@@ -127,6 +127,7 @@ export type GetAirdrops200Item = {
   totalAmount: number;
   recipientCount: number;
   status: GetAirdrops200ItemStatus;
+  label: string;
   createdAt: number;
   updatedAt: number;
   recipients: GetAirdrops200ItemRecipientsItem[];
@@ -180,6 +181,7 @@ export type GetAirdropsId200 = {
   status: GetAirdropsId200Status;
   recipientCount: number;
   totalAmount: number;
+  label: string;
   createdAt: number;
   updatedAt: number;
   transactions: GetAirdropsId200TransactionsItem[];
@@ -225,6 +227,15 @@ export type PostAirdropsAirdropIdRetryBatchBatchIdBody = {
 };
 
 export type PostAirdropsAirdropIdRetryBatchBatchId200 = {
+  success: boolean;
+};
+
+export type PostAirdropsAirdropIdSetLabelBody = {
+  /** @maxLength 16 */
+  label: string;
+};
+
+export type PostAirdropsAirdropIdSetLabel200 = {
   success: boolean;
 };
 
