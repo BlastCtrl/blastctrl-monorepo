@@ -583,7 +583,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
           disabled={!validateAll()}
           className="!px-6"
         >
-          Review Step
+          Review
         </Button>
       </div>
     </div>
