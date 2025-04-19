@@ -4,6 +4,7 @@ import React, { useState, useRef, ChangeEvent } from "react";
 import Papa from "papaparse";
 import { Button } from "@blastctrl/ui";
 import { Box } from "../box";
+import { MAX_RECIPIENTS } from "../common";
 
 type Recipient = {
   address: string;
@@ -56,7 +57,6 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
     csv: "",
   });
 
-  const maxRecipients = 1000;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validateSolAddress = (address: string): boolean => {
@@ -127,7 +127,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
 
   // Add new recipient field
   const addRecipient = (): void => {
-    if (recipients.length < maxRecipients) {
+    if (recipients.length < MAX_RECIPIENTS) {
       setRecipients([...recipients, { address: "", amount: "" }]);
       setErrors({
         ...errors,
@@ -225,9 +225,9 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
     if (data.length === 0) {
       isValid = false;
       errorMsg = "CSV file is empty";
-    } else if (data.length > maxRecipients) {
+    } else if (data.length > MAX_RECIPIENTS) {
       isValid = false;
-      errorMsg = `CSV contains ${data.length} recipients. Maximum allowed is ${maxRecipients}.`;
+      errorMsg = `CSV contains ${data.length} recipients. Maximum allowed is ${MAX_RECIPIENTS}.`;
     } else {
       for (let i = 0; i < data.length; i++) {
         const item = data[i];
@@ -363,13 +363,17 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
       </Box>
       {/* Recipients Input Section */}
       <Box className="mb-6">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Recipients</h2>
           <div className="flex items-center rounded-full bg-indigo-100 px-2 py-1 text-sm text-indigo-800">
             <span className="mr-1 font-medium">Total:</span>{" "}
             {calculateTotalSol()} SOL
           </div>
         </div>
+        <p className="mb-3 mt-1 text-sm text-stone-500">
+          Maximum number of recipients is {MAX_RECIPIENTS}. If you need to do
+          more, split it into multiple airdrops.
+        </p>
 
         {airdropType === "different" && (
           <div className="mb-3 rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-800">
