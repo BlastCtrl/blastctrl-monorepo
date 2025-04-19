@@ -25,7 +25,9 @@ export function useLocalStorageState<T>(
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(key, JSON.stringify(state));
+      let newValue = JSON.stringify(state);
+      window.localStorage.setItem(key, newValue);
+      window.dispatchEvent(new StorageEvent("storage", { key, newValue }));
     } catch (error) {
       console.error(
         `Unable to set value to localStorage for key "${key}":`,

@@ -3,6 +3,15 @@ export function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// exports a function that will accepts a promise and waits a minimum amount of time before resolving
+export const withMinimumTime = async <T>(
+  promise: Promise<T>,
+  ms: number,
+): Promise<T> => {
+  const [result] = await Promise.all([promise, sleep(ms)]);
+  return result;
+};
+
 export function chunk<T>(array: T[], size: number): T[][] {
   if (!array?.length || size < 1) {
     return [];
@@ -22,7 +31,7 @@ export function chunk<T>(array: T[], size: number): T[][] {
 export const zipMap = <T, U, V>(
   left: T[],
   right: U[],
-  fn: (t: T, u: U | null, i: number) => V
+  fn: (t: T, u: U | null, i: number) => V,
 ): V[] => left.map((t: T, index) => fn(t, right?.[index] ?? null, index));
 
 export async function fetcher<T>(url: string, options?: RequestInit) {

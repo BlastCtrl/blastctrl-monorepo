@@ -18,13 +18,20 @@ const config = {
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'arweave.net',
-        port: '',
+        protocol: "https",
+        hostname: "arweave.net",
+        port: "",
       },
     ],
   },
-  // typescript: { ignoreBuildErrors: true },
+  async rewrites() {
+    return [
+      {
+        source: "/blast-api/:path*",
+        destination: `${process.env.BLAST_BACKEND_URL}/:path*`,
+      },
+    ];
+  },
 };
 
 export default config;
