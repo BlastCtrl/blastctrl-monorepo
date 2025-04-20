@@ -57,7 +57,9 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
   const hasInsufficientFunds: boolean = finalBalance < 0;
 
   // Search
-  const searchResults = recipients.filter((r) => r.address === searchTerm);
+  const searchResults = recipients.filter((r) =>
+    r.address.includes(searchTerm),
+  );
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
   };
