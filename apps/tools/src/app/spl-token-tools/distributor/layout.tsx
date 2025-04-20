@@ -19,7 +19,7 @@ export default function Distributor({ children }: { children: ReactNode }) {
             <span className="italic">/soʊlɑː.tʃe/</span>
           </span> */}
         </h1>
-        <div className="mt-3 text-sm text-gray-500">
+        <div className="mt-3 text-gray-500 sm:text-sm">
           <p>
             Distribute SOL to many wallets using this tool. We will not ask you
             to transfer the SOL initially to our service, all the SOL will be

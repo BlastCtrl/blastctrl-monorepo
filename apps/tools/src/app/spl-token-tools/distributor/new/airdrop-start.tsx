@@ -314,12 +314,12 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
   return (
     <div>
       {/* Airdrop Type Selection */}
-      <Box className="mb-6">
+      <Box enableOnMobile className="mb-6">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex space-x-2">
             <button
               onClick={() => handleAirdropTypeChange("same")}
-              className={`rounded-md px-3 py-1.5 text-sm ${
+              className={`rounded-md px-3 py-1.5 sm:text-sm ${
                 airdropType === "same"
                   ? "bg-indigo-600 text-white"
                   : "bg-gray-200 text-gray-800"
@@ -329,7 +329,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
             </button>
             <button
               onClick={() => handleAirdropTypeChange("different")}
-              className={`rounded-md px-3 py-1.5 text-sm ${
+              className={`rounded-md px-3 py-1.5 sm:text-sm ${
                 airdropType === "different"
                   ? "bg-indigo-600 text-white"
                   : "bg-gray-200 text-gray-800"
@@ -341,13 +341,13 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
 
           {airdropType === "same" && (
             <div className="flex items-center">
-              <label className="mr-2 text-sm font-medium">Amount:</label>
+              <label className="mr-2 font-medium sm:text-sm">Amount:</label>
               <div className="flex w-32">
                 <input
                   type="text"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="w-full rounded-l border p-1.5 text-sm"
+                  className="w-full rounded-l border p-1.5 focus:border-blue-600 focus:outline-none sm:text-sm"
                   placeholder="0.1"
                 />
                 <span className="flex items-center rounded-r border border-l-0 bg-gray-100 px-2 py-1.5 text-sm">
@@ -362,15 +362,15 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
         </div>
       </Box>
       {/* Recipients Input Section */}
-      <Box className="mb-6">
+      <Box enableOnMobile className="mb-6">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Recipients</h2>
-          <div className="flex items-center rounded-full bg-indigo-100 px-2 py-1 text-sm text-indigo-800">
+          <div className="flex items-center rounded-full bg-indigo-100 px-3 py-1 text-indigo-800 sm:px-2 sm:text-sm">
             <span className="mr-1 font-medium">Total:</span>{" "}
             {calculateTotalSol()} SOL
           </div>
         </div>
-        <p className="mb-3 mt-1 text-sm text-stone-500">
+        <p className="mb-3 mt-1 text-stone-500 sm:text-sm">
           Maximum number of recipients is {MAX_RECIPIENTS}. If you need to do
           more, split it into multiple airdrops.
         </p>
@@ -387,7 +387,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
             <div className="flex space-x-3">
               <button
                 onClick={() => setInputMethod("manual")}
-                className={`rounded-md px-3 py-1.5 text-sm ${
+                className={`rounded-md px-3 py-1.5 sm:text-sm ${
                   inputMethod === "manual"
                     ? "bg-indigo-600 text-white"
                     : "bg-gray-200 text-gray-800"
@@ -397,7 +397,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
               </button>
               <button
                 onClick={() => setInputMethod("csv")}
-                className={`rounded-md px-3 py-1.5 text-sm ${
+                className={`rounded-md px-3 py-1.5 sm:text-sm ${
                   inputMethod === "csv"
                     ? "bg-indigo-600 text-white"
                     : "bg-gray-200 text-gray-800"
@@ -415,7 +415,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
               {recipients.map((recipient, index) => (
                 <div
                   key={index}
-                  className="flex space-x-2 border-b p-2 last:border-b-0"
+                  className="flex items-center gap-2 border-b p-2 last:border-b-0"
                 >
                   <div className="flex-grow">
                     <input
@@ -424,7 +424,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                       onChange={(e) =>
                         handleRecipientChange(index, "address", e.target.value)
                       }
-                      className="w-full rounded border p-1.5 text-sm"
+                      className="w-full rounded border p-1.5 sm:text-sm"
                       placeholder="Recipient wallet address"
                     />
                     {errors.recipients[index]?.address && (
@@ -436,7 +436,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
 
                   <button
                     onClick={() => removeRecipient(index)}
-                    className="flex h-8 w-8 items-center justify-center rounded bg-gray-200 p-1.5 hover:bg-gray-300"
+                    className="flex size-9 items-center justify-center rounded bg-gray-200 p-1.5 hover:bg-gray-300 sm:size-8"
                     disabled={recipients.length === 1}
                   >
                     ✕
@@ -473,7 +473,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                 <div className="flex items-center">
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="rounded-md bg-gray-200 px-3 py-1.5 text-sm hover:bg-gray-300"
+                    className="rounded-md bg-gray-200 px-3 py-1.5 hover:bg-gray-300 sm:text-sm"
                   >
                     {csvFile ? "Change CSV File" : "Choose CSV File"}
                   </button>
@@ -517,7 +517,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                   <p className="mb-1 text-gray-600">
                     Format: "address,amount" (each on a new line)
                   </p>
-                  <p className="text-gray-600">
+                  <p className="text-gray-600 break-all">
                     Example: 7X16ca3B9Gg9MnJ2w4EKjJHRWH5NXH8igzyeAW9Vxw3x,0.05
                   </p>
                 </>
