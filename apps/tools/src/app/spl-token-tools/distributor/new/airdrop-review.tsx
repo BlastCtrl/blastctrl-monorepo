@@ -74,8 +74,6 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
       return;
     }
 
-    // const { value, context } =
-    //   await connection.getLatestBlockhashAndContext("confirmed");
     const batches: Array<Array<{ address: string; lamports: number }>> = [];
     for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
       batches.push(
@@ -232,7 +230,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
           <button
             onClick={clearSearch}
             // rounded-none is needed for WebKit
-            className={`rounded-none rounded-r bg-gray-200 px-2 py-1.5 text-xs hover:bg-gray-300 ${!searchTerm ? "cursor-not-allowed opacity-50" : ""}`}
+            className={`rounded-none rounded-r bg-gray-200 px-2 py-1.5 hover:bg-gray-300 sm:text-xs ${!searchTerm ? "cursor-not-allowed opacity-50" : ""}`}
             disabled={!searchTerm}
           >
             Clear
