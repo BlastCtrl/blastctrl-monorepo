@@ -74,7 +74,8 @@ export default function AirdropDetails({
     if (!signAllTransactions) {
       notify({
         type: "error",
-        description: "Sign all transactions not supported",
+        description:
+          "Sign all transactions is unavailable. Ledger is not supported.",
       });
       return;
     }
