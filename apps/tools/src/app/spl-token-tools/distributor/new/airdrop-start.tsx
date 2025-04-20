@@ -359,10 +359,11 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                   value={amount}
                   inputMode="decimal"
                   onChange={(e) => handleSetAmount(e.target.value)}
-                  className="w-full rounded-l border p-1.5 focus:border-blue-600 focus:outline-none sm:text-sm"
+                  // rounded-none is required for WebKit
+                  className="w-full rounded-none rounded-l border p-1.5 focus:border-blue-600 focus:outline-none sm:text-sm"
                   placeholder="0.1"
                 />
-                <span className="flex items-center rounded-r border border-l-0 bg-gray-100 px-2 py-1.5 text-sm">
+                <span className="flex items-center rounded-none rounded-r border border-l-0 bg-gray-100 px-2 py-1.5 text-sm">
                   SOL
                 </span>
               </div>
