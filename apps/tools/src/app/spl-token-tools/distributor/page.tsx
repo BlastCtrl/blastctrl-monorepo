@@ -18,7 +18,7 @@ import { useDeleteAirdrop, useGetAirdrops, useSetLabel } from "./state";
 import { formatDate, useFadeIn } from "./common";
 import { jwtDecode } from "jwt-decode";
 import { notify } from "@/components/notification";
-import { TrashIcon } from "@heroicons/react/16/solid";
+import { ArrowTurnDownRightIcon, TrashIcon } from "@heroicons/react/16/solid";
 import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
 import { Input } from "@headlessui/react";
 import { flushSync } from "react-dom";
@@ -256,7 +256,7 @@ const SolaceAirdropDashboard = () => {
                     Status
                   </th>
                   <th className="">
-                    <span className="sr-only">Delete</span>
+                    <span className="sr-only">Action</span>
                   </th>
                 </tr>
               </thead>
@@ -264,7 +264,7 @@ const SolaceAirdropDashboard = () => {
                 {airdrops.map((airdrop) => (
                   <tr
                     key={airdrop.id}
-                    className={`cursor-pointer hover:bg-gray-50 ${selectedAirdropId === airdrop.id ? "bg-indigo-50" : ""}`}
+                    className={`cursor-default hover:bg-gray-50 ${selectedAirdropId === airdrop.id ? "bg-indigo-50" : ""}`}
                     onClick={() =>
                       setSelectedAirdropId(
                         selectedAirdropId === airdrop.id ? null : airdrop.id,
@@ -327,9 +327,11 @@ const SolaceAirdropDashboard = () => {
             <h2 className="text-base font-semibold">Airdrop Details</h2>
             <Link
               href={`/spl-token-tools/distributor/${selectedAirdrop.id}`}
-              className="text-sm text-indigo-600 hover:text-indigo-800"
+              className="group relative isolate overflow-visible text-sm text-indigo-600 hover:text-indigo-800"
             >
-              View Full Details →
+              <div className="absolute -inset-x-2 -inset-y-1 z-[-1] hidden rounded bg-indigo-50 group-hover:block" />
+              View Full Details{" "}
+              <ArrowTurnDownRightIcon className="inline-block size-3.5" />
             </Link>
           </div>
 
