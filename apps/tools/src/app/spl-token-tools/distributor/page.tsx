@@ -470,7 +470,7 @@ function AirdropName({ airdrop }: { airdrop: GetAirdrops200Item }) {
             });
             inputRef?.current?.select();
           }}
-          className="w-full truncate text-left"
+          className="w-full cursor-text truncate text-left"
         >
           <span className="select-none font-mono text-xs/4 font-medium text-zinc-700">
             {airdrop.label || airdrop.id}
@@ -497,7 +497,7 @@ function AirdropName({ airdrop }: { airdrop: GetAirdrops200Item }) {
             defaultValue={airdrop.label || airdrop.id}
             maxLength={16}
             className={clsx(
-              "w-full px-1 py-px font-mono text-xs/4 font-medium text-zinc-700",
+              "w-full py-px font-mono text-xs/4 font-medium text-zinc-700",
               "bg-transparent focus:outline-none",
             )}
           />
