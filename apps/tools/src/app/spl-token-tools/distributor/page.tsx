@@ -53,6 +53,10 @@ export default function Overview() {
     setAuthToken(response.data);
   }, [publicKey, authToken?.refreshToken]);
 
+  const clearAuthToken = useCallback(() => {
+    setAuthToken(null);
+  }, []);
+
   useEffect(() => {
     if (authToken?.expiresAt) {
       // Set timeout to refresh 1 minute before token expires.
@@ -153,12 +157,16 @@ export default function Overview() {
     );
   }
 
-  return <SolaceAirdropDashboard />;
+  return <SolaceAirdropDashboard clearAuthToken={clearAuthToken} />;
 }
 
 type AirdropStatus = GetAirdropsId200["status"];
 
-const SolaceAirdropDashboard = () => {
+const SolaceAirdropDashboard = ({
+  clearAuthToken,
+}: {
+  clearAuthToken: () => void;
+}) => {
   const visible = useFadeIn();
   const [selectedAirdropId, setSelectedAirdropId] = useState<string | null>(
     null,
@@ -219,6 +227,7 @@ const SolaceAirdropDashboard = () => {
                 <Button
                   className="block"
                   onClick={() => {
+                    clearAuthToken();
                     void disconnect();
                   }}
                 >
