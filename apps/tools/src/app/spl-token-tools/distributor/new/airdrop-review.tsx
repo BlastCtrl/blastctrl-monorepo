@@ -223,12 +223,14 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
               value={searchTerm}
               onChange={handleSearchChange}
               placeholder="Search for an address..."
-              className="w-full rounded-l border p-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              // rounded-none is needed for WebKit
+              className="w-full rounded-none rounded-l border p-1.5 text-base focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:text-xs"
             />
           </div>
           <button
             onClick={clearSearch}
-            className={`rounded-r bg-gray-200 px-2 py-1.5 text-xs hover:bg-gray-300 ${!searchTerm ? "cursor-not-allowed opacity-50" : ""}`}
+            // rounded-none is needed for WebKit
+            className={`rounded-none rounded-r bg-gray-200 px-2 py-1.5 text-xs hover:bg-gray-300 ${!searchTerm ? "cursor-not-allowed opacity-50" : ""}`}
             disabled={!searchTerm}
           >
             Clear
