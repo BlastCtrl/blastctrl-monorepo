@@ -69,6 +69,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
   };
 
   const handleSetAmount = (amount: string) => {
+    amount = amount.replace(",", ".");
     setAmount(amount);
     setRecipients(
       recipients.map((recipient) => ({ address: recipient.address, amount })),

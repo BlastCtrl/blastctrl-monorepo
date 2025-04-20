@@ -108,7 +108,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
       {/* Distribution Summary */}
       <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* Summary Section */}
-        <Box className="h-full">
+        <Box enableOnMobile className="h-full">
           <h2 className="mb-3 text-base font-semibold">Distribution Summary</h2>
 
           <div className="flex items-center justify-between py-1.5 text-sm">
@@ -148,7 +148,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
         {/* Cost and Balance Side by Side */}
         <div className="grid grid-cols-1 gap-4">
           {/* Cost Breakdown */}
-          <Box className="h-full">
+          <Box enableOnMobile className="h-full">
             <div className="flex justify-between">
               <h2 className="mb-3 text-base font-semibold">Cost Breakdown</h2>
               <div className="flex items-center rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
@@ -177,7 +177,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
           </Box>
 
           {/* Balance Summary */}
-          <Box className="h-full">
+          <Box enableOnMobile className="h-full">
             <h2 className="mb-3 text-base font-semibold">Your Balance</h2>
 
             <div className="space-y-2">
@@ -205,7 +205,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
       </div>
 
       {/* Recipient List Preview */}
-      <Box className="mb-4">
+      <Box className="mb-4 max-sm:mt-8">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-base font-semibold">Recipients</h2>
           <span className="text-xs text-gray-500">
@@ -281,7 +281,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
       </Box>
 
       {/* Actions */}
-      <div className="flex justify-between">
+      <div className="flex justify-between max-sm:mt-8">
         <Button onClick={onBack} color="dark/zinc" className="!px-6">
           Back
         </Button>
