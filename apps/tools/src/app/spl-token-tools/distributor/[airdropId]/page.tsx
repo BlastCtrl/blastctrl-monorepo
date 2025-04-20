@@ -129,15 +129,18 @@ export default function AirdropDetails({
       )}
     >
       {/* Header with back button */}
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Airdrop Details</h1>
+      <div className="mb-4 flex flex-wrap items-center justify-between">
+        <h1 className="sr-only whitespace-nowrap text-lg font-semibold sm:not-sr-only">
+          Airdrop Details
+        </h1>
 
         <Button
           href="/spl-token-tools/distributor"
           color="dark/zinc"
-          className="!px-4 text-sm"
+          className="whitespace-nowrap !px-4 text-sm"
         >
-          <ArrowTurnUpLeftIcon className="size-3.5" /> Back to Airdrops
+          <ArrowTurnUpLeftIcon aria-hidden="true" className="size-3.5" />
+          Back to Airdrops
         </Button>
       </div>
 

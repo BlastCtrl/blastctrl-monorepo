@@ -236,14 +236,14 @@ const SolaceAirdropDashboard = () => {
         )}
 
         {!isLoading && !isError && airdrops && airdrops.length > 0 && (
-          <div className="max-h-[500px] overflow-hidden overflow-y-auto rounded border">
+          <div className="rounded border max-sm:overflow-x-auto sm:max-h-[500px] sm:overflow-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Name
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="hidden px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:table-cell">
                     Date
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
@@ -255,11 +255,12 @@ const SolaceAirdropDashboard = () => {
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Status
                   </th>
-                  <th className="">
-                    <span className="sr-only">Action</span>
+                  <th className="relative w-0">
+                    {/* <span className="sr-only">Action</span> */}
                   </th>
                 </tr>
               </thead>
+
               <tbody className="divide-y divide-gray-200 bg-white">
                 {airdrops.map((airdrop) => (
                   <tr
@@ -271,11 +272,10 @@ const SolaceAirdropDashboard = () => {
                       )
                     }
                   >
-                    <td className="whitespace-nowrap px-3 py-2 text-sm">
+                    <td className="max-w-[140px] whitespace-nowrap px-3 py-2 text-sm sm:max-w-none">
                       <AirdropName airdrop={airdrop} />
-                      {/* <span className="font-mono">{airdrop.id}</span> */}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-sm">
+                    <td className="hidden whitespace-nowrap px-3 py-2 text-sm sm:table-cell">
                       {formatDate(airdrop.createdAt)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-sm">SOL</td>
@@ -289,8 +289,8 @@ const SolaceAirdropDashboard = () => {
                         {airdrop.status}
                       </span>
                     </td>
-                    <td className="w-16 whitespace-nowrap">
-                      <div className="flex items-center justify-center">
+                    <td className="w-0 whitespace-nowrap py-2 pr-2">
+                      <div className="relative flex items-center justify-center">
                         {airdrop.status === "created" && (
                           <button
                             disabled={isPending}
@@ -329,9 +329,12 @@ const SolaceAirdropDashboard = () => {
               href={`/spl-token-tools/distributor/${selectedAirdrop.id}`}
               className="group relative isolate overflow-visible text-sm text-indigo-600 hover:text-indigo-800"
             >
-              <div className="absolute -inset-x-2 -inset-y-1 z-[-1] hidden rounded bg-indigo-50 group-hover:block" />
+              <div className="absolute -inset-x-2 -inset-y-1 z-[-1] hidden rounded-md bg-indigo-50 group-hover:block" />
               View Full Details{" "}
-              <ArrowTurnDownRightIcon className="inline-block size-3.5" />
+              <ArrowTurnDownRightIcon
+                aria-hidden="true"
+                className="inline-block size-3.5"
+              />
             </Link>
           </div>
 
@@ -456,55 +459,60 @@ function AirdropName({ airdrop }: { airdrop: GetAirdrops200Item }) {
   }, [state]);
 
   return (
-    <div
-      ref={wrapperRef}
-      className={clsx(
-        "w-full max-w-44 overflow-hidden rounded bg-zinc-50 px-2 py-0.5 ring-1 ring-zinc-300",
-        "focus-within:ring-2 focus-within:ring-indigo-500",
-      )}
-    >
-      {state === "view" ? (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            flushSync(() => {
-              setState("edit");
-            });
-            inputRef?.current?.select();
-          }}
-          className="w-full cursor-text truncate text-left"
-        >
-          <span className="select-none font-mono text-xs/4 font-medium text-zinc-700">
-            {airdrop.label || airdrop.id}
-          </span>
-        </button>
-      ) : (
-        <form
-          onClick={(e) => {
-            e.stopPropagation();
-          }}
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (inputRef.current) {
-              mutate(inputRef.current?.value.trim(), {
-                onSettled: () => {
-                  setState("view");
-                },
+    <>
+      <div className="truncate px-2 py-0.5 text-left text-xs/4 font-medium text-zinc-700 sm:hidden">
+        {airdrop.label || airdrop.id}
+      </div>
+      <div
+        ref={wrapperRef}
+        className={clsx(
+          "hidden w-full max-w-44 overflow-hidden rounded bg-zinc-50 px-2 py-0.5 ring-1 ring-zinc-300 sm:block",
+          "focus-within:ring-2 focus-within:ring-indigo-500",
+        )}
+      >
+        {state === "view" ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              flushSync(() => {
+                setState("edit");
               });
-            }
-          }}
-        >
-          <Input
-            ref={inputRef}
-            defaultValue={airdrop.label || airdrop.id}
-            maxLength={16}
-            className={clsx(
-              "w-full py-px font-mono text-xs/4 font-medium text-zinc-700",
-              "bg-transparent focus:outline-none",
-            )}
-          />
-        </form>
-      )}
-    </div>
+              inputRef?.current?.select();
+            }}
+            className="w-full cursor-text truncate text-left"
+          >
+            <span className="select-none font-mono text-xs/4 font-medium text-zinc-700">
+              {airdrop.label || airdrop.id}
+            </span>
+          </button>
+        ) : (
+          <form
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (inputRef.current) {
+                mutate(inputRef.current?.value.trim(), {
+                  onSettled: () => {
+                    setState("view");
+                  },
+                });
+              }
+            }}
+          >
+            <Input
+              ref={inputRef}
+              defaultValue={airdrop.label || airdrop.id}
+              maxLength={16}
+              className={clsx(
+                "w-full py-px font-mono text-xs/4 font-medium text-zinc-700",
+                "bg-transparent focus:outline-none",
+              )}
+            />
+          </form>
+        )}
+      </div>
+    </>
   );
 }
