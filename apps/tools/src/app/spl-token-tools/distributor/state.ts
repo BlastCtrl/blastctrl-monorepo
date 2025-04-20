@@ -184,6 +184,8 @@ export function useDeleteAirdrop() {
 export function useSetLabel(airdropId: string) {
   const sdk = useSolace();
   const queryClient = useQueryClient();
+  const { publicKey } = useWallet();
+  const queryKey = ["airdrops", "all", publicKey?.toString()];
 
   return useMutation({
     mutationKey: ["set-label"],
@@ -198,19 +200,32 @@ export function useSetLabel(airdropId: string) {
 
       return response.data;
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: ["airdrops"],
-        exact: false,
-        type: "all",
-      });
+    onMutate: async (data) => {
+      await queryClient.cancelQueries({ queryKey: ["airdrops"] });
+      const previousAirdrops =
+        queryClient.getQueryData<GetAirdrops200Item[]>(queryKey);
+      if (!previousAirdrops) return;
+      const updatedAirdrops = previousAirdrops.map((a) =>
+        a.id === airdropId ? { ...a, label: data } : a,
+      );
+
+      queryClient.setQueryData(queryKey, updatedAirdrops);
+      return { previousAirdrops };
     },
-    onError: (error) => {
+    onError: (error, _label, context) => {
+      queryClient.setQueryData(queryKey, context?.previousAirdrops);
       const [title, message] =
         error instanceof SolaceError
           ? [error.error, error.message]
           : [undefined, error.message];
       notify({ type: "error", title, description: message });
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["airdrops"],
+        exact: false,
+        type: "all",
+      });
     },
   });
 }
