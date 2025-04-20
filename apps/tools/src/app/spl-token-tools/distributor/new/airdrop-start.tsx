@@ -5,6 +5,7 @@ import Papa from "papaparse";
 import { Button } from "@blastctrl/ui";
 import { Box } from "../box";
 import { MAX_RECIPIENTS } from "../common";
+import { usePasteAddresses } from "./use-paste-addresses";
 
 type Recipient = {
   address: string;
@@ -58,6 +59,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  usePasteAddresses(amount, setRecipients);
 
   const validateSolAddress = (address: string): boolean => {
     // Basic validation - Solana addresses are 32-44 characters
@@ -430,12 +432,14 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                   <div className="flex-grow">
                     <input
                       type="text"
+                      id={`recipient-address-[${index}]`}
+                      name={`recipient-address-[${index}]`}
                       value={recipient.address}
                       onChange={(e) =>
                         handleRecipientChange(index, "address", e.target.value)
                       }
                       className="w-full rounded border p-1.5 sm:text-sm"
-                      placeholder="Recipient wallet address"
+                      placeholder={`Recipient wallet address.${index === 0 ? " You can paste in multiple addresses." : ""}`}
                     />
                     {errors.recipients[index]?.address && (
                       <p className="mt-1 text-xs text-red-500">
@@ -585,7 +589,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
           </div>
         )}
       </Box>
-      {/* Next Button */}
+
       <div className="flex justify-end">
         <Button
           onClick={handleNext}
