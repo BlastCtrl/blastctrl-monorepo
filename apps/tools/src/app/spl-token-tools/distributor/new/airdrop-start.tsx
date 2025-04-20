@@ -471,7 +471,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
           </div>
         ) : (
           <div>
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-y-4">
               <div>
                 <input
                   type="file"
@@ -483,7 +483,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                 <div className="flex items-center">
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="rounded-md bg-gray-200 px-3 py-1.5 hover:bg-gray-300 sm:text-sm"
+                    className="whitespace-nowrap rounded-md bg-gray-200 px-3 py-1.5 hover:bg-gray-300 sm:text-sm"
                   >
                     {csvFile ? "Change CSV File" : "Choose CSV File"}
                   </button>
@@ -492,7 +492,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                       <span className="ml-2 text-sm">{csvFile.name}</span>
                       <button
                         onClick={clearCsvFile}
-                        className="ml-2 flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 p-1 text-xs text-gray-700 hover:bg-gray-300"
+                        className="ml-2 flex size-6 shrink-0 items-center justify-center rounded-full bg-gray-200 p-1 text-xs text-gray-700 hover:bg-gray-300"
                         title="Remove CSV file"
                       >
                         ✕
@@ -502,7 +502,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                 </div>
               </div>
 
-              <div className="text-sm text-gray-500">
+              <div className="whitespace-nowrap text-sm text-gray-500">
                 {csvData.length}{" "}
                 {csvData.length === 1 ? "recipient" : "recipients"}
               </div>

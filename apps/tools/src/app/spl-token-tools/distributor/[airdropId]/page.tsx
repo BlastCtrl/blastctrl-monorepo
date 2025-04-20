@@ -148,7 +148,7 @@ export default function AirdropDetails({
         <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
           {/* Meta information section */}
           <div className="md:col-span-1">
-            <Box className="h-full">
+            <Box enableOnMobile className="h-full">
               <h2 className="mb-3 text-base font-semibold">
                 Airdrop Information
               </h2>
