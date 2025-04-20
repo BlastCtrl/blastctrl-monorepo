@@ -68,6 +68,13 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
     return !isNaN(Number(amount)) && parseFloat(amount) > 0;
   };
 
+  const handleSetAmount = (amount: string) => {
+    setAmount(amount);
+    setRecipients(
+      recipients.map((recipient) => ({ address: recipient.address, amount })),
+    );
+  };
+
   const calculateTotalSol = (): string => {
     if (airdropType === "same") {
       const recipientCount =
@@ -89,7 +96,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
     setAirdropType(type);
     if (type === "same") {
       // Reset recipients' amounts when switching to 'same' type
-      const updatedRecipients = recipients.map((r) => ({ ...r, amount: "" }));
+      const updatedRecipients = recipients.map((r) => ({ ...r, amount }));
       setRecipients(updatedRecipients);
     } else {
       // If switching to 'different', set input method to CSV
@@ -128,7 +135,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
   // Add new recipient field
   const addRecipient = (): void => {
     if (recipients.length < MAX_RECIPIENTS) {
-      setRecipients([...recipients, { address: "", amount: "" }]);
+      setRecipients([...recipients, { address: "", amount }]);
       setErrors({
         ...errors,
         recipients: [...errors.recipients, { address: "", amount: "" }],
@@ -345,8 +352,10 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
               <div className="flex w-32">
                 <input
                   type="text"
+                  name="same-amount-in-SOL"
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  inputMode="decimal"
+                  onChange={(e) => handleSetAmount(e.target.value)}
                   className="w-full rounded-l border p-1.5 focus:border-blue-600 focus:outline-none sm:text-sm"
                   placeholder="0.1"
                 />
@@ -517,7 +526,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                   <p className="mb-1 text-gray-600">
                     Format: "address,amount" (each on a new line)
                   </p>
-                  <p className="text-gray-600 break-all">
+                  <p className="break-all text-gray-600">
                     Example: 7X16ca3B9Gg9MnJ2w4EKjJHRWH5NXH8igzyeAW9Vxw3x,0.05
                   </p>
                 </>
