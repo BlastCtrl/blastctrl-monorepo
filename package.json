@@ -2,7 +2,7 @@
   "name": "blastctrl-monorepo",
   "private": true,
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "dev": "pnpm run --parallel dev",
