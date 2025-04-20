@@ -11,7 +11,7 @@ const DynamicSolaceProvider = dynamic(
 
 export default function Distributor({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto max-w-5xl p-4">
+    <div className="mx-auto max-w-5xl sm:p-4">
       <Box className="mb-6">
         <h1 className="font-display flex items-center text-3xl font-semibold">
           Solace Airdropper
