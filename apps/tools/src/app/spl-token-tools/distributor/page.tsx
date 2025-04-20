@@ -503,8 +503,9 @@ function AirdropName({ airdrop }: { airdrop: GetAirdrops200Item }) {
           >
             <Input
               ref={inputRef}
+              name="airdrop-label"
               defaultValue={airdrop.label || airdrop.id}
-              maxLength={16}
+              maxLength={30}
               className={clsx(
                 "w-full py-px font-mono text-xs/4 font-medium text-zinc-700",
                 "bg-transparent focus:outline-none",
