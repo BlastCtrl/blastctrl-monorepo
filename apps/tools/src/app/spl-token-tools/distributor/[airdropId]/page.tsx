@@ -21,6 +21,7 @@ import {
   useRetryTransaction,
   useStartAirdrop,
 } from "../state";
+import { ArrowTurnUpLeftIcon } from "@heroicons/react/16/solid";
 
 type TransactionStatus = GetAirdropsId200["transactions"][number]["status"];
 type AirdropStatus = GetAirdropsId200["status"];
@@ -136,7 +137,7 @@ export default function AirdropDetails({
           color="dark/zinc"
           className="!px-4 text-sm"
         >
-          ← Back to Airdrops
+          <ArrowTurnUpLeftIcon className="size-3.5" /> Back to Airdrops
         </Button>
       </div>
 
