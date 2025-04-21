@@ -68,13 +68,13 @@ export function useGetAirdropById(airdropId: string, hasStarted?: boolean) {
   return useQuery({
     refetchInterval: (query) => {
       if (!query.state) {
-        return hasStarted ? 1000 : false;
+        return hasStarted ? 1200 : false;
       }
 
       const data = query.state.data;
       // Refresh if processing or any transactions confirming
       if (data?.transactions?.some((tx) => tx.status === "confirming")) {
-        return 1000;
+        return 1200;
       }
 
       return false;
@@ -145,6 +145,47 @@ export function useRetryTransaction(airdropId: string, batchId: string) {
       }
 
       return response.data;
+    },
+  });
+}
+export function useRetryMany(airdropId: string) {
+  const sdk = useSolace();
+
+  return useMutation({
+    mutationKey: ["retry-many", airdropId],
+    mutationFn: async (
+      data: Array<{
+        batchId: number;
+        data: PostAirdropsAirdropIdRetryBatchBatchIdBody;
+      }>,
+    ) => {
+      const responses = await Promise.allSettled(
+        data.map((batchData) =>
+          sdk.api.postAirdropsAirdropIdRetryBatchBatchId(
+            airdropId,
+            batchData.batchId.toString(),
+            batchData.data,
+          ),
+        ),
+      );
+
+      if (
+        responses.some((response) => {
+          response.status === "rejected" ||
+            (response.status === "fulfilled" && response.value.status !== 200);
+        })
+      ) {
+        throw new Error("Some retry requests were rejected.");
+      }
+
+      return responses;
+    },
+    onError: (err) => {
+      notify({
+        type: "error",
+        title: "Retry all failed",
+        description: err.message,
+      });
     },
   });
 }
