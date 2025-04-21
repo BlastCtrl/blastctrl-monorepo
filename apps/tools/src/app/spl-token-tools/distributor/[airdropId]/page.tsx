@@ -18,6 +18,7 @@ import { Box } from "../box";
 import { formatDate, useFadeIn } from "../common";
 import {
   useGetAirdropById,
+  useRetryMany,
   useRetryTransaction,
   useStartAirdrop,
 } from "../state";
@@ -25,6 +26,9 @@ import { ArrowTurnUpLeftIcon } from "@heroicons/react/16/solid";
 
 type TransactionStatus = GetAirdropsId200["transactions"][number]["status"];
 type AirdropStatus = GetAirdropsId200["status"];
+type AirdropIdQueryReturnData = NonNullable<
+  ReturnType<typeof useGetAirdropById>["data"]
+>;
 
 export default function AirdropDetails({
   params,
@@ -252,6 +256,12 @@ export default function AirdropDetails({
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-base font-semibold">Transaction Batches</h2>
                 <div className="flex items-center space-x-3">
+                  {data && (
+                    <RetryAllButton
+                      airdropData={data}
+                      refetchAirdrop={refetch}
+                    />
+                  )}
                   <button
                     onClick={() => setShowOnlyPending(!showOnlyPending)}
                     className={`rounded-md px-2 py-1 text-xs transition-colors ${
@@ -449,5 +459,86 @@ function Batch({
         </details>
       </div>
     </div>
+  );
+}
+
+function RetryAllButton({
+  airdropData,
+  refetchAirdrop,
+}: {
+  airdropData: AirdropIdQueryReturnData;
+  refetchAirdrop: () => Promise<unknown>;
+}) {
+  const { connection } = useConnection();
+  const { publicKey, signAllTransactions } = useWallet();
+  const { mutate, isPending } = useRetryMany(airdropData.id);
+
+  // airdropData "status" must be failed and there must be NO airdropData transactions that are either "pending" or "confirming"
+  const canRetryAll =
+    airdropData.status === "failed" &&
+    !airdropData.transactions.some(
+      (t) => t.status === "pending" || t.status === "confirming",
+    );
+  if (!canRetryAll || isPending) {
+    return null;
+  }
+
+  const handleRetryAll = async () => {
+    if (!publicKey || !signAllTransactions) {
+      return;
+    }
+
+    const expiredTransactions = airdropData.transactions.filter(
+      (t) => t.status === "expired",
+    );
+    const { value, context } =
+      await connection.getLatestBlockhashAndContext("confirmed");
+    const transactions = expiredTransactions.map((txBatch) => {
+      const tx = new Transaction({ ...value, feePayer: publicKey }).add(
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 10_000 }),
+        ...txBatch.recipients.map((r) =>
+          SystemProgram.transfer({
+            lamports: r.lamports,
+            fromPubkey: publicKey,
+            toPubkey: new PublicKey(r.address),
+          }),
+        ),
+      );
+      tx.recentBlockhash = value.blockhash;
+      tx.lastValidBlockHeight = context.slot;
+      return tx;
+    });
+
+    const signedTransactions = await signAllTransactions(
+      transactions.map((tx) => tx),
+    );
+
+    const mutationData = expiredTransactions.map((t, i) => ({
+      batchId: t.id,
+      data: {
+        ...value,
+        minContextSlot: context.slot,
+        txBase64: signedTransactions[i]!.serialize().toString("base64"),
+      },
+    }));
+
+    mutate(mutationData, {
+      onSettled: async () => {
+        await refetchAirdrop();
+      },
+    });
+  };
+
+  return (
+    <button
+      onClick={handleRetryAll}
+      className={clsx(
+        "rounded-md px-2 py-1 text-xs transition-colors",
+        "border border-amber-200 bg-amber-100 text-amber-800",
+      )}
+    >
+      Retry All
+    </button>
   );
 }
