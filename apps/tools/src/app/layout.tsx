@@ -54,7 +54,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
-      className={`${roboto.variable} ${roboto_slab.variable} h-full antialiased [color-scheme:only_light] [scrollbar-gutter:stable]`}
+      className={`${roboto.variable} ${roboto_slab.variable} h-full antialiased [color-scheme:only_light] [scrollbar-gutter:stable] dark:bg-white`}
     >
       <body className="flex h-full flex-col">
         <Providers>
