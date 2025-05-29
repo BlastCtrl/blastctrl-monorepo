@@ -180,7 +180,7 @@ function AuthorizeTransactionBuilder({
   const [stakeCheckbox, setStakeCheckbox] = useState(true);
   const [isConfirming, setIsConfirming] = useState(false);
 
-  const { refetch } = useStakeAccount(stakePubkey.toString());
+  const { refetch, data: stakeData } = useStakeAccount(stakePubkey.toString());
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -200,25 +200,38 @@ function AuthorizeTransactionBuilder({
       );
 
       const tx = new Transaction();
-      tx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10e6 }));
-
       if (withdrawCheckbox) {
+        let custodianPubkey: PublicKey | undefined;
+        if (stakeData?.data?.info.meta.lockup.custodian) {
+          custodianPubkey = new PublicKey(
+            stakeData?.data?.info.meta.lockup.custodian,
+          );
+        }
+
         tx.add(
           StakeProgram.authorize({
             authorizedPubkey: publicKey,
             newAuthorizedPubkey: new PublicKey(authority),
             stakePubkey,
+            custodianPubkey,
             stakeAuthorizationType: StakeAuthorizationLayout.Withdrawer,
           }),
         );
       }
 
       if (stakeCheckbox) {
+        let custodianPubkey: PublicKey | undefined;
+        if (stakeData?.data?.info.meta.lockup.custodian) {
+          custodianPubkey = new PublicKey(
+            stakeData?.data?.info.meta.lockup.custodian,
+          );
+        }
         tx.add(
           StakeProgram.authorize({
             authorizedPubkey: publicKey,
             newAuthorizedPubkey: new PublicKey(authority),
             stakePubkey,
+            custodianPubkey,
             stakeAuthorizationType: StakeAuthorizationLayout.Staker,
           }),
         );
@@ -255,6 +268,7 @@ function AuthorizeTransactionBuilder({
 
       await refetch();
     } catch (error: any) {
+      console.log(error);
       notify({
         type: "error",
         title: "Transaction error",
