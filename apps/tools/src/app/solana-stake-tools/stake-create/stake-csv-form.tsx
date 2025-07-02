@@ -1,11 +1,36 @@
 "use client";
 
 import { InfoTooltip } from "@/components/info-tooltip";
-import { isPublicKey } from "@/lib/solana/common";
-import { Button } from "@blastctrl/ui";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { notify } from "@/components/notification";
+import { isPublicKey, compress } from "@/lib/solana/common";
+import { getSetLockupInstruction } from "@/lib/solana/stake";
+import { retryWithBackoff } from "@/lib/utils";
+import {
+  useCreateStakeTransactionStore,
+  useCreateStakeTransactionActions,
+  useCreateStakeTransactionState,
+} from "@/state/stake-tx-store";
+import { Button, SpinnerIcon } from "@blastctrl/ui";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import {
+  Blockhash,
+  ComputeBudgetProgram,
+  Keypair,
+  LAMPORTS_PER_SOL,
+  Lockup,
+  PublicKey,
+  StakeAuthorizationLayout,
+  StakeProgram,
+  SystemInstruction,
+  SystemProgram,
+  Transaction,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import Papa from "papaparse";
 import { useState, useRef } from "react";
+
+// 2h:30min
 
 interface CSVRow {
   stake_amount: string;
@@ -31,13 +56,19 @@ interface ParsedData {
 const EXAMPLE_CSV = `stake_amount,withdraw_authority,stake_authority,validator,unlock_date,lockup_custodian
 1000000000,,,GREEDkpTvpKzcGvBu9qd36yk6BfjTWPShB67gLWuixMv,,
 500000000,9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM,,,2024-12-31T23:59:59Z,
-2000000000,,,,"2025-01-15T12:00:00Z",5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1`;
+2000000000,,,,2025-01-15T12:00:00Z,5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1`;
 
 export function StakeCSVForm() {
+  const { connection } = useConnection();
+  const { publicKey, sendTransaction } = useWallet();
+  const { setVisible } = useWalletModal();
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const txState = useCreateStakeTransactionState();
+  const txActions = useCreateStakeTransactionActions();
 
   const downloadExample = () => {
     const blob = new Blob([EXAMPLE_CSV], { type: "text/csv" });
@@ -203,8 +234,188 @@ export function StakeCSVForm() {
   const clearFile = () => {
     setFile(null);
     setParsedData(null);
+    txActions.resetTransactions();
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  };
+
+  const processTransactions = async () => {
+    if (!parsedData || !sendTransaction || !publicKey) return;
+
+    // Generate transaction IDs and data
+    const timestamp = Date.now();
+    const transactionData = parsedData.rows.map((row, index) => ({
+      index: index + 1,
+      amount: parseInt(row.stake_amount),
+      id: `${index + 1}-${timestamp}`,
+    }));
+    txActions.initializeTransactions(transactionData);
+
+    // Store the transaction IDs for consistent reference
+    const transactionIds = transactionData.map((tx) => tx.id);
+
+    try {
+      for (let i = 0; i < parsedData.rows.length; i++) {
+        const row = parsedData.rows[i]!;
+        const txId = transactionIds[i]!;
+
+        try {
+          // Update status to processing
+          txActions.updateTransactionStatus(txId, "processing");
+
+          const { context, value } = await retryWithBackoff(() =>
+            connection.getLatestBlockhashAndContext("confirmed"),
+          );
+
+          const stakeAccountSigner = Keypair.generate();
+          let initialLockup: Lockup | undefined = undefined;
+          if (row.unlock_date) {
+            initialLockup = {
+              custodian: publicKey,
+              epoch: 0,
+              unixTimestamp: Math.floor(
+                new Date(row.unlock_date).getTime() / 1000,
+              ),
+            };
+          } else if (row.lockup_custodian) {
+            // There are reasons for this, if we want to have a lockup (even a one that is not in-force),
+            // the initial custodian must be the wallet that owns the stake account.
+            // If the row.lockup_custodian exists, we'll change it in the next instruction.
+            initialLockup = {
+              custodian: publicKey,
+              epoch: 0,
+              unixTimestamp: 0,
+            };
+          }
+
+          const tx = new Transaction({
+            feePayer: publicKey,
+            blockhash: value.blockhash,
+            lastValidBlockHeight: value.lastValidBlockHeight,
+          }).add(
+            StakeProgram.createAccount({
+              fromPubkey: publicKey,
+              lamports: parseInt(row.stake_amount),
+              stakePubkey: stakeAccountSigner.publicKey,
+              authorized: {
+                staker: publicKey,
+                withdrawer: publicKey,
+              },
+              lockup: initialLockup,
+            }),
+          );
+
+          if (row.stake_authority) {
+            tx.add(
+              StakeProgram.authorize({
+                authorizedPubkey: publicKey,
+                newAuthorizedPubkey: new PublicKey(row.stake_authority),
+                stakePubkey: stakeAccountSigner.publicKey,
+                stakeAuthorizationType: StakeAuthorizationLayout.Staker,
+                custodianPubkey: publicKey,
+              }),
+            );
+          }
+
+          if (row.withdraw_authority) {
+            tx.add(
+              StakeProgram.authorize({
+                authorizedPubkey: publicKey,
+                newAuthorizedPubkey: new PublicKey(row.withdraw_authority),
+                stakePubkey: stakeAccountSigner.publicKey,
+                stakeAuthorizationType: StakeAuthorizationLayout.Withdrawer,
+                custodianPubkey: publicKey,
+              }),
+            );
+          }
+
+          if (row.lockup_custodian) {
+            tx.add(
+              getSetLockupInstruction(
+                StakeProgram.programId,
+                stakeAccountSigner.publicKey,
+                {
+                  custodian: new PublicKey(row.lockup_custodian),
+                },
+                publicKey,
+              ),
+            );
+          }
+
+          if (row.validator) {
+            tx.add(
+              StakeProgram.delegate({
+                stakePubkey: stakeAccountSigner.publicKey,
+                authorizedPubkey: publicKey,
+                votePubkey: new PublicKey(row.validator),
+              }),
+            );
+          }
+
+          tx.partialSign(stakeAccountSigner);
+          const signature = await sendTransaction(tx, connection, {
+            maxRetries: 0,
+            preflightCommitment: "confirmed",
+            skipPreflight: true,
+          });
+
+          const result = await connection.confirmTransaction(
+            {
+              signature,
+              blockhash: value.blockhash,
+              lastValidBlockHeight: value.lastValidBlockHeight!,
+              minContextSlot: context.slot,
+            },
+            "confirmed",
+          );
+
+          if (result.value.err) {
+            throw new Error(
+              `Transaction failed: ${JSON.stringify(result.value.err)}`,
+            );
+          }
+
+          // Update status to confirmed
+          txActions.updateTransactionStatus(txId, "confirmed", signature);
+
+          notify({
+            type: "success",
+            title: `Stake account ${i + 1} created`,
+            txid: signature,
+          });
+        } catch (error: any) {
+          console.error(error);
+          // Update status to failed
+          txActions.updateTransactionStatus(
+            txId,
+            "failed",
+            undefined,
+            error.message,
+          );
+
+          notify({
+            type: "error",
+            title: `Failed to create stake account ${i + 1}`,
+            description: error.message,
+          });
+          // Continue with next transaction even if one fails
+        }
+      }
+
+      notify({
+        type: "success",
+        title: "Batch processing completed",
+        description: `Successfully processed ${txState.completedTransactions} out of ${parsedData.rows.length} transactions`,
+      });
+    } catch (error: any) {
+      notify({
+        type: "error",
+        title: "Batch processing failed",
+        description: error.message,
+      });
+    } finally {
+      txActions.setProcessing(false);
     }
   };
 
@@ -377,22 +588,132 @@ export function StakeCSVForm() {
               </p>
             </div>
           ) : (
-            <div className="rounded-lg bg-green-50 p-4">
-              <h4 className="font-medium text-green-800">
-                CSV Validated Successfully
-              </h4>
-              <div className="mt-2 space-y-1 text-sm text-green-700">
-                <p>✓ {parsedData.rows.length} stake accounts will be created</p>
-                <p>
-                  ✓ Total SOL required: {parsedData.totalSol.toLocaleString()}{" "}
-                  SOL
-                </p>
-                <p className="mt-2 text-xs text-green-600">
-                  Note: Additional SOL will be required for transaction fees.
-                </p>
+            <div className="space-y-4">
+              <div className="rounded-lg bg-green-50 p-4">
+                <h4 className="font-medium text-green-800">
+                  CSV Validated Successfully
+                </h4>
+                <div className="mt-2 space-y-1 text-sm text-green-700">
+                  <p>
+                    ✓ {parsedData.rows.length} stake accounts will be created
+                  </p>
+                  <p>
+                    ✓ Total SOL required: {parsedData.totalSol.toLocaleString()}{" "}
+                    SOL
+                  </p>
+                  <p className="mt-2 text-xs text-green-600">
+                    Note: Additional SOL will be required for transaction fees.
+                  </p>
+                </div>
               </div>
+
+              {/* Processing Status */}
+              {txState.isProcessing && (
+                <div className="rounded-lg bg-blue-50 p-4">
+                  <div className="flex items-center">
+                    <SpinnerIcon className="mr-2 h-5 w-5 text-blue-600" />
+                    <h4 className="font-medium text-blue-800">
+                      Processing Transactions
+                    </h4>
+                  </div>
+                  <div className="mt-2">
+                    <div className="text-sm text-blue-700">
+                      Progress: {txState.completedTransactions} of{" "}
+                      {txState.totalTransactions} transactions completed
+                    </div>
+                    <div className="mt-2 h-2 rounded-full bg-blue-200">
+                      <div
+                        className="h-2 rounded-full bg-blue-600 transition-all duration-300"
+                        style={{
+                          width: `${(txState.completedTransactions / txState.totalTransactions) * 100}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-blue-600">
+                    Please approve each transaction in your wallet when
+                    prompted.
+                  </p>
+                </div>
+              )}
+
+              {/* Proceed Button */}
+              {!txState.isProcessing && (
+                <div className="flex justify-center">
+                  {publicKey ? (
+                    <Button
+                      onClick={processTransactions}
+                      disabled={txState.isProcessing}
+                      className="px-8 py-2"
+                    >
+                      Create {parsedData.rows.length} Stake Account
+                      {parsedData.rows.length > 1 ? "s" : ""}
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => setVisible(true)}
+                      className="px-8 py-2"
+                    >
+                      Connect Wallet to Continue
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Persistent Transaction Tracking */}
+      {txState.transactions.length > 0 && (
+        <div className="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <h4 className="mb-4 font-medium text-gray-900">
+            Transaction Status ({txState.completedTransactions} of{" "}
+            {txState.totalTransactions} completed)
+          </h4>
+          <div className="max-h-64 space-y-2 overflow-y-auto">
+            {txState.transactions.map((tx) => (
+              <div
+                key={tx.id}
+                className="flex items-center justify-between rounded-md bg-white p-3 text-sm"
+              >
+                <div className="flex items-center space-x-4">
+                  <span className="font-mono text-gray-500">#{tx.index}</span>
+                  <span className="text-gray-900">
+                    {(tx.amount / LAMPORTS_PER_SOL).toLocaleString()} SOL
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  {tx.status === "pending" && (
+                    <div className="flex items-center space-x-2">
+                      <div className="size-3 rounded-full bg-yellow-500" />
+                      <span className="text-yellow-700">Pending</span>
+                    </div>
+                  )}
+                  {tx.status === "processing" && (
+                    <div className="flex items-center space-x-2">
+                      <div className="size-3 animate-spin rounded-full border-2 border-b-blue-200 border-l-blue-200 border-r-blue-200 border-t-blue-600"></div>
+                      <span className="text-blue-700">Processing</span>
+                    </div>
+                  )}
+                  {tx.status === "confirmed" && tx.signature && (
+                    <div className="flex items-center space-x-2">
+                      <div className="size-3 rounded-full bg-green-500" />
+                      <span className="text-green-700">
+                        {compress(tx.signature, 6)}
+                      </span>
+                    </div>
+                  )}
+                  {tx.status === "failed" && (
+                    <div className="flex items-center space-x-2">
+                      <div className="size-3 rounded-full bg-red-500" />
+                      <span className="text-red-700">Failed</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
