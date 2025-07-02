@@ -10,7 +10,9 @@ import {
   useCreateStakeTransactionActions,
   useCreateStakeTransactionState,
 } from "@/state/stake-tx-store";
+import useQueryContext from "@/state/use-query-context";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
+import { ArrowTopRightOnSquareIcon } from "@heroicons/react/20/solid";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import {
@@ -66,6 +68,7 @@ export function StakeCSVForm() {
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { fmtUrlWithCluster } = useQueryContext();
 
   const txState = useCreateStakeTransactionState();
   const txActions = useCreateStakeTransactionActions();
@@ -306,6 +309,16 @@ export function StakeCSVForm() {
             }),
           );
 
+          if (row.validator) {
+            tx.add(
+              StakeProgram.delegate({
+                stakePubkey: stakeAccountSigner.publicKey,
+                authorizedPubkey: publicKey,
+                votePubkey: new PublicKey(row.validator),
+              }),
+            );
+          }
+
           if (row.stake_authority) {
             tx.add(
               StakeProgram.authorize({
@@ -340,16 +353,6 @@ export function StakeCSVForm() {
                 },
                 publicKey,
               ),
-            );
-          }
-
-          if (row.validator) {
-            tx.add(
-              StakeProgram.delegate({
-                stakePubkey: stakeAccountSigner.publicKey,
-                authorizedPubkey: publicKey,
-                votePubkey: new PublicKey(row.validator),
-              }),
             );
           }
 
@@ -699,9 +702,16 @@ export function StakeCSVForm() {
                   {tx.status === "confirmed" && tx.signature && (
                     <div className="flex items-center space-x-2">
                       <div className="size-3 rounded-full bg-green-500" />
-                      <span className="text-green-700">
-                        {compress(tx.signature, 6)}
-                      </span>
+                      <a
+                        href={fmtUrlWithCluster(
+                          `https://explorer.solana.com/tx/${tx.signature}`,
+                        )}
+                        target="_blank"
+                        className="whitespace-pre font-medium text-green-700 visited:text-green-900 hover:underline"
+                      >
+                        {compress(tx.signature, 4)}{" "}
+                        <ArrowTopRightOnSquareIcon className="inline-block size-4 -translate-y-px" />
+                      </a>
                     </div>
                   )}
                   {tx.status === "failed" && (
