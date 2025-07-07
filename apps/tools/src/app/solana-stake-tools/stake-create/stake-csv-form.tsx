@@ -673,6 +673,100 @@ export function StakeCSVForm() {
     }
   };
 
+  const retryTransaction = async (transactionId: string) => {
+    if (!parsedData || !sendTransaction || !publicKey) return;
+
+    // Find the transaction in the state
+    const currentTxState = useCreateStakeTransactionStore.getState().state;
+    const transaction = currentTxState.transactions.find(
+      (tx) => tx.id === transactionId,
+    );
+
+    if (!transaction) {
+      console.error("Transaction not found for retry:", transactionId);
+      return;
+    }
+
+    // Find the corresponding CSV row
+    const rowIndex = transaction.index - 1;
+    const row = parsedData.rows[rowIndex];
+
+    if (!row) {
+      console.error("CSV row not found for transaction:", transactionId);
+      return;
+    }
+
+    try {
+      // Update status to processing
+      txActions.updateTransactionStatus(transactionId, "processing");
+
+      // Get fresh blockhash
+      const { context, value } = await retryWithBackoff(() =>
+        connection.getLatestBlockhashAndContext("confirmed"),
+      );
+
+      // Generate new keypair for the stake account
+      const stakeAccountSigner = Keypair.generate();
+
+      // Build the transaction
+      const tx = await buildTransaction(
+        row,
+        stakeAccountSigner,
+        value.blockhash,
+        value.lastValidBlockHeight!,
+      );
+
+      // Send the transaction
+      const signature = await sendTransaction(tx, connection, {
+        maxRetries: 0,
+        preflightCommitment: "confirmed",
+        skipPreflight: true,
+      });
+
+      // Confirm the transaction
+      const result = await connection.confirmTransaction(
+        {
+          signature,
+          blockhash: value.blockhash,
+          lastValidBlockHeight: value.lastValidBlockHeight!,
+          minContextSlot: context.slot,
+        },
+        "confirmed",
+      );
+
+      if (result.value.err) {
+        throw new Error(
+          `Transaction failed: ${JSON.stringify(result.value.err)}`,
+        );
+      }
+
+      // Update status to confirmed
+      txActions.updateTransactionStatus(transactionId, "confirmed", signature);
+
+      notify({
+        type: "success",
+        title: `Retry successful`,
+        description: `Stake account ${transaction.index} created successfully`,
+      });
+    } catch (error: any) {
+      console.error("Retry failed:", error);
+
+      // Update status back to failed
+      txActions.updateTransactionStatus(
+        transactionId,
+        "failed",
+        undefined,
+        error.message,
+      );
+
+      notify({
+        type: "error",
+        title: `Retry failed for stake account ${transaction.index}`,
+        description: error.message,
+      });
+    }
+  };
+
   return (
     <div className="mt-6 space-y-6">
       {/* Description */}
@@ -985,6 +1079,14 @@ export function StakeCSVForm() {
                     <div className="flex items-center space-x-2">
                       <div className="size-3 rounded-full bg-red-500" />
                       <span className="text-red-700">Failed</span>
+                      <Button
+                        onClick={() => retryTransaction(tx.id)}
+                        disabled={txState.isProcessing}
+                        className="ml-2 px-2 py-1 text-xs"
+                        outline
+                      >
+                        Retry
+                      </Button>
                     </div>
                   )}
                 </div>
