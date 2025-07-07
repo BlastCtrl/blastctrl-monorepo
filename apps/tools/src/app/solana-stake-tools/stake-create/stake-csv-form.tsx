@@ -6,9 +6,9 @@ import { isPublicKey, compress } from "@/lib/solana/common";
 import { getSetLockupInstruction } from "@/lib/solana/stake";
 import { retryWithBackoff } from "@/lib/utils";
 import {
-  useCreateStakeTransactionStore,
   useCreateStakeTransactionActions,
   useCreateStakeTransactionState,
+  useCreateStakeTransactionStore,
 } from "@/state/stake-tx-store";
 import useQueryContext from "@/state/use-query-context";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
@@ -30,7 +30,9 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import Papa from "papaparse";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import toast from "react-hot-toast";
+import { NotificationWindow } from "@/components/notification";
 
 // 2h:30min
 
@@ -62,16 +64,47 @@ const EXAMPLE_CSV = `stake_amount,withdraw_authority,stake_authority,validator,u
 
 export function StakeCSVForm() {
   const { connection } = useConnection();
-  const { publicKey, sendTransaction } = useWallet();
+  const { publicKey, sendTransaction, signAllTransactions } = useWallet();
   const { setVisible } = useWalletModal();
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasStartedProcessing, setHasStartedProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { fmtUrlWithCluster } = useQueryContext();
 
   const txState = useCreateStakeTransactionState();
   const txActions = useCreateStakeTransactionActions();
+
+  // Debug logging for store state changes
+  useEffect(() => {
+    console.log("🔍 Store state changed:", {
+      totalTransactions: txState.totalTransactions,
+      completedTransactions: txState.completedTransactions,
+      isProcessing: txState.isProcessing,
+      confirmedCount: txState.transactions.filter(
+        (tx) => tx.status === "confirmed",
+      ).length,
+      failedCount: txState.transactions.filter((tx) => tx.status === "failed")
+        .length,
+      pendingCount: txState.transactions.filter((tx) => tx.status === "pending")
+        .length,
+      processingCount: txState.transactions.filter(
+        (tx) => tx.status === "processing",
+      ).length,
+      transactions: txState.transactions.map((tx) => ({
+        id: tx.id,
+        index: tx.index,
+        status: tx.status,
+        signature: tx.signature ? tx.signature.slice(0, 8) + "..." : undefined,
+      })),
+    });
+  }, [
+    txState.totalTransactions,
+    txState.completedTransactions,
+    txState.isProcessing,
+    txState.transactions,
+  ]);
 
   const downloadExample = () => {
     const blob = new Blob([EXAMPLE_CSV], { type: "text/csv" });
@@ -237,9 +270,258 @@ export function StakeCSVForm() {
   const clearFile = () => {
     setFile(null);
     setParsedData(null);
+    setHasStartedProcessing(false);
     txActions.resetTransactions();
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  };
+
+  const buildTransaction = async (
+    row: CSVRow,
+    stakeAccountSigner: Keypair,
+    blockhash: string,
+    lastValidBlockHeight: number,
+  ) => {
+    let initialLockup: Lockup | undefined = undefined;
+    if (row.unlock_date) {
+      initialLockup = {
+        custodian: publicKey!,
+        epoch: 0,
+        unixTimestamp: Math.floor(new Date(row.unlock_date).getTime() / 1000),
+      };
+    } else if (row.lockup_custodian) {
+      // There are reasons for this, if we want to have a lockup (even a one that is not in-force),
+      // the initial custodian must be the wallet that owns the stake account.
+      // If the row.lockup_custodian exists, we'll change it in the next instruction.
+      initialLockup = {
+        custodian: publicKey!,
+        epoch: 0,
+        unixTimestamp: 0,
+      };
+    }
+
+    const tx = new Transaction({
+      feePayer: publicKey!,
+      blockhash,
+      lastValidBlockHeight,
+    }).add(
+      StakeProgram.createAccount({
+        fromPubkey: publicKey!,
+        lamports: parseInt(row.stake_amount),
+        stakePubkey: stakeAccountSigner.publicKey,
+        authorized: {
+          staker: publicKey!,
+          withdrawer: publicKey!,
+        },
+        lockup: initialLockup,
+      }),
+    );
+
+    if (row.validator) {
+      tx.add(
+        StakeProgram.delegate({
+          stakePubkey: stakeAccountSigner.publicKey,
+          authorizedPubkey: publicKey!,
+          votePubkey: new PublicKey(row.validator),
+        }),
+      );
+    }
+
+    if (row.stake_authority) {
+      tx.add(
+        StakeProgram.authorize({
+          authorizedPubkey: publicKey!,
+          newAuthorizedPubkey: new PublicKey(row.stake_authority),
+          stakePubkey: stakeAccountSigner.publicKey,
+          stakeAuthorizationType: StakeAuthorizationLayout.Staker,
+          custodianPubkey: publicKey!,
+        }),
+      );
+    }
+
+    if (row.withdraw_authority) {
+      tx.add(
+        StakeProgram.authorize({
+          authorizedPubkey: publicKey!,
+          newAuthorizedPubkey: new PublicKey(row.withdraw_authority),
+          stakePubkey: stakeAccountSigner.publicKey,
+          stakeAuthorizationType: StakeAuthorizationLayout.Withdrawer,
+          custodianPubkey: publicKey!,
+        }),
+      );
+    }
+
+    if (row.lockup_custodian) {
+      tx.add(
+        getSetLockupInstruction(
+          StakeProgram.programId,
+          stakeAccountSigner.publicKey,
+          {
+            custodian: new PublicKey(row.lockup_custodian),
+          },
+          publicKey!,
+        ),
+      );
+    }
+
+    tx.partialSign(stakeAccountSigner);
+    return tx;
+  };
+
+  const processTransactionsBatch = async (
+    batchRows: CSVRow[],
+    batchIds: string[],
+    batchIndices: number[],
+    stakeAccountSigners: Keypair[],
+    blockhash: string,
+    lastValidBlockHeight: number,
+    contextSlot: number,
+  ) => {
+    // Build all transactions for this batch
+    const transactions = await Promise.all(
+      batchRows.map((row, i) =>
+        buildTransaction(
+          row,
+          stakeAccountSigners[i]!,
+          blockhash,
+          lastValidBlockHeight,
+        ),
+      ),
+    );
+
+    // Sign all transactions in the batch
+    const signedTransactions = await signAllTransactions!(transactions);
+
+    // Send and confirm all transactions in parallel
+    const sendPromises = signedTransactions.map(async (signedTx, i) => {
+      const txId = batchIds[i]!;
+      const txIndex = batchIndices[i]!;
+
+      try {
+        // Send the transaction
+        const signature = await connection.sendRawTransaction(
+          signedTx.serialize(),
+          {
+            maxRetries: 0,
+            preflightCommitment: "confirmed",
+            skipPreflight: true,
+          },
+        );
+
+        // Confirm the transaction
+        const result = await connection.confirmTransaction(
+          {
+            signature,
+            blockhash,
+            lastValidBlockHeight,
+            minContextSlot: contextSlot,
+          },
+          "confirmed",
+        );
+
+        if (result.value.err) {
+          throw new Error(
+            `Transaction failed: ${JSON.stringify(result.value.err)}`,
+          );
+        }
+
+        // Update status to confirmed
+        txActions.updateTransactionStatus(txId, "confirmed", signature);
+
+        // Don't show individual success toasts for batch - will be handled at batch level
+        return { success: true, txId, signature };
+      } catch (error: any) {
+        console.error(error);
+        // Update status to failed
+        txActions.updateTransactionStatus(
+          txId,
+          "failed",
+          undefined,
+          error.message,
+        );
+
+        notify({
+          type: "error",
+          title: `Failed to create stake account ${txIndex}`,
+          description: error.message,
+        });
+
+        return { success: false, txId, error: error.message };
+      }
+    });
+
+    // Wait for all transactions in the batch to complete
+    await Promise.all(sendPromises);
+  };
+
+  const processTransactionsIndividual = async (
+    rows: CSVRow[],
+    transactionIds: string[],
+  ) => {
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i]!;
+      const txId = transactionIds[i]!;
+
+      try {
+        // Update status to processing
+        txActions.updateTransactionStatus(txId, "processing");
+
+        const { context, value } = await retryWithBackoff(() =>
+          connection.getLatestBlockhashAndContext("confirmed"),
+        );
+
+        const stakeAccountSigner = Keypair.generate();
+        const tx = await buildTransaction(
+          row,
+          stakeAccountSigner,
+          value.blockhash,
+          value.lastValidBlockHeight!,
+        );
+
+        const signature = await sendTransaction(tx, connection, {
+          maxRetries: 0,
+          preflightCommitment: "confirmed",
+          skipPreflight: true,
+        });
+
+        const result = await connection.confirmTransaction(
+          {
+            signature,
+            blockhash: value.blockhash,
+            lastValidBlockHeight: value.lastValidBlockHeight!,
+            minContextSlot: context.slot,
+          },
+          "confirmed",
+        );
+
+        if (result.value.err) {
+          throw new Error(
+            `Transaction failed: ${JSON.stringify(result.value.err)}`,
+          );
+        }
+
+        // Update status to confirmed
+        txActions.updateTransactionStatus(txId, "confirmed", signature);
+
+        // Don't show individual success toasts - will be handled at completion
+      } catch (error: any) {
+        console.error(error);
+        // Update status to failed
+        txActions.updateTransactionStatus(
+          txId,
+          "failed",
+          undefined,
+          error.message,
+        );
+
+        notify({
+          type: "error",
+          title: `Failed to create stake account ${i + 1}`,
+          description: error.message,
+        });
+        // Continue with next transaction even if one fails
+      }
     }
   };
 
@@ -258,160 +540,129 @@ export function StakeCSVForm() {
     // Store the transaction IDs for consistent reference
     const transactionIds = transactionData.map((tx) => tx.id);
 
+    // Mark that processing has started
+    setHasStartedProcessing(true);
+
     try {
-      for (let i = 0; i < parsedData.rows.length; i++) {
-        const row = parsedData.rows[i]!;
-        const txId = transactionIds[i]!;
+      // Check if batch signing is available
+      if (signAllTransactions) {
+        // Process in batches of 10
+        const BATCH_SIZE = 10;
+        const rows = parsedData.rows;
 
-        try {
-          // Update status to processing
-          txActions.updateTransactionStatus(txId, "processing");
-
-          const { context, value } = await retryWithBackoff(() =>
-            connection.getLatestBlockhashAndContext("confirmed"),
+        for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+          const batchEnd = Math.min(i + BATCH_SIZE, rows.length);
+          const batchRows = rows.slice(i, batchEnd);
+          const batchIds = transactionIds.slice(i, batchEnd);
+          const batchIndices = Array.from(
+            { length: batchEnd - i },
+            (_, idx) => i + idx + 1,
           );
 
-          const stakeAccountSigner = Keypair.generate();
-          let initialLockup: Lockup | undefined = undefined;
-          if (row.unlock_date) {
-            initialLockup = {
-              custodian: publicKey,
-              epoch: 0,
-              unixTimestamp: Math.floor(
-                new Date(row.unlock_date).getTime() / 1000,
+          // Update all transactions in this batch to processing
+          batchIds.forEach((txId) => {
+            txActions.updateTransactionStatus(txId, "processing");
+          });
+
+          try {
+            // Get fresh blockhash for this batch
+            const { context, value } = await retryWithBackoff(() =>
+              connection.getLatestBlockhashAndContext("confirmed"),
+            );
+
+            // Generate keypairs for this batch
+            const stakeAccountSigners = Array.from(
+              { length: batchRows.length },
+              () => Keypair.generate(),
+            );
+
+            await processTransactionsBatch(
+              batchRows,
+              batchIds,
+              batchIndices,
+              stakeAccountSigners,
+              value.blockhash,
+              value.lastValidBlockHeight!,
+              context.slot,
+            );
+
+            const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+            const totalBatches = Math.ceil(parsedData.rows.length / BATCH_SIZE);
+            const isLastBatch = batchNum === totalBatches;
+
+            toast.custom(
+              (t) => (
+                <NotificationWindow
+                  type="success"
+                  title={`Batch ${batchNum} completed`}
+                  description={`Processed ${batchRows.length} transactions`}
+                  visible={t.visible}
+                  onClose={() => toast.dismiss(t.id)}
+                />
               ),
-            };
-          } else if (row.lockup_custodian) {
-            // There are reasons for this, if we want to have a lockup (even a one that is not in-force),
-            // the initial custodian must be the wallet that owns the stake account.
-            // If the row.lockup_custodian exists, we'll change it in the next instruction.
-            initialLockup = {
-              custodian: publicKey,
-              epoch: 0,
-              unixTimestamp: 0,
-            };
-          }
-
-          const tx = new Transaction({
-            feePayer: publicKey,
-            blockhash: value.blockhash,
-            lastValidBlockHeight: value.lastValidBlockHeight,
-          }).add(
-            StakeProgram.createAccount({
-              fromPubkey: publicKey,
-              lamports: parseInt(row.stake_amount),
-              stakePubkey: stakeAccountSigner.publicKey,
-              authorized: {
-                staker: publicKey,
-                withdrawer: publicKey,
-              },
-              lockup: initialLockup,
-            }),
-          );
-
-          if (row.validator) {
-            tx.add(
-              StakeProgram.delegate({
-                stakePubkey: stakeAccountSigner.publicKey,
-                authorizedPubkey: publicKey,
-                votePubkey: new PublicKey(row.validator),
-              }),
+              { duration: isLastBatch ? 20000 : 3000 },
             );
-          }
-
-          if (row.stake_authority) {
-            tx.add(
-              StakeProgram.authorize({
-                authorizedPubkey: publicKey,
-                newAuthorizedPubkey: new PublicKey(row.stake_authority),
-                stakePubkey: stakeAccountSigner.publicKey,
-                stakeAuthorizationType: StakeAuthorizationLayout.Staker,
-                custodianPubkey: publicKey,
-              }),
+          } catch (error: any) {
+            console.error(
+              `Batch ${Math.floor(i / BATCH_SIZE) + 1} failed:`,
+              error,
             );
-          }
 
-          if (row.withdraw_authority) {
-            tx.add(
-              StakeProgram.authorize({
-                authorizedPubkey: publicKey,
-                newAuthorizedPubkey: new PublicKey(row.withdraw_authority),
-                stakePubkey: stakeAccountSigner.publicKey,
-                stakeAuthorizationType: StakeAuthorizationLayout.Withdrawer,
-                custodianPubkey: publicKey,
-              }),
-            );
-          }
+            // Mark all transactions in this batch as failed
+            batchIds.forEach((txId) => {
+              txActions.updateTransactionStatus(
+                txId,
+                "failed",
+                undefined,
+                error.message,
+              );
+            });
 
-          if (row.lockup_custodian) {
-            tx.add(
-              getSetLockupInstruction(
-                StakeProgram.programId,
-                stakeAccountSigner.publicKey,
-                {
-                  custodian: new PublicKey(row.lockup_custodian),
-                },
-                publicKey,
+            const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+            const totalBatches = Math.ceil(parsedData.rows.length / BATCH_SIZE);
+            const isLastBatch = batchNum === totalBatches;
+
+            toast.custom(
+              (t) => (
+                <NotificationWindow
+                  type="error"
+                  title={`Batch ${batchNum} failed`}
+                  description={error.message}
+                  visible={t.visible}
+                  onClose={() => toast.dismiss(t.id)}
+                />
               ),
+              { duration: isLastBatch ? 20000 : 3000 },
             );
+            // Continue with next batch even if one fails
           }
-
-          tx.partialSign(stakeAccountSigner);
-          const signature = await sendTransaction(tx, connection, {
-            maxRetries: 0,
-            preflightCommitment: "confirmed",
-            skipPreflight: true,
-          });
-
-          const result = await connection.confirmTransaction(
-            {
-              signature,
-              blockhash: value.blockhash,
-              lastValidBlockHeight: value.lastValidBlockHeight!,
-              minContextSlot: context.slot,
-            },
-            "confirmed",
-          );
-
-          if (result.value.err) {
-            throw new Error(
-              `Transaction failed: ${JSON.stringify(result.value.err)}`,
-            );
-          }
-
-          // Update status to confirmed
-          txActions.updateTransactionStatus(txId, "confirmed", signature);
-
-          notify({
-            type: "success",
-            title: `Stake account ${i + 1} created`,
-            txid: signature,
-          });
-        } catch (error: any) {
-          console.error(error);
-          // Update status to failed
-          txActions.updateTransactionStatus(
-            txId,
-            "failed",
-            undefined,
-            error.message,
-          );
-
-          notify({
-            type: "error",
-            title: `Failed to create stake account ${i + 1}`,
-            description: error.message,
-          });
-          // Continue with next transaction even if one fails
         }
+      } else {
+        // Fallback to individual transaction processing
+        await processTransactionsIndividual(parsedData.rows, transactionIds);
       }
 
+      const currentTxState = useCreateStakeTransactionStore.getState().state;
+      console.log("FINAL STATE", currentTxState);
+
+      // Final completion message with normal duration
+      const successCount = currentTxState.transactions.filter(
+        (tx) => tx.status === "confirmed",
+      ).length;
+      const failedCount = currentTxState.transactions.filter(
+        (tx) => tx.status === "failed",
+      ).length;
+
       notify({
-        type: "success",
+        type: successCount === parsedData.rows.length ? "success" : "info",
         title: "Batch processing completed",
-        description: `Successfully processed ${txState.completedTransactions} out of ${parsedData.rows.length} transactions`,
+        description:
+          failedCount === 0
+            ? `Successfully created all ${successCount} stake accounts`
+            : `Created ${successCount} stake accounts, ${failedCount} failed`,
       });
     } catch (error: any) {
+      // Final error message with normal duration
       notify({
         type: "error",
         title: "Batch processing failed",
@@ -433,6 +684,12 @@ export function StakeCSVForm() {
           including amounts, authorities, delegation targets, and lockup
           settings. Maximum 50 rows allowed.
         </p>
+        {signAllTransactions && (
+          <p className="mt-2 text-sm font-medium text-blue-600">
+            ✨ Your wallet supports batch signing! Transactions will be
+            processed in batches of 10 for faster execution.
+          </p>
+        )}
       </div>
 
       {/* Example Download */}
@@ -616,13 +873,22 @@ export function StakeCSVForm() {
                   <div className="flex items-center">
                     <SpinnerIcon className="mr-2 h-5 w-5 text-blue-600" />
                     <h4 className="font-medium text-blue-800">
-                      Processing Transactions
+                      {signAllTransactions
+                        ? "Processing Transaction Batches"
+                        : "Processing Transactions"}
                     </h4>
                   </div>
                   <div className="mt-2">
                     <div className="text-sm text-blue-700">
                       Progress: {txState.completedTransactions} of{" "}
                       {txState.totalTransactions} transactions completed
+                      {signAllTransactions && (
+                        <span className="ml-2 text-blue-600">
+                          (Batch{" "}
+                          {Math.floor(txState.completedTransactions / 10) + 1}{" "}
+                          of {Math.ceil(txState.totalTransactions / 10)})
+                        </span>
+                      )}
                     </div>
                     <div className="mt-2 h-2 rounded-full bg-blue-200">
                       <div
@@ -634,14 +900,15 @@ export function StakeCSVForm() {
                     </div>
                   </div>
                   <p className="mt-2 text-xs text-blue-600">
-                    Please approve each transaction in your wallet when
-                    prompted.
+                    {signAllTransactions
+                      ? "Please approve transaction batches in your wallet when prompted. Each batch contains up to 10 transactions."
+                      : "Please approve each transaction in your wallet when prompted."}
                   </p>
                 </div>
               )}
 
               {/* Proceed Button */}
-              {!txState.isProcessing && (
+              {!txState.isProcessing && !hasStartedProcessing && (
                 <div className="flex justify-center">
                   {publicKey ? (
                     <Button
