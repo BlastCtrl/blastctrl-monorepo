@@ -1,6 +1,5 @@
 "use client";
 
-import { InfoTooltip } from "@/components/info-tooltip";
 import { notify } from "@/components/notification";
 import { isPublicKey, compress } from "@/lib/solana/common";
 import { getSetLockupInstruction } from "@/lib/solana/stake";
@@ -16,25 +15,18 @@ import { ArrowTopRightOnSquareIcon } from "@heroicons/react/20/solid";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import {
-  Blockhash,
-  ComputeBudgetProgram,
   Keypair,
   LAMPORTS_PER_SOL,
   Lockup,
   PublicKey,
   StakeAuthorizationLayout,
   StakeProgram,
-  SystemInstruction,
-  SystemProgram,
   Transaction,
-  TransactionInstruction,
 } from "@solana/web3.js";
 import Papa from "papaparse";
 import { useState, useRef, useEffect } from "react";
 import toast from "react-hot-toast";
 import { NotificationWindow } from "@/components/notification";
-
-// 2h:30min
 
 interface CSVRow {
   stake_amount: string;
@@ -75,36 +67,6 @@ export function StakeCSVForm() {
 
   const txState = useCreateStakeTransactionState();
   const txActions = useCreateStakeTransactionActions();
-
-  // Debug logging for store state changes
-  useEffect(() => {
-    console.log("🔍 Store state changed:", {
-      totalTransactions: txState.totalTransactions,
-      completedTransactions: txState.completedTransactions,
-      isProcessing: txState.isProcessing,
-      confirmedCount: txState.transactions.filter(
-        (tx) => tx.status === "confirmed",
-      ).length,
-      failedCount: txState.transactions.filter((tx) => tx.status === "failed")
-        .length,
-      pendingCount: txState.transactions.filter((tx) => tx.status === "pending")
-        .length,
-      processingCount: txState.transactions.filter(
-        (tx) => tx.status === "processing",
-      ).length,
-      transactions: txState.transactions.map((tx) => ({
-        id: tx.id,
-        index: tx.index,
-        status: tx.status,
-        signature: tx.signature ? tx.signature.slice(0, 8) + "..." : undefined,
-      })),
-    });
-  }, [
-    txState.totalTransactions,
-    txState.completedTransactions,
-    txState.isProcessing,
-    txState.transactions,
-  ]);
 
   const downloadExample = () => {
     const blob = new Blob([EXAMPLE_CSV], { type: "text/csv" });
