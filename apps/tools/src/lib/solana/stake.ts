@@ -13,6 +13,11 @@ const publicKey = (property = "publicKey") => {
   return blob(32, property);
 };
 
+/**
+ * This function creates an instance of a TransactionInstruction that calls the set_lockup instruction on the Stake Program.
+ * The web3.js (legacy version) doesn't expose this instruction, so I create it manually here.
+ * @returns TransactionInstruction
+ */
 export function getSetLockupInstruction(
   programId: PublicKey,
   stakePubkey: PublicKey,
