@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@blastctrl/ui/table";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { retryWithBackoff } from "@/lib/utils";
 import { createRevokeInstruction } from "@solana/spl-token";
@@ -62,16 +62,7 @@ export const AccountList = ({
         <div className="text-sm">
           {selectedAccounts.length} accounts selected
         </div>
-        <Button
-          onClick={() => {
-            void refetch();
-          }}
-          aria-label="Refresh data"
-          data-refetching={isRefetching ? true : undefined}
-          className="group ml-auto !h-[36px] !px-2.5"
-        >
-          <RotateCwIcon className="size-5 group-data-[refetching]:animate-[spin_0.38s_normal_forwards_ease-in-out]" />
-        </Button>
+        <RefreshAccountListButton />
         <RevokeDelegationsButton selectedAccounts={selectedAccounts} />
       </div>
 
@@ -248,6 +239,38 @@ const TokenMetadataCell = ({ mint }: { mint: string }) => {
     </div>
   );
 };
+
+function RefreshAccountListButton() {
+  const { publicKey } = useWallet();
+  const { refetch, isRefetching } = useDelegatedAssets(
+    publicKey?.toString() ?? "",
+  );
+
+  const [isButtonDisabled, setIsButtonDisabled] = useState(false);
+  const handleRateLimitedRefresh = useCallback(() => {
+    if (isButtonDisabled) return;
+
+    setIsButtonDisabled(true);
+    void refetch();
+
+    // Re-enable after 2 seconds
+    setTimeout(() => {
+      setIsButtonDisabled(false);
+    }, 2000);
+  }, [isButtonDisabled, refetch]);
+
+  return (
+    <Button
+      onClick={handleRateLimitedRefresh}
+      aria-label="Refresh data"
+      data-refetching={isRefetching ? true : undefined}
+      disabled={isButtonDisabled || isRefetching}
+      className="group ml-auto !h-[36px] !px-2.5 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <RotateCwIcon className="size-5 group-data-[refetching]:animate-[spin_0.38s_normal_forwards_ease-in-out]" />
+    </Button>
+  );
+}
 
 function RevokeDelegationsButton({
   selectedAccounts,
