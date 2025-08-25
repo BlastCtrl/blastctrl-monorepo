@@ -31,6 +31,13 @@ export default function Tokens() {
       description: "Send SOL to many wallets",
       active: true,
     },
+    {
+      name: "Revoke delegations",
+      href: "/spl-token-tools/revoke-delegations",
+      description:
+        "View and revoke token delegations to regain full control of your tokens.",
+      active: true,
+    },
   ];
   return (
     <>
