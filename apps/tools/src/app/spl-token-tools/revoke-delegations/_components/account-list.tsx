@@ -34,9 +34,6 @@ export const AccountList = ({
   const [selectedAccounts, setSelectedAccounts] = useState<
     typeof delegatedAccounts
   >([]);
-  const { refetch, isRefetching } = useDelegatedAssets(
-    publicKey?.toString() ?? "",
-  );
 
   useLayoutEffect(() => {
     const isIndeterminate =
@@ -291,6 +288,8 @@ function RevokeDelegationsButton({
         createRevokeInstruction(
           new PublicKey(account.token_account),
           publicKey,
+          [],
+          new PublicKey(account.token_program),
         ),
       ),
     );

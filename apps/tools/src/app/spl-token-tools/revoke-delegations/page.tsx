@@ -6,7 +6,10 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { AccountList } from "./_components";
 import { retryWithBackoff } from "@/lib/utils";
-import { createApproveInstruction } from "@solana/spl-token";
+import {
+  createApproveInstruction,
+  TOKEN_2022_PROGRAM_ID,
+} from "@solana/spl-token";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { notify } from "@/components";
 
@@ -32,6 +35,46 @@ export default function RevokeDelegations() {
     );
     const tx = new Transaction().add(
       createApproveInstruction(tokenAccount, delegate, publicKey, 25 * 1e8),
+    );
+
+    (tx.recentBlockhash = value.blockhash), (tx.feePayer = publicKey);
+    const signature = await sendTransaction(tx, connection, {
+      preflightCommitment: "confirmed",
+      skipPreflight: true,
+      maxRetries: 0,
+    });
+    await connection.confirmTransaction({
+      blockhash: value.blockhash,
+      lastValidBlockHeight: value.lastValidBlockHeight,
+      signature,
+    });
+
+    notify({
+      type: "success",
+      title: "Transaction confirmed",
+      txid: signature,
+    });
+  };
+  const handleDelegate22Account = async () => {
+    if (!publicKey || !sendTransaction) return;
+    const { value } = await retryWithBackoff(() =>
+      connection.getLatestBlockhashAndContext({ commitment: "confirmed" }),
+    );
+    const tokenAccount = new PublicKey(
+      "6kCzhxTd5UAMnbGYnQw1vrCuYP18taxskvouuQijvbFx",
+    );
+    const delegate = new PublicKey(
+      "AuKct4JHSMhftUHZHmkiSLUAC7uevUdJjhvUhSpTitJC",
+    );
+    const tx = new Transaction().add(
+      createApproveInstruction(
+        tokenAccount,
+        delegate,
+        publicKey,
+        25 * 1e8,
+        [],
+        TOKEN_2022_PROGRAM_ID,
+      ),
     );
 
     (tx.recentBlockhash = value.blockhash), (tx.feePayer = publicKey);
@@ -115,9 +158,14 @@ export default function RevokeDelegations() {
               {buttonText()}
             </Button>
             {process.env.NODE_ENV === "development" && (
-              <Button onClick={handleDelegateAccount}>
-                DEV: delegate the TOKENI account
-              </Button>
+              <>
+                <Button onClick={handleDelegateAccount}>
+                  DEV: delegate the TOKENI account
+                </Button>
+                <Button onClick={handleDelegate22Account}>
+                  DEV: delegate the TOKENI22 account
+                </Button>
+              </>
             )}
           </div>
         </>
