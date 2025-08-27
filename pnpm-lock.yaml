@@ -130,8 +130,8 @@ importers:
         specifier: ^10.4.3
         version: 10.5.0
       devalue:
-        specifier: ^5.0.0
-        version: 5.1.1
+        specifier: ^5.3.2
+        version: 5.3.2
       jwt-decode:
         specifier: ^4.0.0
         version: 4.0.0
@@ -4265,8 +4265,8 @@ packages:
   detect-europe-js@0.1.2:
     resolution: {integrity: sha512-lgdERlL3u0aUdHocoouzT10d9I89VVhk0qNRmll7mXdGfJT1/wqZ2ZLA4oJAjeACPY5fT1wsbq2AT+GkuInsow==}
 
-  devalue@5.1.1:
-    resolution: {integrity: sha512-maua5KUiapvEwiEAe+XnlZ3Rh0GD+qI1J/nb9vrJc3muPXvcF/8gXYTWF76+5DAqHyDUtOIImEuo0YKE9mshVw==}
+  devalue@5.3.2:
+    resolution: {integrity: sha512-UDsjUbpQn9kvm68slnrs+mfxwFkIflOhkanmyabZ8zOYk8SMEIbJ3TK+88g70hSIeytu4y18f0z/hYHMTrXIWw==}
 
   didyoumean@1.2.2:
     resolution: {integrity: sha512-gxtyfqMg7GKyhQmb056K7M3xszy/myH8w+B4RT+QXBQsvAOdc3XymqDDPHx1BgPgsdAA5SIifona89YtRATDzw==}
@@ -13051,7 +13051,7 @@ snapshots:
 
   detect-europe-js@0.1.2: {}
 
-  devalue@5.1.1: {}
+  devalue@5.3.2: {}
 
   didyoumean@1.2.2: {}
 
