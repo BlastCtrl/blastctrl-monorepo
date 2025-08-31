@@ -12,6 +12,7 @@ import type {
   GetAuthChallenge200,
   GetAuthChallenge400,
   GetAuthChallengeParams,
+  GetHealth200,
   PostAirdrops201,
   PostAirdropsAirdropIdRetryBatchBatchId200,
   PostAirdropsAirdropIdRetryBatchBatchIdBody,
@@ -20,6 +21,8 @@ import type {
   PostAirdropsBody,
   PostAirdropsIdStart200,
   PostAirdropsIdStartBodyItem,
+  PostAirdropsToken201,
+  PostAirdropsTokenBody,
   PostAuthRefresh200,
   PostAuthRefresh400,
   PostAuthRefresh401,
@@ -237,6 +240,44 @@ export const getAirdrops = async ( options?: RequestInit): Promise<getAirdropsRe
 
 
 
+export type postAirdropsTokenResponse201 = {
+  data: PostAirdropsToken201
+  status: 201
+}
+
+export type postAirdropsTokenResponse400 = {
+  data: Def1
+  status: 400
+}
+    
+export type postAirdropsTokenResponseComposite = postAirdropsTokenResponse201 | postAirdropsTokenResponse400;
+    
+export type postAirdropsTokenResponse = postAirdropsTokenResponseComposite & {
+  headers: Headers;
+}
+
+export const getPostAirdropsTokenUrl = () => {
+
+
+  
+
+  return `/airdrops/token`
+}
+
+export const postAirdropsToken = async (postAirdropsTokenBody: PostAirdropsTokenBody, options?: RequestInit): Promise<postAirdropsTokenResponse> => {
+  
+  return customFetch<postAirdropsTokenResponse>(getPostAirdropsTokenUrl(),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      postAirdropsTokenBody,)
+  }
+);}
+
+
+
 export type deleteAirdropsIdResponse204 = {
   data: unknown
   status: 204
@@ -431,7 +472,7 @@ export const postAirdropsAirdropIdSetLabel = async (airdropId: string,
 
 
 export type getHealthResponse200 = {
-  data: unknown
+  data: GetHealth200
   status: 200
 }
     
