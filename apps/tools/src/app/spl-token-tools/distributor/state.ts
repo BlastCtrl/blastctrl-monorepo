@@ -39,7 +39,7 @@ function getAirdropByIdTransformer(data: GetAirdropsId200) {
   if (recipients.length === 0) {
     type = "same";
   } else {
-    const amounts = new Set(recipients.map((r) => r.lamports));
+    const amounts = new Set(recipients.map((r) => r.atomicAmount));
     type = amounts.size === 1 ? "same" : "different";
   }
 
@@ -57,7 +57,7 @@ function getAirdropByIdTransformer(data: GetAirdropsId200) {
     type,
     lamportsPerUser:
       type === "same"
-        ? data.transactions[0]?.recipients?.[0]?.lamports
+        ? data.transactions[0]?.recipients?.[0]?.atomicAmount
         : undefined,
   };
 }
