@@ -411,7 +411,7 @@ const SolaceAirdropDashboard = ({
                           {recipient.address}
                         </td>
                         <td className="p-1.5 text-right">
-                          {recipient.lamports / LAMPORTS_PER_SOL}
+                          {recipient.atomicAmount / LAMPORTS_PER_SOL}
                         </td>
                       </tr>
                     ))}

@@ -92,7 +92,7 @@ export default function AirdropDetails({
         ComputeBudgetProgram.setComputeUnitLimit({ units: 10_000 }),
         ...txBatch.recipients.map((r) =>
           SystemProgram.transfer({
-            lamports: r.lamports,
+            lamports: r.atomicAmount,
             fromPubkey: publicKey,
             toPubkey: new PublicKey(r.address),
           }),
@@ -362,7 +362,7 @@ function Batch({
         SystemProgram.transfer({
           fromPubkey: publicKey,
           toPubkey: new PublicKey(r.address),
-          lamports: r.lamports,
+          lamports: r.atomicAmount,
         }),
       ),
     );
@@ -451,7 +451,7 @@ function Batch({
               >
                 <span className="break-all font-mono">{recipient.address}</span>
                 <span className="whitespace-nowrap">
-                  {recipient.lamports / LAMPORTS_PER_SOL} SOL
+                  {recipient.atomicAmount / LAMPORTS_PER_SOL} SOL
                 </span>
               </div>
             ))}
@@ -499,7 +499,7 @@ function RetryAllButton({
         ComputeBudgetProgram.setComputeUnitLimit({ units: 10_000 }),
         ...txBatch.recipients.map((r) =>
           SystemProgram.transfer({
-            lamports: r.lamports,
+            lamports: r.atomicAmount,
             fromPubkey: publicKey,
             toPubkey: new PublicKey(r.address),
           }),

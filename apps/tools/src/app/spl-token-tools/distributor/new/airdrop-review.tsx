@@ -74,12 +74,12 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
       return;
     }
 
-    const batches: Array<Array<{ address: string; lamports: number }>> = [];
+    const batches: Array<Array<{ address: string; atomicAmount: number }>> = [];
     for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
       batches.push(
         recipients.slice(i, i + BATCH_SIZE).map((r) => ({
           address: r.address,
-          lamports: Number(r.amount) * LAMPORTS_PER_SOL,
+          atomicAmount: Number(r.amount) * LAMPORTS_PER_SOL,
         })),
       );
     }
