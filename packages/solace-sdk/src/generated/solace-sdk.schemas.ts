@@ -82,7 +82,7 @@ export type PostAuthRefresh401 = {
 export type PostAirdropsBodyBatchesItemItem = {
   address: string;
   /** @minimum 1 */
-  lamports: number;
+  atomicAmount: number;
 };
 
 export type PostAirdropsBody = {
@@ -119,7 +119,7 @@ export const GetAirdrops200ItemStatus = {
 
 export type GetAirdrops200ItemRecipientsItem = {
   address: string;
-  lamports: number;
+  atomicAmount: number;
 };
 
 export type GetAirdrops200Item = {
@@ -131,6 +131,34 @@ export type GetAirdrops200Item = {
   createdAt: number;
   updatedAt: number;
   recipients: GetAirdrops200ItemRecipientsItem[];
+};
+
+export type PostAirdropsTokenBodyBatchesItemItem = {
+  address: string;
+  /** @minimum 1 */
+  atomicAmount: number;
+};
+
+export type PostAirdropsTokenBody = {
+  mintAddress: string;
+  /**
+   * @minItems 1
+   * @maxItems 100
+   */
+  batches: PostAirdropsTokenBodyBatchesItemItem[][];
+};
+
+export type PostAirdropsToken201Status = typeof PostAirdropsToken201Status[keyof typeof PostAirdropsToken201Status];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const PostAirdropsToken201Status = {
+  created: 'created',
+} as const;
+
+export type PostAirdropsToken201 = {
+  id?: string;
+  status?: PostAirdropsToken201Status;
 };
 
 export type GetAirdropsId200Status = typeof GetAirdropsId200Status[keyof typeof GetAirdropsId200Status];
@@ -158,7 +186,7 @@ export const GetAirdropsId200TransactionsItemStatus = {
 
 export type GetAirdropsId200TransactionsItemRecipientsItem = {
   address: string;
-  lamports: number;
+  atomicAmount: number;
 };
 
 export type GetAirdropsId200TransactionsItem = {
@@ -218,12 +246,12 @@ export type PostAirdropsIdStart200 = {
 };
 
 export type PostAirdropsAirdropIdRetryBatchBatchIdBody = {
-  blockhash?: string;
+  blockhash: string;
   /** @minimum 0 */
-  lastValidBlockHeight?: number;
+  lastValidBlockHeight: number;
   /** @minimum 0 */
-  minContextSlot?: number;
-  txBase64?: string;
+  minContextSlot: number;
+  txBase64: string;
 };
 
 export type PostAirdropsAirdropIdRetryBatchBatchId200 = {
@@ -231,11 +259,19 @@ export type PostAirdropsAirdropIdRetryBatchBatchId200 = {
 };
 
 export type PostAirdropsAirdropIdSetLabelBody = {
-  /** @maxLength 16 */
+  /** @maxLength 30 */
   label: string;
 };
 
 export type PostAirdropsAirdropIdSetLabel200 = {
   success: boolean;
 };
+
+export type GetHealth200 = typeof GetHealth200[keyof typeof GetHealth200];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const GetHealth200 = {
+  ok: 'ok',
+} as const;
 
