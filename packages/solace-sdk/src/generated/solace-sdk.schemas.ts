@@ -130,6 +130,8 @@ export type GetAirdrops200Item = {
   label: string;
   createdAt: number;
   updatedAt: number;
+  mintAddress: string;
+  decimals: number;
   recipients: GetAirdrops200ItemRecipientsItem[];
 };
 
@@ -141,6 +143,11 @@ export type PostAirdropsTokenBodyBatchesItemItem = {
 
 export type PostAirdropsTokenBody = {
   mintAddress: string;
+  /**
+   * @minimum 0
+   * @maximum 9
+   */
+  decimals: number;
   /**
    * @minItems 1
    * @maxItems 100
@@ -212,6 +219,8 @@ export type GetAirdropsId200 = {
   label: string;
   createdAt: number;
   updatedAt: number;
+  mintAddress: string;
+  decimals: number;
   transactions: GetAirdropsId200TransactionsItem[];
 };
 
