@@ -3,6 +3,7 @@
 import React from "react";
 
 export const BATCH_SIZE = 20;
+export const TOKEN_BATCH_SIZE = 4;
 export const MAX_RECIPIENTS = 1000;
 
 export class SolaceError extends Error {
