@@ -1,4 +1,5 @@
 import { notify } from "@/components";
+import { InfoTooltip } from "@/components/info-tooltip";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
@@ -8,6 +9,7 @@ import { Box } from "../box";
 import { useCreateAirdrop, useCreateTokenAirdrop } from "../state";
 import { BATCH_SIZE, TOKEN_BATCH_SIZE } from "../common";
 import { MintAddressLink } from "../mint-address-link";
+import { useTokenAccountExistence } from "@/state/queries/use-token-account-existence";
 
 type Recipient = {
   address: string;
@@ -55,8 +57,19 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
   const error = errorSol || errorToken;
   const [searchTerm, setSearchTerm] = React.useState("");
 
+  // Hook to check token account existence for custom tokens
+  const {
+    data: tokenAccountData,
+    isLoading: isLoadingTokenAccounts,
+    error: tokenAccountError,
+  } = useTokenAccountExistence(
+    tokenType === "custom" ? mintAddress : "",
+    tokenType === "custom" ? recipients.map((r) => r.address) : [],
+  );
+
   // Constants
   const COST_PER_BATCH = 0.000005;
+  const TOKEN_ACCOUNT_CREATION_COST = 2039280; // in lamports (0.00203928 SOL)
 
   // Calculate totals
   const recipientsCount: number = recipients.length;
@@ -64,6 +77,12 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
     recipientsCount / (tokenType === "sol" ? BATCH_SIZE : TOKEN_BATCH_SIZE),
   );
   const transactionFee: number = batchesNeeded * COST_PER_BATCH;
+
+  // Calculate token account creation costs
+  const tokenAccountsToCreate = tokenAccountData?.accountsToCreate ?? 0;
+  const tokenAccountCreationFee =
+    (tokenAccountsToCreate * TOKEN_ACCOUNT_CREATION_COST) / LAMPORTS_PER_SOL;
+  const totalTokenFees = transactionFee + tokenAccountCreationFee;
 
   // Calculate total SOL to distribute
   const totalDistribution: number =
@@ -74,12 +93,12 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
           0,
         );
 
-  // Calculate final balance (only for SOL airdrops)
+  // Calculate final balance
   const finalBalance: number =
     tokenType === "sol"
       ? balance - totalDistribution - transactionFee
-      : balance - transactionFee;
-  const hasInsufficientFunds: boolean = tokenType === "sol" && finalBalance < 0;
+      : balance - totalTokenFees;
+  const hasInsufficientFunds: boolean = finalBalance < 0;
 
   // Search
   const searchResults = recipients.filter((r) =>
@@ -225,25 +244,52 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between py-1 text-sm">
-                <span className="text-gray-600">Distribution amount</span>
-                <span>
-                  {totalDistribution.toFixed(decimals)}{" "}
-                  {tokenType === "sol" ? "SOL" : "Tokens"}
-                </span>
-              </div>
+              {tokenType === "sol" && (
+                <div className="flex items-center justify-between py-1 text-sm">
+                  <span className="text-gray-600">Distribution amount</span>
+                  <span>{totalDistribution.toFixed(decimals)} Tokens</span>
+                </div>
+              )}
 
               <div className="flex items-center justify-between py-1 text-sm">
                 <span className="text-gray-600">Transaction fee</span>
                 <span>{transactionFee.toFixed(6)} SOL</span>
               </div>
 
+              {tokenType === "custom" && (
+                <div className="flex items-center justify-between py-1 text-sm">
+                  <span className="flex items-center text-gray-600">
+                    Token account creation
+                    <InfoTooltip className="ml-1">
+                      If a recipient doesn't own a token account for this token,
+                      we need to create it for them. The fee is 0.00203928 SOL
+                      per account.
+                    </InfoTooltip>
+                  </span>
+                  <span>
+                    {isLoadingTokenAccounts ? (
+                      <span className="text-xs text-gray-500">
+                        Calculating...
+                      </span>
+                    ) : tokenAccountError ? (
+                      <span className="text-xs text-red-500">Error</span>
+                    ) : (
+                      `${tokenAccountsToCreate} × ${(TOKEN_ACCOUNT_CREATION_COST / LAMPORTS_PER_SOL).toFixed(8)} = ${tokenAccountCreationFee.toFixed(6)} SOL`
+                    )}
+                  </span>
+                </div>
+              )}
+
               <div className="mt-1 flex items-center justify-between border-t py-1.5 pt-2 text-sm">
-                <span className="font-medium text-gray-800">Total cost</span>
+                <span className="font-medium text-gray-800">
+                  {tokenType === "sol" ? "Total SOL needed" : "Total SOL fees"}
+                </span>
                 <span className="font-semibold">
                   {tokenType === "sol"
                     ? `${(totalDistribution + transactionFee).toFixed(decimals)} SOL`
-                    : `${totalDistribution.toFixed(decimals)} Tokens + ${transactionFee.toFixed(6)} SOL (fees)`}
+                    : isLoadingTokenAccounts
+                      ? "Calculating..."
+                      : `${totalTokenFees.toFixed(6)} SOL`}
                 </span>
               </div>
             </div>
