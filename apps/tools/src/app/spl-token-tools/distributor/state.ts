@@ -10,6 +10,8 @@ import type {
   PostAirdropsIdStartBodyItem,
   GetAirdropsId200,
   GetAirdrops200Item,
+  PostAirdropsToken201,
+  PostAirdropsTokenBody,
 } from "@blastctrl/solace-sdk";
 import { notify } from "@/components/notification";
 import { withMinimumTime } from "@/lib/utils";
@@ -100,6 +102,21 @@ export function useCreateAirdrop() {
     mutationKey: ["createAirdrop"],
     mutationFn: async (data) => {
       const response = await withMinimumTime(sdk.api.postAirdrops(data), 500);
+      if (response.status !== 201) {
+        throw new SolaceError(response.data);
+      }
+      return response.data;
+    },
+  });
+}
+
+export function useCreateTokenAirdrop() {
+  const sdk = useSolace();
+
+  return useMutation<PostAirdropsToken201, SolaceError, PostAirdropsTokenBody>({
+    mutationKey: ["createTokenAirdrop"],
+    mutationFn: async (data) => {
+      const response = await withMinimumTime(sdk.api.postAirdropsToken(data), 500);
       if (response.status !== 201) {
         throw new SolaceError(response.data);
       }

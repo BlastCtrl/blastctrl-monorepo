@@ -25,6 +25,7 @@ type Errors = {
 
 type AirdropType = "same" | "different";
 type InputMethod = "manual" | "csv";
+type TokenType = "sol" | "custom";
 
 interface CSVParseResult {
   data: string[][];
@@ -37,6 +38,8 @@ interface AirdropData {
   amount: string;
   recipients: Recipient[];
   totalSol: string;
+  tokenType: TokenType;
+  mintAddress: string;
 }
 
 interface SolaceAirdropperProps {
@@ -52,6 +55,8 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
   const [inputMethod, setInputMethod] = useState<InputMethod>("manual");
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvData, setCsvData] = useState<Recipient[]>([]);
+  const [tokenType, setTokenType] = useState<TokenType>("sol");
+  const [mintAddress, setMintAddress] = useState<string>("");
   const [errors, setErrors] = useState<Errors>({
     amount: "",
     recipients: [{ address: "", amount: "" }],
@@ -63,6 +68,11 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
 
   const validateSolAddress = (address: string): boolean => {
     // Basic validation - Solana addresses are 32-44 characters
+    return address.length >= 32 && address.length <= 44;
+  };
+
+  const validateMintAddress = (address: string): boolean => {
+    // Same validation as Solana addresses - mint addresses follow same format
     return address.length >= 32 && address.length <= 44;
   };
 
@@ -276,6 +286,10 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
       return false;
     }
 
+    if (tokenType === "custom" && !validateMintAddress(mintAddress)) {
+      return false;
+    }
+
     if (inputMethod === "manual") {
       if (recipients.length === 0) return false;
 
@@ -318,11 +332,60 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
       amount,
       recipients: formattedRecipients,
       totalSol: calculateTotalSol(),
+      tokenType,
+      mintAddress: tokenType === "custom" ? mintAddress : "",
     });
   };
 
   return (
     <div>
+      {/* Token Selection */}
+      <Box enableOnMobile className="mb-6">
+        <h2 className="mb-3 text-lg font-semibold">Token Type</h2>
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setTokenType("sol")}
+              className={`rounded-md px-3 py-1.5 sm:text-sm ${
+                tokenType === "sol"
+                  ? "bg-indigo-600 text-white"
+                  : "bg-gray-200 text-gray-800"
+              }`}
+            >
+              SOL
+            </button>
+            <button
+              onClick={() => setTokenType("custom")}
+              className={`rounded-md px-3 py-1.5 sm:text-sm ${
+                tokenType === "custom"
+                  ? "bg-indigo-600 text-white"
+                  : "bg-gray-200 text-gray-800"
+              }`}
+            >
+              Custom Token
+            </button>
+          </div>
+
+          {tokenType === "custom" && (
+            <div className="flex items-center">
+              <label className="mr-2 font-medium sm:text-sm">Mint Address:</label>
+              <div className="flex w-80">
+                <input
+                  type="text"
+                  value={mintAddress}
+                  onChange={(e) => setMintAddress(e.target.value)}
+                  className="w-full rounded border p-1.5 focus:border-blue-600 focus:outline-none sm:text-sm"
+                  placeholder="Enter SPL token mint address"
+                />
+              </div>
+              {tokenType === "custom" && mintAddress && !validateMintAddress(mintAddress) && (
+                <p className="ml-2 text-xs text-red-500">Invalid mint address</p>
+              )}
+            </div>
+          )}
+        </div>
+      </Box>
+
       {/* Airdrop Type Selection */}
       <Box enableOnMobile className="mb-6">
         <div className="flex flex-wrap items-center gap-4">
@@ -364,7 +427,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                   placeholder="0.1"
                 />
                 <span className="flex items-center rounded-none rounded-r border border-l-0 bg-gray-100 px-2 py-1.5 text-sm">
-                  SOL
+                  {tokenType === "sol" ? "SOL" : "Tokens"}
                 </span>
               </div>
               {errors.amount && (
@@ -374,13 +437,14 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
           )}
         </div>
       </Box>
+
       {/* Recipients Input Section */}
       <Box enableOnMobile className="mb-6">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Recipients</h2>
           <div className="flex items-center rounded-full bg-indigo-100 px-3 py-1 text-indigo-800 sm:px-2 sm:text-sm">
             <span className="mr-1 font-medium">Total:</span>{" "}
-            {calculateTotalSol()} SOL
+            {calculateTotalSol()} {tokenType === "sol" ? "SOL" : "Tokens"}
           </div>
         </div>
         <p className="mb-3 mt-1 text-stone-500 sm:text-sm">
@@ -550,7 +614,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                         </th>
                         {airdropType === "different" && (
                           <th className="w-32 p-1.5 text-left text-xs font-medium">
-                            Amount (SOL)
+                            Amount ({tokenType === "sol" ? "SOL" : "Tokens"})
                           </th>
                         )}
                       </tr>

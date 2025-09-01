@@ -21,8 +21,8 @@ export default function Distributor({ children }: { children: ReactNode }) {
         </h1>
         <div className="mt-3 text-gray-500 sm:text-sm">
           <p>
-            Distribute SOL to many wallets using this tool. We will not ask you
-            to transfer the SOL initially to our service, all the SOL will be
+            Distribute SOL or SPL tokens to many wallets using this tool. We will not ask you
+            to transfer the tokens initially to our service, all tokens will be
             sent from your wallet directly. Due to the nature of Solana
             transactions having a chance of not being included in the block or
             expiring, you might need to resign transactions so that the transfer

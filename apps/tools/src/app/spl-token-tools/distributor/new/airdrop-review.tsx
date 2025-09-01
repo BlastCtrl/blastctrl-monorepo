@@ -5,7 +5,7 @@ import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { useRouter } from "next/navigation";
 import React from "react";
 import { Box } from "../box";
-import { useCreateAirdrop } from "../state";
+import { useCreateAirdrop, useCreateTokenAirdrop } from "../state";
 import { BATCH_SIZE } from "../common";
 
 type Recipient = {
@@ -14,12 +14,16 @@ type Recipient = {
 };
 
 type AirdropType = "same" | "different";
+type TokenType = "sol" | "custom";
 
 interface SolaceAirdropReviewProps {
   balance: number;
   airdropType: AirdropType;
   amount: string;
   recipients: Recipient[];
+  tokenType: TokenType;
+  mintAddress: string;
+  decimals: number;
   onBack: () => void;
 }
 
@@ -28,11 +32,26 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
   balance,
   amount,
   recipients,
+  tokenType,
+  mintAddress,
+  decimals,
   onBack,
 }) => {
   const { publicKey } = useWallet();
-  const { mutate, isPending, error } = useCreateAirdrop();
+  const {
+    mutate: mutateSol,
+    isPending: isPendingSol,
+    error: errorSol,
+  } = useCreateAirdrop();
+  const {
+    mutate: mutateToken,
+    isPending: isPendingToken,
+    error: errorToken,
+  } = useCreateTokenAirdrop();
   const router = useRouter();
+
+  const isPending = isPendingSol || isPendingToken;
+  const error = errorSol || errorToken;
   const [searchTerm, setSearchTerm] = React.useState("");
 
   // Constants
@@ -52,9 +71,12 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
           0,
         );
 
-  // Calculate final balance
-  const finalBalance: number = balance - totalDistribution - transactionFee;
-  const hasInsufficientFunds: boolean = finalBalance < 0;
+  // Calculate final balance (only for SOL airdrops)
+  const finalBalance: number =
+    tokenType === "sol"
+      ? balance - totalDistribution - transactionFee
+      : balance - transactionFee;
+  const hasInsufficientFunds: boolean = tokenType === "sol" && finalBalance < 0;
 
   // Search
   const searchResults = recipients.filter((r) =>
@@ -79,19 +101,37 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
       batches.push(
         recipients.slice(i, i + BATCH_SIZE).map((r) => ({
           address: r.address,
-          atomicAmount: Number(r.amount) * LAMPORTS_PER_SOL,
+          atomicAmount:
+            tokenType === "sol"
+              ? Number(r.amount) * LAMPORTS_PER_SOL
+              : Number(r.amount) * Math.pow(10, decimals),
         })),
       );
     }
 
-    mutate(
-      { batches },
-      {
-        onSuccess: (res) => {
-          router.push(`/spl-token-tools/distributor/${res.id}`);
+    if (tokenType === "sol") {
+      mutateSol(
+        { batches },
+        {
+          onSuccess: (res) => {
+            router.push(`/spl-token-tools/distributor/${res.id}`);
+          },
         },
-      },
-    );
+      );
+    } else {
+      mutateToken(
+        {
+          mintAddress,
+          decimals,
+          batches,
+        },
+        {
+          onSuccess: (res) => {
+            router.push(`/spl-token-tools/distributor/${res.id}`);
+          },
+        },
+      );
+    }
   };
 
   return (
@@ -101,7 +141,8 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
           Review Your Airdrop
         </h1>
         <p className="mt-2 text-sm text-gray-500">
-          Please review your SOL distribution details before proceeding.
+          Please review your {tokenType === "sol" ? "SOL" : "token"}{" "}
+          distribution details before proceeding.
         </p>
       </Box>
 
@@ -110,6 +151,28 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
         {/* Summary Section */}
         <Box enableOnMobile className="h-full">
           <h2 className="mb-3 text-base font-semibold">Distribution Summary</h2>
+
+          <div className="flex items-center justify-between py-1.5 text-sm">
+            <span className="text-gray-600">Token Type</span>
+            <span className="font-medium">
+              {tokenType === "sol" ? "SOL" : "Custom Token"}
+            </span>
+          </div>
+
+          {tokenType === "custom" && (
+            <>
+              <div className="flex items-center justify-between py-1.5 text-sm">
+                <span className="text-gray-600">Mint Address</span>
+                <span className="font-mono text-xs">
+                  {mintAddress.slice(0, 8)}...{mintAddress.slice(-4)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1.5 text-sm">
+                <span className="text-gray-600">Token Decimals</span>
+                <span className="font-medium">{decimals}</span>
+              </div>
+            </>
+          )}
 
           <div className="flex items-center justify-between py-1.5 text-sm">
             <span className="text-gray-600">Distribution Method</span>
@@ -121,7 +184,9 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
           {airdropType === "same" && (
             <div className="flex items-center justify-between py-1.5 text-sm">
               <span className="text-gray-600">Amount per recipient</span>
-              <span className="font-medium">{amount} SOL</span>
+              <span className="font-medium">
+                {amount} {tokenType === "sol" ? "SOL" : "Tokens"}
+              </span>
             </div>
           )}
 
@@ -137,10 +202,11 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
 
           <div className="mt-1 flex items-center justify-between border-t py-1.5 pt-2 text-sm">
             <span className="font-medium text-gray-800">
-              Total SOL to distribute
+              Total {tokenType === "sol" ? "SOL" : "tokens"} to distribute
             </span>
             <span className="font-semibold">
-              {totalDistribution.toFixed(4)} SOL
+              {totalDistribution.toFixed(tokenType === "sol" ? 4 : 0)}{" "}
+              {tokenType === "sol" ? "SOL" : "Tokens"}
             </span>
           </div>
         </Box>
@@ -159,7 +225,10 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
             <div className="space-y-2">
               <div className="flex items-center justify-between py-1 text-sm">
                 <span className="text-gray-600">Distribution amount</span>
-                <span>{totalDistribution.toFixed(4)} SOL</span>
+                <span>
+                  {totalDistribution.toFixed(tokenType === "sol" ? 4 : 0)}{" "}
+                  {tokenType === "sol" ? "SOL" : "Tokens"}
+                </span>
               </div>
 
               <div className="flex items-center justify-between py-1 text-sm">
@@ -170,7 +239,9 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
               <div className="mt-1 flex items-center justify-between border-t py-1.5 pt-2 text-sm">
                 <span className="font-medium text-gray-800">Total cost</span>
                 <span className="font-semibold">
-                  {(totalDistribution + transactionFee).toFixed(4)} SOL
+                  {tokenType === "sol"
+                    ? `${(totalDistribution + transactionFee).toFixed(4)} SOL`
+                    : `${totalDistribution.toFixed(0)} Tokens + ${transactionFee.toFixed(6)} SOL (fees)`}
                 </span>
               </div>
             </div>
@@ -178,16 +249,27 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
 
           {/* Balance Summary */}
           <Box enableOnMobile className="h-full">
-            <h2 className="mb-3 text-base font-semibold">Your Balance</h2>
+            <h2 className="mb-3 text-base font-semibold">SOL Balance</h2>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between py-1 text-sm">
-                <span className="text-gray-600">Current balance</span>
+                <span className="text-gray-600">Current SOL balance</span>
                 <span>{balance.toFixed(4)} SOL</span>
               </div>
 
+              {tokenType === "custom" && (
+                <div className="flex items-center justify-between py-1 text-sm">
+                  <span className="text-gray-600">Token distribution</span>
+                  <span className="text-xs text-gray-500">
+                    Check your token balance separately
+                  </span>
+                </div>
+              )}
+
               <div className="mt-1 flex items-center justify-between border-t py-1.5 pt-2 text-sm">
-                <span className="font-medium text-gray-800">Final balance</span>
+                <span className="font-medium text-gray-800">
+                  SOL after fees
+                </span>
                 <span
                   className={`font-semibold ${hasInsufficientFunds ? "text-red-600" : ""}`}
                 >
@@ -243,7 +325,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
               <tr>
                 <th className="p-1.5 text-left text-xs font-medium">Address</th>
                 <th className="w-32 p-1.5 text-right text-xs font-medium">
-                  Amount (SOL)
+                  Amount ({tokenType === "sol" ? "SOL" : "Tokens"})
                 </th>
               </tr>
             </thead>
@@ -300,7 +382,9 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
 
       {hasInsufficientFunds && (
         <div className="mt-2 text-center text-xs text-red-600">
-          You don't have enough SOL to complete this airdrop.
+          {tokenType === "sol"
+            ? "You don't have enough SOL to complete this airdrop."
+            : "You don't have enough SOL to cover the transaction fees for this airdrop."}
         </div>
       )}
       {error && (
