@@ -7,6 +7,7 @@ import React from "react";
 import { Box } from "../box";
 import { useCreateAirdrop, useCreateTokenAirdrop } from "../state";
 import { BATCH_SIZE, TOKEN_BATCH_SIZE } from "../common";
+import { MintAddressLink } from "../mint-address-link";
 
 type Recipient = {
   address: string;
@@ -166,9 +167,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
             <>
               <div className="flex items-center justify-between py-1.5 text-sm">
                 <span className="text-gray-600">Mint Address</span>
-                <span className="font-mono text-xs">
-                  {mintAddress.slice(0, 8)}...{mintAddress.slice(-4)}
-                </span>
+                <MintAddressLink mintAddress={mintAddress} />
               </div>
               <div className="flex items-center justify-between py-1.5 text-sm">
                 <span className="text-gray-600">Token Decimals</span>

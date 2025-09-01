@@ -28,6 +28,7 @@ import {
   createTransferCheckedInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
+import { MintAddressLink } from "../mint-address-link";
 
 type TransactionStatus = GetAirdropsId200["transactions"][number]["status"];
 type AirdropStatus = GetAirdropsId200["status"];
@@ -223,10 +224,7 @@ export default function AirdropDetails({
                   <>
                     <div className="flex items-center justify-between py-1 text-sm">
                       <span className="text-gray-600">Mint Address</span>
-                      <span className="font-mono text-xs">
-                        {data.mintAddress.slice(0, 8)}...
-                        {data.mintAddress.slice(-4)}
-                      </span>
+                      <MintAddressLink mintAddress={data.mintAddress} />
                     </div>
                     <div className="flex items-center justify-between py-1 text-sm">
                       <span className="text-gray-600">Decimals</span>

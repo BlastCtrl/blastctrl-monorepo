@@ -23,6 +23,7 @@ import { useNetworkConfigurationStore } from "@/state/use-network-configuration"
 import { Input } from "@headlessui/react";
 import { flushSync } from "react-dom";
 import clsx from "clsx";
+import { MintAddressLink } from "./mint-address-link";
 
 export default function Overview() {
   const { network } = useNetworkConfigurationStore();
@@ -289,9 +290,7 @@ const SolaceAirdropDashboard = ({
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-sm">
                       {airdrop.mintAddress ? (
-                        <span className="font-mono text-xs">
-                          {airdrop.mintAddress.slice(0, 8)}...{airdrop.mintAddress.slice(-4)}
-                        </span>
+                        <MintAddressLink mintAddress={airdrop.mintAddress} />
                       ) : (
                         "SOL"
                       )}
@@ -377,7 +376,11 @@ const SolaceAirdropDashboard = ({
                 <div className="flex justify-between py-1 text-sm">
                   <span className="text-gray-600">Total Amount</span>
                   <span className="font-medium">
-                    {(selectedAirdrop.totalAmount / Math.pow(10, selectedAirdrop.decimals)).toFixed(selectedAirdrop.decimals)} {selectedAirdrop.mintAddress ? "Tokens" : "SOL"}
+                    {(
+                      selectedAirdrop.totalAmount /
+                      Math.pow(10, selectedAirdrop.decimals)
+                    ).toFixed(selectedAirdrop.decimals)}{" "}
+                    {selectedAirdrop.mintAddress ? "Tokens" : "SOL"}
                   </span>
                 </div>
                 <div className="flex justify-between py-1 text-sm">
@@ -406,7 +409,7 @@ const SolaceAirdropDashboard = ({
                       Address
                     </th>
                     <th className="w-32 p-1.5 text-right text-xs font-medium">
-                      Amount ({selectedAirdrop.mintAddress ? 'Tokens' : 'SOL'})
+                      Amount ({selectedAirdrop.mintAddress ? "Tokens" : "SOL"})
                     </th>
                   </tr>
                 </thead>
@@ -419,7 +422,10 @@ const SolaceAirdropDashboard = ({
                           {recipient.address}
                         </td>
                         <td className="p-1.5 text-right">
-                          {(recipient.atomicAmount / Math.pow(10, selectedAirdrop.decimals)).toFixed(selectedAirdrop.decimals)}
+                          {(
+                            recipient.atomicAmount /
+                            Math.pow(10, selectedAirdrop.decimals)
+                          ).toFixed(selectedAirdrop.decimals)}
                         </td>
                       </tr>
                     ))}
