@@ -23,6 +23,11 @@ import {
   useStartAirdrop,
 } from "../state";
 import { ArrowTurnUpLeftIcon } from "@heroicons/react/16/solid";
+import {
+  createAssociatedTokenAccountIdempotentInstruction,
+  createTransferCheckedInstruction,
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
 
 type TransactionStatus = GetAirdropsId200["transactions"][number]["status"];
 type AirdropStatus = GetAirdropsId200["status"];
@@ -87,16 +92,48 @@ export default function AirdropDetails({
     const { value, context } =
       await connection.getLatestBlockhashAndContext("confirmed");
     const transactions = data.transactions.map((txBatch) => {
-      const tx = new Transaction({ ...value, feePayer: publicKey }).add(
-        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 10_000 }),
-        ...txBatch.recipients.map((r) =>
+      let transferInstructions;
+      if (data.mintAddress === null) {
+        transferInstructions = txBatch.recipients.map((r) =>
           SystemProgram.transfer({
             lamports: r.atomicAmount,
             fromPubkey: publicKey,
             toPubkey: new PublicKey(r.address),
           }),
-        ),
+        );
+      } else {
+        const mint = new PublicKey(data.mintAddress);
+        transferInstructions = txBatch.recipients
+          .map((r) => {
+            const distributorAta = getAssociatedTokenAddressSync(
+              mint,
+              publicKey,
+            );
+            const recipient = new PublicKey(r.address);
+            const recipientAta = getAssociatedTokenAddressSync(mint, recipient);
+            return [
+              createAssociatedTokenAccountIdempotentInstruction(
+                publicKey,
+                recipientAta,
+                recipient,
+                mint,
+              ),
+              createTransferCheckedInstruction(
+                distributorAta,
+                mint,
+                recipientAta,
+                publicKey,
+                r.atomicAmount,
+                data.decimals,
+              ),
+            ];
+          })
+          .flat();
+      }
+      const tx = new Transaction({ ...value, feePayer: publicKey }).add(
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 10_000 }),
+        ...transferInstructions,
       );
       tx.recentBlockhash = value.blockhash;
       tx.lastValidBlockHeight = context.slot;
