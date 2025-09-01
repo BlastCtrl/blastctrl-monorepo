@@ -132,7 +132,9 @@ export default function AirdropDetails({
       }
       const tx = new Transaction({ ...value, feePayer: publicKey }).add(
         ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 10_000 }),
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units: transferInstructions.length * 30_000,
+        }),
         ...transferInstructions,
       );
       tx.recentBlockhash = value.blockhash;
@@ -213,7 +215,28 @@ export default function AirdropDetails({
                 </div>
 
                 <div className="flex items-center justify-between py-1 text-sm">
-                  <span className="text-gray-600">Type</span>
+                  <span className="text-gray-600">Token Type</span>
+                  <span>{data.mintAddress ? "Custom Token" : "SOL"}</span>
+                </div>
+
+                {data.mintAddress && (
+                  <>
+                    <div className="flex items-center justify-between py-1 text-sm">
+                      <span className="text-gray-600">Mint Address</span>
+                      <span className="font-mono text-xs">
+                        {data.mintAddress.slice(0, 8)}...
+                        {data.mintAddress.slice(-4)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between py-1 text-sm">
+                      <span className="text-gray-600">Decimals</span>
+                      <span>{data.decimals}</span>
+                    </div>
+                  </>
+                )}
+
+                <div className="flex items-center justify-between py-1 text-sm">
+                  <span className="text-gray-600">Distribution Method</span>
                   <span>
                     {data.type === "same" ? "Same amount" : "Different amounts"}
                   </span>
@@ -223,7 +246,11 @@ export default function AirdropDetails({
                   <div className="flex items-center justify-between py-1 text-sm">
                     <span className="text-gray-600">Amount per recipient</span>
                     <span className="text-right">
-                      {(data?.lamportsPerUser ?? 0) / LAMPORTS_PER_SOL} SOL
+                      {(
+                        (data?.lamportsPerUser ?? 0) /
+                        Math.pow(10, data.decimals)
+                      ).toFixed(data.decimals)}{" "}
+                      {data.mintAddress ? "Tokens" : "SOL"}
                     </span>
                   </div>
                 )}
@@ -231,7 +258,10 @@ export default function AirdropDetails({
                 <div className="flex items-center justify-between py-1 text-sm">
                   <span className="text-gray-600">Total Amount</span>
                   <span className="text-right font-medium">
-                    {data.totalAmount / LAMPORTS_PER_SOL} SOL
+                    {(data.totalAmount / Math.pow(10, data.decimals)).toFixed(
+                      data.decimals,
+                    )}{" "}
+                    {data.mintAddress ? "Tokens" : "SOL"}
                   </span>
                 </div>
 
@@ -338,6 +368,7 @@ export default function AirdropDetails({
                           index={batch.counter}
                           batch={batch}
                           airdropId={data.id}
+                          airdropData={data}
                           refetchAirdrop={refetch}
                         />
                       ))
@@ -356,10 +387,12 @@ function Batch({
   batch,
   index,
   airdropId,
+  airdropData,
   refetchAirdrop,
 }: {
   batch: GetAirdropsId200["transactions"][number];
   airdropId: string;
+  airdropData: AirdropIdQueryReturnData;
   refetchAirdrop: () => Promise<unknown>;
   index: number;
 }) {
@@ -394,14 +427,51 @@ function Batch({
     }
     const { context, value } =
       await connection.getLatestBlockhashAndContext("confirmed");
-    const transaction = new Transaction({ ...value, feePayer: publicKey }).add(
-      ...batch.recipients.map((r) =>
+
+    let transferInstructions;
+    if (!airdropData.mintAddress) {
+      // SOL transfer
+      transferInstructions = batch.recipients.map((r) =>
         SystemProgram.transfer({
           fromPubkey: publicKey,
           toPubkey: new PublicKey(r.address),
           lamports: r.atomicAmount,
         }),
-      ),
+      );
+    } else {
+      // Token transfer
+      const mint = new PublicKey(airdropData.mintAddress);
+      transferInstructions = batch.recipients
+        .map((r) => {
+          const distributorAta = getAssociatedTokenAddressSync(mint, publicKey);
+          const recipient = new PublicKey(r.address);
+          const recipientAta = getAssociatedTokenAddressSync(mint, recipient);
+          return [
+            createAssociatedTokenAccountIdempotentInstruction(
+              publicKey,
+              recipientAta,
+              recipient,
+              mint,
+            ),
+            createTransferCheckedInstruction(
+              distributorAta,
+              mint,
+              recipientAta,
+              publicKey,
+              r.atomicAmount,
+              airdropData.decimals,
+            ),
+          ];
+        })
+        .flat();
+    }
+
+    const transaction = new Transaction({ ...value, feePayer: publicKey }).add(
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: transferInstructions.length * 30_000,
+      }),
+      ...transferInstructions,
     );
     const signed = await signTransaction(transaction);
 
@@ -488,7 +558,10 @@ function Batch({
               >
                 <span className="break-all font-mono">{recipient.address}</span>
                 <span className="whitespace-nowrap">
-                  {recipient.atomicAmount / LAMPORTS_PER_SOL} SOL
+                  {(
+                    recipient.atomicAmount / Math.pow(10, airdropData.decimals)
+                  ).toFixed(airdropData.decimals)}{" "}
+                  {airdropData.mintAddress ? "Tokens" : "SOL"}
                 </span>
               </div>
             ))}
@@ -531,16 +604,53 @@ function RetryAllButton({
     const { value, context } =
       await connection.getLatestBlockhashAndContext("confirmed");
     const transactions = expiredTransactions.map((txBatch) => {
-      const tx = new Transaction({ ...value, feePayer: publicKey }).add(
-        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 10_000 }),
-        ...txBatch.recipients.map((r) =>
+      let transferInstructions;
+      if (!airdropData.mintAddress) {
+        // SOL transfer
+        transferInstructions = txBatch.recipients.map((r) =>
           SystemProgram.transfer({
             lamports: r.atomicAmount,
             fromPubkey: publicKey,
             toPubkey: new PublicKey(r.address),
           }),
-        ),
+        );
+      } else {
+        // Token transfer
+        const mint = new PublicKey(airdropData.mintAddress);
+        transferInstructions = txBatch.recipients
+          .map((r) => {
+            const distributorAta = getAssociatedTokenAddressSync(
+              mint,
+              publicKey,
+            );
+            const recipient = new PublicKey(r.address);
+            const recipientAta = getAssociatedTokenAddressSync(mint, recipient);
+            return [
+              createAssociatedTokenAccountIdempotentInstruction(
+                publicKey,
+                recipientAta,
+                recipient,
+                mint,
+              ),
+              createTransferCheckedInstruction(
+                distributorAta,
+                mint,
+                recipientAta,
+                publicKey,
+                r.atomicAmount,
+                airdropData.decimals,
+              ),
+            ];
+          })
+          .flat();
+      }
+
+      const tx = new Transaction({ ...value, feePayer: publicKey }).add(
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units: transferInstructions.length * 30_000,
+        }),
+        ...transferInstructions,
       );
       tx.recentBlockhash = value.blockhash;
       tx.lastValidBlockHeight = context.slot;

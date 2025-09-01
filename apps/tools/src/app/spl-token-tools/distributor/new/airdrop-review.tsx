@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import React from "react";
 import { Box } from "../box";
 import { useCreateAirdrop, useCreateTokenAirdrop } from "../state";
-import { BATCH_SIZE } from "../common";
+import { BATCH_SIZE, TOKEN_BATCH_SIZE } from "../common";
 
 type Recipient = {
   address: string;
@@ -59,7 +59,9 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
 
   // Calculate totals
   const recipientsCount: number = recipients.length;
-  const batchesNeeded: number = Math.ceil(recipientsCount / BATCH_SIZE);
+  const batchesNeeded: number = Math.ceil(
+    recipientsCount / (tokenType === "sol" ? BATCH_SIZE : TOKEN_BATCH_SIZE),
+  );
   const transactionFee: number = batchesNeeded * COST_PER_BATCH;
 
   // Calculate total SOL to distribute
@@ -97,9 +99,10 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
     }
 
     const batches: Array<Array<{ address: string; atomicAmount: number }>> = [];
-    for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
+    const batchSize = tokenType === "sol" ? BATCH_SIZE : TOKEN_BATCH_SIZE;
+    for (let i = 0; i < recipients.length; i += batchSize) {
       batches.push(
-        recipients.slice(i, i + BATCH_SIZE).map((r) => ({
+        recipients.slice(i, i + batchSize).map((r) => ({
           address: r.address,
           atomicAmount:
             tokenType === "sol"
@@ -205,7 +208,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
               Total {tokenType === "sol" ? "SOL" : "tokens"} to distribute
             </span>
             <span className="font-semibold">
-              {totalDistribution.toFixed(tokenType === "sol" ? 4 : 0)}{" "}
+              {totalDistribution.toFixed(decimals)}{" "}
               {tokenType === "sol" ? "SOL" : "Tokens"}
             </span>
           </div>
@@ -226,7 +229,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
               <div className="flex items-center justify-between py-1 text-sm">
                 <span className="text-gray-600">Distribution amount</span>
                 <span>
-                  {totalDistribution.toFixed(tokenType === "sol" ? 4 : 0)}{" "}
+                  {totalDistribution.toFixed(decimals)}{" "}
                   {tokenType === "sol" ? "SOL" : "Tokens"}
                 </span>
               </div>
@@ -240,8 +243,8 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
                 <span className="font-medium text-gray-800">Total cost</span>
                 <span className="font-semibold">
                   {tokenType === "sol"
-                    ? `${(totalDistribution + transactionFee).toFixed(4)} SOL`
-                    : `${totalDistribution.toFixed(0)} Tokens + ${transactionFee.toFixed(6)} SOL (fees)`}
+                    ? `${(totalDistribution + transactionFee).toFixed(decimals)} SOL`
+                    : `${totalDistribution.toFixed(decimals)} Tokens + ${transactionFee.toFixed(6)} SOL (fees)`}
                 </span>
               </div>
             </div>

@@ -377,10 +377,7 @@ const SolaceAirdropDashboard = ({
                 <div className="flex justify-between py-1 text-sm">
                   <span className="text-gray-600">Total Amount</span>
                   <span className="font-medium">
-                    {selectedAirdrop.mintAddress 
-                      ? `${selectedAirdrop.totalAmount} tokens`
-                      : `${selectedAirdrop.totalAmount / LAMPORTS_PER_SOL} SOL`
-                    }
+                    {(selectedAirdrop.totalAmount / Math.pow(10, selectedAirdrop.decimals)).toFixed(selectedAirdrop.decimals)} {selectedAirdrop.mintAddress ? "Tokens" : "SOL"}
                   </span>
                 </div>
                 <div className="flex justify-between py-1 text-sm">
@@ -422,10 +419,7 @@ const SolaceAirdropDashboard = ({
                           {recipient.address}
                         </td>
                         <td className="p-1.5 text-right">
-                          {selectedAirdrop.mintAddress 
-                            ? recipient.atomicAmount
-                            : recipient.atomicAmount / LAMPORTS_PER_SOL
-                          }
+                          {(recipient.atomicAmount / Math.pow(10, selectedAirdrop.decimals)).toFixed(selectedAirdrop.decimals)}
                         </td>
                       </tr>
                     ))}
