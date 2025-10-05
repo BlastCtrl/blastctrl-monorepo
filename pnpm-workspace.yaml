@@ -11,3 +11,10 @@ ignoredBuiltDependencies:
 onlyBuiltDependencies:
   - bigint-buffer
   - bufferutil
+minimumReleaseAge: 2880
+minimumReleaseAgeExclude:
+  - react
+  - "@blastctrl/*"
+  - "@types/react"
+  - "@tanstack/react-query"
+  - "@tanstack/react-query-devtools"
