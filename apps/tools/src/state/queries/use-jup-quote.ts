@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 const QUOTE_API_BASE =
-  process.env.JUP_SWAP_API ?? "https://quote-api.jup.ag/v6/quote";
+  process.env.JUP_SWAP_API ?? "https://lite-api.jup.ag/swap/v1/quote";
 
 type UseJupQueryArgs = {
   inputMint: string;
