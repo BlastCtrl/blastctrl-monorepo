@@ -41,7 +41,7 @@ export async function getJupiterSwapInstructions(params: {
   quoteParams.append("slippageBps", params.slippageBps.toString());
 
   // TODO: use the .env variable here?
-  const url = new URL("https://quote-api.jup.ag/v6/quote");
+  const url = new URL("https://lite-api.jup.ag/swap/v1/quote");
   url.search = quoteParams.toString();
 
   let quoteResponse: JupiterQuoteResponseSchema;
@@ -69,7 +69,7 @@ export async function getJupiterSwapInstructions(params: {
   let instructions: JupiterSwapInstructionsApiResponse;
   try {
     const response = await (
-      await fetch("https://quote-api.jup.ag/v6/swap-instructions", {
+      await fetch("https://lite-api.jup.ag/swap/v1/swap-instructions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

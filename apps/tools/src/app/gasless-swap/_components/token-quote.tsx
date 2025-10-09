@@ -10,7 +10,7 @@ type Props = {
   } | null;
 };
 
-const SOL_MINT = "So11111111111111111111111111111111111111112";
+// const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 export const TokenQuote = ({ quoteToken }: Props) => {
   const { data, error, isLoading } = useJupPrice(quoteToken?.address ?? "");
