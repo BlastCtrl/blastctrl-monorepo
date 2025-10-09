@@ -1,12 +1,11 @@
 import { useQuery, queryOptions } from "@tanstack/react-query";
 
 type TokensResponse = {
-  address: string;
-  chainId: number;
+  id: string;
   decimals: number;
   name: string;
   symbol: string;
-  logoURI: string;
+  icon?: string;
   tags: string[];
   extensions: {
     [key: string]: string;
@@ -43,7 +42,7 @@ export function jupTokensQuery(wallet = "", useUnknownTokens: boolean) {
     queryKey: ["jup-tokens", wallet || "none", useUnknownTokens],
     queryFn: async () => {
       const jupFetch = fetch(
-        `https://tokens.jup.ag/tokens?tags=verified${useUnknownTokens ? ",unknown" : ""}`,
+        `https://lite-api.jup.ag/tokens/v2/tag?query=verified`,
         {
           headers: { origin: "https://tools.blastctrl.com" },
         },
@@ -80,6 +79,9 @@ export function jupTokensQuery(wallet = "", useUnknownTokens: boolean) {
       ]);
 
       if (!jupResponse.ok || !assetsResponse.ok) {
+        if (jupResponse.status === 429) {
+          throw new Error("Rate limit exceeded");
+        }
         throw new Error("Network response was not ok");
       }
 
@@ -88,9 +90,11 @@ export function jupTokensQuery(wallet = "", useUnknownTokens: boolean) {
         assetsResponse.json() as Promise<AssetsResponse>,
       ]);
 
+      console.log(userAssets);
+
       const set = new Set(userAssets?.result?.items?.map((asset) => asset?.id));
       const intersectionTokens = jupTokens
-        .filter((token) => set.has(token.address))
+        .filter((token) => set.has(token.id))
         .reverse();
 
       return intersectionTokens;
