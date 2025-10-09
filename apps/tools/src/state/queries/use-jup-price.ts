@@ -1,13 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 
-export function useJupPrice(mintOrSymbol: string, vsMint: string) {
+export function useJupPrice(mint: string) {
   return useQuery<string, Error>({
-    enabled: !!mintOrSymbol && !!vsMint,
-    queryKey: ["jup-price", mintOrSymbol, vsMint],
+    enabled: !!mint,
+    queryKey: ["jup-price", mint],
     queryFn: async () => {
-      const priceResponse = await fetch(
-        `/api/octane/price?mint=${mintOrSymbol}&vsMint=${vsMint}`,
-      );
+      const priceResponse = await fetch(`/api/octane/price?mint=${mint}`);
       if (!priceResponse.ok) {
         throw new Error("Error fetching price");
       }

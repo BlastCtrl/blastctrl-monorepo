@@ -1,23 +1,20 @@
 import { z } from "zod";
 import { isPublicKey } from "@/lib/solana/common";
 import { redisClient } from "@/lib/redis";
+import Decimal from "decimal.js";
 
 export const maxDuration = 60;
 export const runtime = "nodejs";
 
 const REDIS_KEY_DURATION = 60; // seconds
 
-type TokenData = {
-  id: string;
-  type: "derivedPrice";
-  price: string;
-};
-
 type JupiterPriceResponse = {
-  data: {
-    [key: string]: TokenData;
+  [key: string]: {
+    blockId?: number;
+    decimals: number;
+    usdPrice: number;
+    priceChange24h?: number;
   };
-  timeTaken: number;
 };
 
 export async function GET(req: Request) {
@@ -26,13 +23,9 @@ export async function GET(req: Request) {
     mint: z
       .string()
       .refine((val) => isPublicKey(val), "Must be a valid Solana public key"),
-    vsMint: z
-      .string()
-      .refine((val) => isPublicKey(val), "Must be a valid Solana public key"),
   });
   const result = schema.safeParse({
     mint: searchParams.get("mint"),
-    vsMint: searchParams.get("vsMint"),
   });
   if (!result.success) {
     return new Response(JSON.stringify({ error: result.error }), {
@@ -42,11 +35,9 @@ export async function GET(req: Request) {
 
   // mint is usually SOL
   // vsMint is the token we are comparing to
+  const vsMint = "So11111111111111111111111111111111111111112";
 
-  const key = PriceSerializer.serializeKey(
-    result.data.mint,
-    result.data.vsMint,
-  );
+  const key = PriceSerializer.serializeKey(result.data.mint, vsMint);
   try {
     const cachedPriceData = await redisClient.get<string>(key);
     if (cachedPriceData !== null) {
@@ -60,9 +51,8 @@ export async function GET(req: Request) {
   }
 
   const params = new URLSearchParams();
-  params.append("ids", result.data.mint);
-  params.append("vsToken", result.data.vsMint);
-  const url = new URL("https://api.jup.ag/price/v2");
+  params.append("ids", `${result.data.mint},${vsMint}`);
+  const url = new URL("https://lite-api.jup.ag/price/v3");
   url.search = params.toString();
 
   const priceResponse = await fetch(url);
@@ -76,11 +66,16 @@ export async function GET(req: Request) {
     );
   }
 
-  const priceData = ((await priceResponse.json()) as JupiterPriceResponse).data;
+  const priceData = (await priceResponse.json()) as JupiterPriceResponse;
 
-  if (priceData[result.data.mint]) {
+  if (result.data.mint in priceData && vsMint in priceData) {
+    const mintUsdPrice = priceData[result.data.mint]!.usdPrice;
+    const solUsdPrice = priceData[vsMint]!.usdPrice;
+
+    const solPrice = new Decimal(solUsdPrice).div(mintUsdPrice);
+
     try {
-      await redisClient.set(key, priceData[result.data.mint]?.price, {
+      await redisClient.set(key, solPrice, {
         ex: REDIS_KEY_DURATION,
       });
     } catch (error) {
@@ -89,7 +84,7 @@ export async function GET(req: Request) {
         `Failed to save redis data for key ${key}: ${(error as Error).message}`,
       );
     }
-    return new Response(priceData[result.data.mint]?.price);
+    return new Response(solPrice.toFixed());
   } else {
     return new Response(JSON.stringify({ error: "No price data found" }), {
       status: 500,
