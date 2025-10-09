@@ -13,10 +13,7 @@ type Props = {
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 export const TokenQuote = ({ quoteToken }: Props) => {
-  const { data, error, isLoading } = useJupPrice(
-    SOL_MINT,
-    quoteToken?.address ?? "",
-  );
+  const { data, error, isLoading } = useJupPrice(quoteToken?.address ?? "");
 
   if (!quoteToken) {
     return <div aria-hidden="true" className="h-12"></div>;
