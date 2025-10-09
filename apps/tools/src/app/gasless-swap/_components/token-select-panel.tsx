@@ -120,16 +120,21 @@ export function TokenSelectPanel({
                 onClick={() => {
                   const t = filteredTokens[virtualItem.index];
                   if (t) {
-                    onSelect(t);
+                    onSelect({
+                      address: t.id,
+                      decimals: t.decimals,
+                      name: t.name,
+                      symbol: t.symbol,
+                    });
                   }
                 }}
                 className="flex h-full w-full items-center gap-3 px-4 py-3"
               >
-                {filteredTokens[virtualItem.index]?.logoURI ? (
+                {filteredTokens[virtualItem.index]?.icon ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     loading="lazy"
-                    src={filteredTokens[virtualItem.index]?.logoURI}
+                    src={filteredTokens[virtualItem.index]?.icon}
                     alt=""
                     height={40}
                     width={40}
@@ -142,17 +147,14 @@ export function TokenSelectPanel({
                   {filteredTokens[virtualItem.index]?.symbol}
                 </span>
                 <a
-                  href={`https://solscan.io/token/${filteredTokens[virtualItem.index]?.address}`}
+                  href={`https://solscan.io/token/${filteredTokens[virtualItem.index]?.id}`}
                   target="_blank"
                   onClick={(e) => e.stopPropagation()}
                   className="flex flex-nowrap items-center rounded-md bg-gray-300 px-3 py-1 text-xs"
                   rel="noreferrer"
                 >
                   <span className="text-xs font-medium">
-                    {compress(
-                      filteredTokens[virtualItem.index]?.address ?? "",
-                      4,
-                    )}
+                    {compress(filteredTokens[virtualItem.index]?.id ?? "", 4)}
                   </span>
                   <LinkIcon aria-hidden="true" className="ml-1 size-4" />
                 </a>
