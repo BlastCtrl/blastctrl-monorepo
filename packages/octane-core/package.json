@@ -18,7 +18,7 @@
     "@blastctrl/eslint-config": "workspace:^",
     "@blastctrl/tsconfig": "workspace:^",
     "@solana/spl-token": "^0.4.12",
-    "@solana/web3.js": "^1.98.0",
+    "@solana/web3.js": "^1.98.4",
     "@types/bs58": "^4.0.1",
     "bn.js": "^5.2.1",
     "bs58": "4.0.1",

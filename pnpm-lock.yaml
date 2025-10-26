@@ -237,10 +237,10 @@ importers:
         version: 1.51.1
       '@solana/spl-token':
         specifier: ^0.4.12
-        version: 0.4.13(@solana/web3.js@1.98.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.4.13(@solana/web3.js@1.98.4(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/web3.js':
-        specifier: ^1.98.0
-        version: 1.98.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+        specifier: ^1.98.4
+        version: 1.98.4(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10)
       dotenv:
         specifier: ^16.4.7
         version: 16.4.7
@@ -268,10 +268,10 @@ importers:
         version: link:../../tooling/typescript
       '@solana/spl-token':
         specifier: ^0.4.12
-        version: 0.4.13(@solana/web3.js@1.98.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.4.13(@solana/web3.js@1.98.4(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/web3.js':
-        specifier: ^1.98.0
-        version: 1.98.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+        specifier: ^1.98.4
+        version: 1.98.4(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@types/bs58':
         specifier: ^4.0.1
         version: 4.0.4
@@ -2799,9 +2799,6 @@ packages:
     resolution: {integrity: sha512-NF+MI5tOxyvfTU4A+O5idh/gJFmjm52bMwsPpFGRSL79GECSN0XLmpVOO/jqTKJgac2uIeYDpQw/eMaQuWuUXw==}
     engines: {node: '>=16'}
 
-  '@solana/web3.js@1.98.0':
-    resolution: {integrity: sha512-nz3Q5OeyGFpFCR+erX2f6JPt3sKhzhYcSycBCSPkWjzSVDh/Rr1FqTVMRe58FKO16/ivTUcuJjeS5MyBvpkbzA==}
-
   '@solana/web3.js@1.98.4':
     resolution: {integrity: sha512-vv9lfnvjUsRiq//+j5pBdXig0IQdtzA0BRZ3bXEP4KaIyF1CcaydWqgyzQgfZMNIsWNWmG+AUHwPy4AHOD6gpw==}
 
@@ -3196,9 +3193,6 @@ packages:
 
   '@types/node@22.18.8':
     resolution: {integrity: sha512-pAZSHMiagDR7cARo/cch1f3rXy0AEXwsVsVH09FcyeJVAzCnGgmYis7P3JidtTUjyadhTeSo8TgRPswstghDaw==}
-
-  '@types/node@24.7.0':
-    resolution: {integrity: sha512-IbKooQVqUBrlzWTi79E8Fw78l8k1RNtlDDNWsFZs7XonuQSJ8oNYfEeclhprUldXISRMLzBpILuKgPlIxm+/Yw==}
 
   '@types/papaparse@5.3.15':
     resolution: {integrity: sha512-JHe6vF6x/8Z85nCX4yFdDslN11d+1pr12E526X8WAfhadOeaOTx5AuIkvDKIBopfvlzpzkdMx4YyvSKCM9oqtw==}
@@ -7185,9 +7179,6 @@ packages:
   undici-types@7.10.0:
     resolution: {integrity: sha512-t5Fy/nfn+14LuOc2KNYg75vZqClpAiqscVvMygNnlsHBFpSXdJaYtXMcdNLpl/Qvc3P2cB3s6lOV51nqsFq4ag==}
 
-  undici-types@7.14.0:
-    resolution: {integrity: sha512-QQiYxHuyZ9gQUIrmPo3IA+hUl4KYk8uSA7cHrcKd/l3p1OTpZcM0Tbp9x7FAtXdAYhlasd60ncPpgu6ihG6TOA==}
-
   unidragger@3.0.1:
     resolution: {integrity: sha512-RngbGSwBFmqGBWjkaH+yB677uzR95blSQyxq6hYbrQCejH3Mx1nm8DVOuh3M9k2fQyTstWUG5qlgCnNqV/9jVw==}
 
@@ -7551,18 +7542,6 @@ packages:
 
   ws@8.18.0:
     resolution: {integrity: sha512-8VbfWfHLbbwu3+N6OKsOMpBdT4kXPDDB9cJk2bJ6mh9ucxdlnNvH1e+roYkKmN9Nxw2yjz7VzeO9oOz2zJ04Pw==}
-    engines: {node: '>=10.0.0'}
-    peerDependencies:
-      bufferutil: ^4.0.1
-      utf-8-validate: '>=5.0.2'
-    peerDependenciesMeta:
-      bufferutil:
-        optional: true
-      utf-8-validate:
-        optional: true
-
-  ws@8.18.1:
-    resolution: {integrity: sha512-RKW2aJZMXeMxVpnZ6bck+RswznaxmzdULiBr6KY7XkTnW8uvt0iT9H5DkHUChXrc+uurzwa0rVI16n/Xzjdz1w==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -8732,7 +8711,7 @@ snapshots:
     dependencies:
       '@metaplex-foundation/umi': 0.9.2
       '@metaplex-foundation/umi-web3js-adapters': 0.9.2(@metaplex-foundation/umi@0.9.2)(@solana/web3.js@1.98.4(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10))
-      '@noble/curves': 1.8.1
+      '@noble/curves': 1.9.2
       '@solana/web3.js': 1.98.4(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)
 
   '@metaplex-foundation/umi-http-fetch@0.9.2(@metaplex-foundation/umi@0.9.2)':
@@ -10302,14 +10281,6 @@ snapshots:
     transitivePeerDependencies:
       - fastestsmallesttextencoderdecoder
 
-  '@solana/spl-token-group@0.0.7(@solana/web3.js@1.98.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)':
-    dependencies:
-      '@solana/codecs': 2.0.0-rc.1(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
-      '@solana/web3.js': 1.98.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
-    transitivePeerDependencies:
-      - fastestsmallesttextencoderdecoder
-      - typescript
-
   '@solana/spl-token-group@0.0.7(@solana/web3.js@1.98.4(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10))(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.8.3)':
     dependencies:
       '@solana/codecs': 2.0.0-rc.1(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.8.3)
@@ -10318,10 +10289,10 @@ snapshots:
       - fastestsmallesttextencoderdecoder
       - typescript
 
-  '@solana/spl-token-metadata@0.1.6(@solana/web3.js@1.98.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)':
+  '@solana/spl-token-group@0.0.7(@solana/web3.js@1.98.4(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10))(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)':
     dependencies:
       '@solana/codecs': 2.0.0-rc.1(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
-      '@solana/web3.js': 1.98.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      '@solana/web3.js': 1.98.4(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10)
     transitivePeerDependencies:
       - fastestsmallesttextencoderdecoder
       - typescript
@@ -10334,13 +10305,21 @@ snapshots:
       - fastestsmallesttextencoderdecoder
       - typescript
 
-  '@solana/spl-token@0.4.13(@solana/web3.js@1.98.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)':
+  '@solana/spl-token-metadata@0.1.6(@solana/web3.js@1.98.4(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10))(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)':
+    dependencies:
+      '@solana/codecs': 2.0.0-rc.1(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
+      '@solana/web3.js': 1.98.4(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10)
+    transitivePeerDependencies:
+      - fastestsmallesttextencoderdecoder
+      - typescript
+
+  '@solana/spl-token@0.4.13(@solana/web3.js@1.98.4(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)':
     dependencies:
       '@solana/buffer-layout': 4.0.1
       '@solana/buffer-layout-utils': 0.2.0(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@solana/spl-token-group': 0.0.7(@solana/web3.js@1.98.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
-      '@solana/spl-token-metadata': 0.1.6(@solana/web3.js@1.98.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
-      '@solana/web3.js': 1.98.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      '@solana/spl-token-group': 0.0.7(@solana/web3.js@1.98.4(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10))(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
+      '@solana/spl-token-metadata': 0.1.6(@solana/web3.js@1.98.4(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10))(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
+      '@solana/web3.js': 1.98.4(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10)
       buffer: 6.0.3
     transitivePeerDependencies:
       - bufferutil
@@ -10831,7 +10810,7 @@ snapshots:
 
   '@solana/wallet-standard-util@1.1.2':
     dependencies:
-      '@noble/curves': 1.8.1
+      '@noble/curves': 1.9.2
       '@solana/wallet-standard-chains': 1.1.1
       '@solana/wallet-standard-features': 1.3.0
 
@@ -10903,33 +10882,11 @@ snapshots:
       - bs58
       - react
 
-  '@solana/web3.js@1.98.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)':
-    dependencies:
-      '@babel/runtime': 7.27.0
-      '@noble/curves': 1.8.1
-      '@noble/hashes': 1.7.1
-      '@solana/buffer-layout': 4.0.1
-      agentkeepalive: 4.6.0
-      bigint-buffer: 1.1.5
-      bn.js: 5.2.2
-      borsh: 0.7.0
-      bs58: 4.0.1
-      buffer: 6.0.3
-      fast-stable-stringify: 1.0.0
-      jayson: 4.1.3(bufferutil@4.0.9)(utf-8-validate@5.0.10)
-      node-fetch: 2.7.0
-      rpc-websockets: 9.1.1
-      superstruct: 2.0.2
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - utf-8-validate
-
   '@solana/web3.js@1.98.4(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)':
     dependencies:
       '@babel/runtime': 7.27.0
-      '@noble/curves': 1.8.1
-      '@noble/hashes': 1.7.1
+      '@noble/curves': 1.9.2
+      '@noble/hashes': 1.8.0
       '@solana/buffer-layout': 4.0.1
       '@solana/codecs-numbers': 2.3.0(typescript@5.8.3)
       agentkeepalive: 4.6.0
@@ -10951,8 +10908,8 @@ snapshots:
   '@solana/web3.js@1.98.4(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10)':
     dependencies:
       '@babel/runtime': 7.27.0
-      '@noble/curves': 1.8.1
-      '@noble/hashes': 1.7.1
+      '@noble/curves': 1.9.2
+      '@noble/hashes': 1.8.0
       '@solana/buffer-layout': 4.0.1
       '@solana/codecs-numbers': 2.3.0(typescript@5.9.3)
       agentkeepalive: 4.6.0
@@ -11437,7 +11394,7 @@ snapshots:
       '@ethereumjs/tx': 10.0.0
       '@fivebinaries/coin-selection': 3.0.0
       '@mobily/ts-belt': 3.13.1
-      '@noble/hashes': 1.7.1
+      '@noble/hashes': 1.8.0
       '@scure/bip39': 1.6.0
       '@solana-program/compute-budget': 0.7.0(@solana/kit@2.1.1(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.8.3)(ws@8.18.2(bufferutil@4.0.9)(utf-8-validate@5.0.10)))
       '@solana-program/system': 0.7.0(@solana/kit@2.1.1(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.8.3)(ws@8.18.2(bufferutil@4.0.9)(utf-8-validate@5.0.10)))
@@ -11566,7 +11523,7 @@ snapshots:
     dependencies:
       '@trezor/utils': 9.4.0(tslib@2.8.1)
       tslib: 2.8.1
-      ws: 8.18.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      ws: 8.18.2(bufferutil@4.0.9)(utf-8-validate@5.0.10)
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -11607,7 +11564,7 @@ snapshots:
 
   '@types/es-aggregate-error@1.0.6':
     dependencies:
-      '@types/node': 24.7.0
+      '@types/node': 22.18.8
 
   '@types/eslint@8.56.12':
     dependencies:
@@ -11658,10 +11615,6 @@ snapshots:
   '@types/node@22.18.8':
     dependencies:
       undici-types: 6.21.0
-
-  '@types/node@24.7.0':
-    dependencies:
-      undici-types: 7.14.0
 
   '@types/papaparse@5.3.15':
     dependencies:
@@ -12389,9 +12342,9 @@ snapshots:
 
   '@xrplf/isomorphic@1.0.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)':
     dependencies:
-      '@noble/hashes': 1.7.1
+      '@noble/hashes': 1.8.0
       eventemitter3: 5.0.1
-      ws: 8.18.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      ws: 8.18.2(bufferutil@4.0.9)(utf-8-validate@5.0.10)
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -12984,7 +12937,7 @@ snapshots:
 
   bs58check@4.0.0:
     dependencies:
-      '@noble/hashes': 1.7.1
+      '@noble/hashes': 1.8.0
       bs58: 6.0.0
 
   bser@2.1.1:
@@ -13873,7 +13826,7 @@ snapshots:
 
   ethereum-bloom-filters@1.2.0:
     dependencies:
-      '@noble/hashes': 1.7.1
+      '@noble/hashes': 1.8.0
 
   ethereum-cryptography@2.2.1:
     dependencies:
@@ -15470,8 +15423,8 @@ snapshots:
   ox@0.6.7(typescript@5.8.3)(zod@3.25.76):
     dependencies:
       '@adraffy/ens-normalize': 1.11.0
-      '@noble/curves': 1.8.1
-      '@noble/hashes': 1.7.1
+      '@noble/curves': 1.9.2
+      '@noble/hashes': 1.8.0
       '@scure/bip32': 1.6.2
       '@scure/bip39': 1.5.4
       abitype: 1.0.8(typescript@5.8.3)(zod@3.25.76)
@@ -16055,7 +16008,7 @@ snapshots:
 
   ripple-keypairs@2.0.0(bufferutil@4.0.9)(utf-8-validate@5.0.10):
     dependencies:
-      '@noble/curves': 1.8.1
+      '@noble/curves': 1.9.2
       '@xrplf/isomorphic': 1.0.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       ripple-address-codec: 5.0.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
     transitivePeerDependencies:
@@ -16096,7 +16049,7 @@ snapshots:
       buffer: 6.0.3
       eventemitter3: 5.0.1
       uuid: 8.3.2
-      ws: 8.18.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      ws: 8.18.2(bufferutil@4.0.9)(utf-8-validate@5.0.10)
     optionalDependencies:
       bufferutil: 4.0.9
       utf-8-validate: 5.0.10
@@ -16838,8 +16791,6 @@ snapshots:
 
   undici-types@7.10.0: {}
 
-  undici-types@7.14.0: {}
-
   unidragger@3.0.1:
     dependencies:
       ev-emitter: 2.1.2
@@ -17210,11 +17161,6 @@ snapshots:
       utf-8-validate: 5.0.10
 
   ws@8.18.0(bufferutil@4.0.9)(utf-8-validate@5.0.10):
-    optionalDependencies:
-      bufferutil: 4.0.9
-      utf-8-validate: 5.0.10
-
-  ws@8.18.1(bufferutil@4.0.9)(utf-8-validate@5.0.10):
     optionalDependencies:
       bufferutil: 4.0.9
       utf-8-validate: 5.0.10
