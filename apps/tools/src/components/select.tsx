@@ -1,6 +1,11 @@
 import { cn } from "@blastctrl/ui";
 import type { ListboxOptionsProps, ListboxProps } from "@headlessui/react";
-import { Listbox, Transition } from "@headlessui/react";
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  Transition,
+} from "@headlessui/react";
 import { Fragment, forwardRef } from "react";
 
 type CustomSelectProps<TType, TActualType> = Omit<
@@ -54,8 +59,8 @@ const CustomSelectOptions = (
   );
 };
 
-const SelectButton = Listbox.Button;
-const SelectOption = Listbox.Option;
+const SelectButton = ListboxButton;
+const SelectOption = ListboxOption;
 const SelectOptions = forwardRef(CustomSelectOptions);
 
 export const Select = Object.assign(CustomSelect, {
