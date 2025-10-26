@@ -125,25 +125,23 @@ export default function RemoveTokens() {
       )}
     >
       <h1 className="font-display mb-4 text-3xl font-semibold">
-        Remove Tokens
+        Token Hoover 🧹
       </h1>
 
       {!data && (
         <>
-          <div className="space-y-2 text-gray-500">
+          <div className="space-y-2 text-sm text-gray-500">
             <p className="text-pretty">
               This tool allows you to remove tokens from a wallet by either
               transferring them to your connected wallet or burning them
               permanently.
             </p>
-            <p className="text-balance">
-              First, connect your wallet to receive the transferred tokens. Then
-              enter the private key of the wallet containing the tokens you want
-              to remove.
-            </p>
-            <p className="font-medium text-amber-600">
-              Warning: Burning tokens is irreversible. Make sure you understand
-              the consequences before proceeding.
+            <p className="text-pretty">
+              First, connect your main wallet which will receive tokens from the
+              secondary wallet. Then enter the private key of the secondary
+              wallet containing the tokens you want to remove. Burning tokens is
+              <em>irreversible</em>, so be very careful if you choose this
+              option.
             </p>
           </div>
 
@@ -154,7 +152,7 @@ export default function RemoveTokens() {
                   htmlFor="privateKey"
                   className="mb-1 block text-sm font-medium text-gray-600"
                 >
-                  Private Key (Base58 or Byte Array)
+                  Private Key of the Secondary Wallet (Base58 or Byte Array)
                 </label>
                 <input
                   id="privateKey"

@@ -124,6 +124,12 @@ export default function Page() {
           >
             Withdraw MEV rewards
           </Link>
+          <Link
+            href="/spl-token-tools/token-hoover"
+            className="inline-flex items-center justify-center rounded-lg border-2 border-rose-600 px-3 py-1.5 text-rose-950 shadow hover:bg-rose-50"
+          >
+            Clean up old wallet
+          </Link>
         </div>
         <div className="mt-6 text-sm font-medium text-gray-700">
           More to come...

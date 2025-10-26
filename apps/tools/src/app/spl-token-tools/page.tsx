@@ -38,6 +38,13 @@ export default function Tokens() {
         "View and revoke token delegations to regain full control of your tokens.",
       active: true,
     },
+    {
+      name: "Token hoover",
+      href: "/spl-token-tools/token-hoover",
+      description:
+        "Hoover up tokens from a wallet you don't want to use anymore and transfer them to your main wallet, or burn them.",
+      active: true,
+    },
   ];
   return (
     <>
