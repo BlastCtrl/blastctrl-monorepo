@@ -2,7 +2,7 @@ import { NATIVE_MINT } from "@solana/spl-token";
 import config from "./config.js";
 import { VersionedTransaction } from "@solana/web3.js";
 
-const BASE_URL = "https://api.jup.ag/ultra/v1";
+const BASE_URL = "https://lite-api.jup.ag/ultra/v1";
 
 interface SuccessfulSwapResponse {
   status: "Success";
@@ -48,7 +48,7 @@ export async function runJupiterUltraSwap(amount: number) {
   const signedTransaction = Buffer.from(transaction.serialize()).toString("base64");
 
   const executeResponse = (await (
-    await fetch("https://api.jup.ag/ultra/v1/execute", {
+    await fetch(`${BASE_URL}/execute`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
