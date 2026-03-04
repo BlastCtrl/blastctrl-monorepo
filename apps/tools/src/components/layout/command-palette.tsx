@@ -87,15 +87,18 @@ export const CommandPalette = ({
                 className="divide-y divide-gray-100"
                 onChange={(navItem: (typeof navigation)[number]) => {
                   setIsOpen(false);
-                  router.push(navItem.href);
-                  /* Navigate the user to the selected page */
+                  if (navItem?.href) {
+                    /* Navigate the user to the selected page */
+                    router.push(navItem.href);
+                  }
                 }}
               >
                 <div className="flex items-center px-4">
-                  <MagnifyingGlassIcon className="h-6 w-6 text-gray-500" />
+                  <MagnifyingGlassIcon className="mr-2 size-6 text-gray-500" />
                   <Combobox.Input
+                    autoFocus
                     onChange={(event) => setQuery(event.target.value)}
-                    className="h-12 w-full border-0 bg-transparent text-sm text-gray-800 placeholder:text-gray-400 focus:ring-0"
+                    className="h-12 w-full border-0 bg-transparent text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-0"
                     placeholder="Search..."
                   />
                 </div>
