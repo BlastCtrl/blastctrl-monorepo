@@ -9,13 +9,22 @@ import { MagnifyingGlassIcon } from "@heroicons/react/20/solid";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import Image from "next/image";
 import Link from "next/link";
-import { useContext } from "react";
+import { useContext, useEffect, useState } from "react";
 import { CommandPaletteContext } from "./command-palette";
 import { DesktopWallet } from "./desktop-wallet";
 import { MobileWallet } from "./mobile-wallet";
 
 export function Topbar() {
   const { setIsOpen } = useContext(CommandPaletteContext);
+  const [modifierKey, setModifierKey] = useState("⌘");
+
+  useEffect(() => {
+    setModifierKey(
+      navigator.platform.startsWith("Mac") || navigator.platform === "iPhone"
+        ? "⌘" // command key
+        : "Ctrl ", // control key
+    );
+  }, []);
 
   return (
     <>
@@ -98,7 +107,7 @@ export function Topbar() {
                       </button>
                       <div className="absolute inset-y-0 right-0 hidden py-1.5 pr-1.5 sm:flex">
                         <kbd className="inline-flex items-center rounded border border-transparent px-2 font-sans text-sm font-medium text-gray-200 shadow-sm">
-                          ⌘K
+                          {modifierKey}K
                         </kbd>
                       </div>
                     </div>
