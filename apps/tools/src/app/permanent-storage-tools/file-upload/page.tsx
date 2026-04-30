@@ -1,29 +1,27 @@
 "use client";
 
-import { IrysStorage } from "@/lib/irys";
-import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
+import { TurboStorage } from "@/lib/turbo";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useEffect, useState } from "react";
 import { UploaderView } from "./_components/view";
 
 export default function FileUpload() {
-  const { network } = useNetworkConfigurationStore();
   const wallet = useWallet();
-  const [storage, setStorage] = useState<IrysStorage | null>(null);
+  const [storage, setStorage] = useState<TurboStorage | null>(null);
 
   useEffect(() => {
-    async function makeWebIrys() {
-      const irys = await IrysStorage.makeWebIrys(network, wallet);
-      setStorage(irys);
+    async function make() {
+      const turbo = await TurboStorage.make(wallet);
+      setStorage(turbo);
     }
     if (!storage && wallet?.connected) {
-      void makeWebIrys();
+      void make();
     }
 
     () => {
       setStorage(null);
     };
-  }, [network, storage, wallet, wallet.connected]);
+  }, [storage, wallet, wallet.connected]);
 
   return (
     <div>
@@ -33,12 +31,12 @@ export default function FileUpload() {
             Simple Arweave Uploader
           </h1>
           <p className="text-center text-sm leading-snug tracking-tight text-gray-900">
-            Upload files to Arweave using the Irys Network and paying in SOL.
+            Upload files to Arweave using Turbo and paying in SOL.
           </p>
         </div>
       </div>
       {wallet && storage ? (
-        <UploaderView irys={storage} />
+        <UploaderView turbo={storage} />
       ) : (
         <div>Connect your wallet to use this tool</div>
       )}

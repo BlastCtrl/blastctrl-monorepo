@@ -8,8 +8,7 @@ import {
   notify,
   notifyPromise,
 } from "@/components";
-import { IrysStorage } from "@/lib/irys";
-import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
+import { TurboStorage } from "@/lib/turbo";
 import { useWalletConnection } from "@/state/use-wallet-connection";
 import {
   createMetadataInstruction,
@@ -48,7 +47,6 @@ export default function CreateToken() {
   const wallet = useWallet();
   const { setVisible } = useWalletModal();
   const { simulateVersionedTransaction } = useWalletConnection();
-  const { network } = useNetworkConfigurationStore();
   const [isConfirming, setIsConfirming] = useState(false);
   const [selectedAction, setSelectedAction] = useState<Actions>(actions[0]);
   const {
@@ -66,7 +64,7 @@ export default function CreateToken() {
     }
 
     setIsConfirming(true);
-    const irys = await IrysStorage.makeWebIrys(network, wallet);
+    const turbo = await TurboStorage.make(wallet);
 
     // Test if creating metadata is possible
     const ixs: Instruction[] =
@@ -120,7 +118,7 @@ export default function CreateToken() {
 
     if (data.image) {
       imageUri = await notifyPromise(
-        irys.uploadFile(data.image).then((r) => `https://arweave.net/${r.id}`),
+        turbo.uploadFile(data.image).then((r) => `https://arweave.net/${r.id}`),
         {
           loading: { description: "Uploading image to Arweave..." },
           success: { description: "Image upload complete" },
@@ -168,7 +166,7 @@ export default function CreateToken() {
     });
 
     const metadataUri = await notifyPromise(
-      irys.uploadFile(metadataFile).then((r) => `https://arweave.net/${r.id}`),
+      turbo.uploadFile(metadataFile).then((r) => `https://arweave.net/${r.id}`),
       {
         loading: { description: "Uploading metadata file to Arweave..." },
         success: { description: "JSON upload complete" },

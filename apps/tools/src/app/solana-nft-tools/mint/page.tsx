@@ -11,9 +11,8 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import Link from "next/link";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { InputMultiline, notify } from "@/components";
-import { IrysStorage } from "@/lib/irys";
+import { TurboStorage } from "@/lib/turbo";
 import { mimeTypeToCategory } from "@/lib/utils";
-import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
 import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
 import { Switch } from "@headlessui/react";
 import { WalletError } from "@solana/wallet-adapter-base";
@@ -63,7 +62,6 @@ export type CreateFormInputs = {
 };
 
 export default function Mint() {
-  const { network } = useNetworkConfigurationStore();
   const wallet = useWallet();
   const { setVisible } = useWalletModal();
   const params = useSearchParams();
@@ -139,7 +137,7 @@ export default function Mint() {
     // Setup
     setIsConfirming(true);
 
-    const irys = await IrysStorage.makeWebIrys(network, wallet);
+    const turbo = await TurboStorage.make(wallet);
 
     // Check if we are uploading a json file
     let jsonUrl: string;
@@ -149,7 +147,7 @@ export default function Mint() {
         notify({
           title: "Uploading external metadata",
           description:
-            "The metadata JSON file is being uploaded to Arweave via Irys. This will require multiple wallet confirmations, including payment and signature verification.",
+            "The metadata JSON file is being uploaded to Arweave via Turbo. This will require multiple wallet confirmations, including payment and signature verification.",
         });
 
         // Check if we're also uploading media files
@@ -159,9 +157,9 @@ export default function Mint() {
 
         try {
           if (image)
-            imageUrl = `https://arweave.net/${(await irys.uploadFile(image)).id}`;
+            imageUrl = `https://arweave.net/${(await turbo.uploadFile(image)).id}`;
           if (animation_url)
-            animationUrl = `https://arweave.net/${(await irys.uploadFile(animation_url)).id}`;
+            animationUrl = `https://arweave.net/${(await turbo.uploadFile(animation_url)).id}`;
         } catch (err: any) {
           setIsConfirming(false);
           return notify({
@@ -222,7 +220,7 @@ export default function Mint() {
           type: "application/json",
         });
 
-        jsonUrl = `https://arweave.net/${(await irys.uploadFile(metadata)).id}`;
+        jsonUrl = `https://arweave.net/${(await turbo.uploadFile(metadata)).id}`;
       } else {
         jsonUrl = data.uri;
       }
@@ -435,7 +433,7 @@ export default function Mint() {
                 <p className="mt-1 text-sm text-gray-500">
                   Image that represents your NFT and an additional file that
                   will be associated with it. All files are uploaded to Arweave
-                  via Irys.
+                  via Turbo.
                 </p>
               </div>
               <MediaFiles watch={watch} setValue={setValue} />

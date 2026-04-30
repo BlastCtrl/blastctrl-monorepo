@@ -1,12 +1,11 @@
 import { notify } from "@/components";
-import type { IrysStorage } from "@/lib/irys";
+import type { TurboStorage } from "@/lib/turbo";
 import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
 import type { Amount, Currency } from "@/types";
-import { formatAmount, lamports } from "@/types";
+import { formatAmount } from "@/types";
 import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
 import { Transition } from "@headlessui/react";
 import { QuestionMarkCircleIcon } from "@heroicons/react/20/solid";
-import { ChevronRightIcon } from "@heroicons/react/24/outline";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { useLocalStorage, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
@@ -28,7 +27,7 @@ function pascalify(text: string) {
   return text.substring(0, 1).toUpperCase() + text.substring(1);
 }
 
-export const UploaderView = ({ irys }: { irys: IrysStorage }) => {
+export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
   const { connected } = useWallet();
   const { setVisible } = useWalletModal();
   const { network } = useNetworkConfigurationStore();
@@ -44,9 +43,9 @@ export const UploaderView = ({ irys }: { irys: IrysStorage }) => {
 
   const refreshBalance = useCallback(async () => {
     if (!connected) return;
-    const balance = await irys.getBalance();
+    const balance = await turbo.getBalance();
     setBalance(balance);
-  }, [irys, connected]);
+  }, [turbo, connected]);
 
   useEffect(() => {
     if (network !== WalletAdapterNetwork.Mainnet) {
@@ -54,16 +53,8 @@ export const UploaderView = ({ irys }: { irys: IrysStorage }) => {
         title: `Network is set to ${network}`,
         description: (
           <>
-            Using Irys on non-mainnet networks will result in your uploads not
-            being permanent. All uploads are removed after a week.{" "}
-            <a
-              className="text-blue-300 underline"
-              rel="noreferrer"
-              target="_blank"
-              href="https://docs.irys.xyz/developer-docs/using-devnet"
-            >
-              Docs
-            </a>
+            Turbo only settles payments on Solana mainnet. Switch your wallet
+            network to mainnet before uploading.
           </>
         ),
       });
@@ -79,42 +70,6 @@ export const UploaderView = ({ irys }: { irys: IrysStorage }) => {
       subscribed = false;
     };
   }, [network, refreshBalance]);
-
-  const handleWithdraw = async () => {
-    try {
-      const { requested } = await irys.withdrawAll();
-      const balance = lamports(requested);
-      notify({
-        title: "Withdraw succesful",
-        type: "success",
-        description: (
-          <>
-            Withdrawed{" "}
-            <span className="font-medium text-blue-300">
-              {formatAmount(balance)}
-            </span>
-          </>
-        ),
-      });
-    } catch (err: any) {
-      console.log({ err });
-      notify({
-        title: "Error withdrawing",
-        type: "error",
-        description: (
-          <>
-            {err.message ? (
-              <span className="break-words">{err.message}</span>
-            ) : (
-              "Unknown error, check the console for more information."
-            )}
-          </>
-        ),
-      });
-    } finally {
-      await refreshBalance();
-    }
-  };
 
   const handleDrag = (event: DragEvent<HTMLFormElement | HTMLDivElement>) => {
     event.preventDefault();
@@ -133,7 +88,7 @@ export const UploaderView = ({ irys }: { irys: IrysStorage }) => {
     if (event.dataTransfer.files?.[0]) {
       const droppedFile = event.dataTransfer.files[0];
       setFile(droppedFile);
-      void irys
+      void turbo
         .getUploadPrice(droppedFile.size)
         .then((price) => setFilePrice(price));
     }
@@ -144,7 +99,7 @@ export const UploaderView = ({ irys }: { irys: IrysStorage }) => {
     if (event.target?.files?.length === 1) {
       const selectedFile = event.target.files.item(0)!;
       setFile(selectedFile);
-      void irys
+      void turbo
         .getUploadPrice(selectedFile.size)
         .then((price) => setFilePrice(price));
     }
@@ -171,7 +126,7 @@ export const UploaderView = ({ irys }: { irys: IrysStorage }) => {
 
     try {
       setIsUploading(true);
-      const res = await irys.uploadFile(file);
+      const res = await turbo.uploadFile(file);
       const uri = `https://arweave.net/${res.id}`;
       setUploads((uploads) => [
         {
@@ -187,7 +142,7 @@ export const UploaderView = ({ irys }: { irys: IrysStorage }) => {
         type: "success",
         description: (
           <>
-            Your file is available at{" "}
+            Your file will become available at{" "}
             <a
               href={uri}
               rel="noreferrer"
@@ -195,7 +150,8 @@ export const UploaderView = ({ irys }: { irys: IrysStorage }) => {
               className="break-all font-medium text-blue-300 underline"
             >
               {uri}
-            </a>
+            </a>{" "}
+            once it finishes propagating on Arweave (usually a few minutes).
           </>
         ),
       });
@@ -349,7 +305,7 @@ export const UploaderView = ({ irys }: { irys: IrysStorage }) => {
                     <dt className="text-sm font-medium text-gray-500">
                       Estimated cost
                       <a
-                        href="https://docs.irys.xyz/overview/fees"
+                        href="https://docs.ardrive.io/docs/turbo/what-is-turbo.html"
                         rel="noreferrer"
                         target="_blank"
                       >
@@ -402,30 +358,15 @@ export const UploaderView = ({ irys }: { irys: IrysStorage }) => {
             <span className="mb-1 block text-xs uppercase tracking-wider text-gray-500">
               {network}
             </span>
-            <span className="font-medium text-gray-500">Irys funds </span>
+            <span className="font-medium text-gray-500">Turbo Credits </span>
             <span className="mx-1 text-base font-semibold text-gray-700">
-              {balance ? <>{formatAmount(balance)}</> : "0 SOL"}
+              {formatAmount(balance)}
             </span>
           </div>
-
-          <div className="my-3 w-full">
-            <button
-              disabled={isUploading}
-              onClick={handleWithdraw}
-              className={cn(
-                "bg-secondary inline-flex w-full items-center justify-center rounded-md border border-transparent px-4 py-1.5 text-base font-medium text-gray-50",
-                "hover:bg-secondary-focus focus:ring-secondary-focus focus:outline-none focus:ring-2 focus:ring-offset-2",
-                "disabled:pointer-events-none disabled:bg-gray-400",
-              )}
-            >
-              <ChevronRightIcon className="-ml-1 mr-1 h-5 w-5" />
-              Withdraw all
-            </button>
-            <p className="pt-2 text-xs text-gray-500">
-              These are the leftovers due to how the pricing works. Minimum
-              balance for withdrawing is 5000 lamports.
-            </p>
-          </div>
+          <p className="pb-1 pt-2 text-xs text-gray-500">
+            Leftover credits from previous uploads. Turbo Credits are
+            non-refundable but roll over to cover future uploads.
+          </p>
         </div>
       )}
 

@@ -1,0 +1,139 @@
+diff --git a/lib/esm/cli/cli.js b/lib/esm/cli/cli.js
+index dd9588980fbc19acd997119a847f86c02240f781..139faca94c4aa5430dc90453dfbdceecf89805aa 100755
+--- a/lib/esm/cli/cli.js
++++ b/lib/esm/cli/cli.js
+@@ -16,7 +16,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ // eslint-disable-next-line header/header -- This is a CLI file
+-import { DataItem } from '@dha-team/arbundles';
++import { DataItem } from '@dha-team/arbundles/web';
+ import { program } from 'commander';
+ import { readFileSync, readdirSync } from 'fs';
+ import { version } from '../version.js';
+diff --git a/lib/esm/common/factory.js b/lib/esm/common/factory.js
+index 074843a0887a5e07ed6fe503a68196efb185e282..9334dc8684aa80ce5e045dc91d70bc7c7b02f928 100644
+--- a/lib/esm/common/factory.js
++++ b/lib/esm/common/factory.js
+@@ -13,7 +13,7 @@
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
+-import { HexInjectedSolanaSigner, InjectedEthereumSigner, SignatureConfig, } from '@dha-team/arbundles';
++import { HexInjectedSolanaSigner, InjectedEthereumSigner, SignatureConfig, } from '@dha-team/arbundles/web';
+ import { isEthereumWalletAdapter, isSolanaWalletAdapter, supportedEvmSignerTokens, } from '../types.js';
+ import { Logger } from './logger.js';
+ import { TurboAuthenticatedPaymentService, TurboUnauthenticatedPaymentService, } from './payment.js';
+diff --git a/lib/esm/common/signer.js b/lib/esm/common/signer.js
+index de09197f1151b26f07930e4e2ce1b973fa3433af..5c3db59415b5f40a833c186fbc410e980dc48335 100644
+--- a/lib/esm/common/signer.js
++++ b/lib/esm/common/signer.js
+@@ -16,7 +16,7 @@
+ import { pubkeyToAddress } from '@cosmjs/amino';
+ import { Secp256k1 } from '@cosmjs/crypto';
+ import { toBase64 } from '@cosmjs/encoding';
+-import { EthereumSigner, HexSolanaSigner } from '@dha-team/arbundles';
++import { EthereumSigner, HexSolanaSigner } from '@dha-team/arbundles/web';
+ import { computePublicKey } from '@ethersproject/signing-key';
+ import { Connection, PublicKey, SystemProgram, Transaction, TransactionInstruction, } from '@solana/web3.js';
+ import { BigNumber } from 'bignumber.js';
+diff --git a/lib/esm/common/token/ario.js b/lib/esm/common/token/ario.js
+index 35da8ae130675ccf8ff8bb089362f8846d47b7f3..4e5b1078d17b6102246dc1205a3a546070af0bfb 100644
+--- a/lib/esm/common/token/ario.js
++++ b/lib/esm/common/token/ario.js
+@@ -13,7 +13,7 @@
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
+-import { ArconnectSigner, DataItem, createData } from '@dha-team/arbundles';
++import { ArconnectSigner, DataItem, createData } from '@dha-team/arbundles/web';
+ import { connect, createDataItemSigner } from '@permaweb/aoconnect';
+ import { BigNumber } from 'bignumber.js';
+ import { defaultProdAoConfigs, sleep } from '../../utils/common.js';
+diff --git a/lib/esm/common/token/erc20.js b/lib/esm/common/token/erc20.js
+index f19ac8e2c0534e36487f89d0c220463f838d2d29..961677a8bd5fd6e4f31b54444a4e7a1c5d026002 100644
+--- a/lib/esm/common/token/erc20.js
++++ b/lib/esm/common/token/erc20.js
+@@ -13,7 +13,7 @@
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
+-import { EthereumSigner } from '@dha-team/arbundles';
++import { EthereumSigner } from '@dha-team/arbundles/web';
+ import { Wallet as EthereumWallet, JsonRpcProvider, ethers } from 'ethers';
+ import { isEthereumWalletAdapter, } from '../../types.js';
+ import { defaultProdGatewayUrls } from '../../utils/common.js';
+diff --git a/lib/esm/common/token/solana.js b/lib/esm/common/token/solana.js
+index b11af674ea2a99057a73fa7d77d33045355bb722..c366afe0035e20b7c58d0783ed869302aa52a77a 100644
+--- a/lib/esm/common/token/solana.js
++++ b/lib/esm/common/token/solana.js
+@@ -13,7 +13,7 @@
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
+-import { HexInjectedSolanaSigner } from '@dha-team/arbundles';
++import { HexInjectedSolanaSigner } from '@dha-team/arbundles/web';
+ import { Connection, PublicKey, SystemProgram, Transaction, TransactionInstruction, } from '@solana/web3.js';
+ import { BigNumber } from 'bignumber.js';
+ import bs58 from 'bs58';
+diff --git a/lib/esm/common/upload.js b/lib/esm/common/upload.js
+index 81ff6b1d01a0f5a6cacaf175265dafc792841d48..bc07c5eeea5f4a2c3cda496674ac66323cd7458e 100644
+--- a/lib/esm/common/upload.js
++++ b/lib/esm/common/upload.js
+@@ -330,7 +330,7 @@ export class TurboAuthenticatedBaseUploadService extends TurboUnauthenticatedUpl
+         throw new FailedRequestError(msg, lastStatusCode);
+     }
+     async generateManifest({ paths, indexFile, fallbackFile, }) {
+-        const indexPath = 
++        const indexPath =
+         // Use the user provided index file if it exists,
+         indexFile !== undefined && paths[indexFile]?.id !== undefined
+             ? indexFile
+@@ -339,7 +339,7 @@ export class TurboAuthenticatedBaseUploadService extends TurboUnauthenticatedUpl
+                     ? 'index.html'
+                     : // Else use the first file in the paths object.
+                         Object.keys(paths)[0];
+-        const fallbackId = 
++        const fallbackId =
+         // Use the user provided fallback file if it exists,
+         fallbackFile !== undefined && paths[fallbackFile]?.id !== undefined
+             ? paths[fallbackFile].id
+diff --git a/lib/esm/node/signer.js b/lib/esm/node/signer.js
+index c9c7b392feda212058ead4cc62650d0558b186ad..61978fddef91b3bc60ecf0469240d2167d5aa606 100644
+--- a/lib/esm/node/signer.js
++++ b/lib/esm/node/signer.js
+@@ -13,7 +13,7 @@
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
+-import { ArconnectSigner, ArweaveSigner, EthereumSigner, HexSolanaSigner, serializeTags, streamSigner, } from '@dha-team/arbundles';
++import { ArconnectSigner, ArweaveSigner, EthereumSigner, HexSolanaSigner, serializeTags, streamSigner, } from '@dha-team/arbundles/web';
+ import { Readable } from 'stream';
+ import { createStreamWithSigningEvents } from '../common/events.js';
+ import { TurboDataItemAbstractSigner } from '../common/signer.js';
+diff --git a/lib/esm/utils/common.js b/lib/esm/utils/common.js
+index 92c9f75500e4bcb5b6ba89e4f5c9ce48afe6ad32..fc556bf0e7b54e159d1ffda10f7bf5ef404a703a 100644
+--- a/lib/esm/utils/common.js
++++ b/lib/esm/utils/common.js
+@@ -16,7 +16,7 @@
+ import { Secp256k1HdWallet, makeCosmoshubPath } from '@cosmjs/amino';
+ import { Slip10, Slip10Curve } from '@cosmjs/crypto';
+ import { toHex } from '@cosmjs/encoding';
+-import { ArweaveSigner, EthereumSigner, HexSolanaSigner, InjectedEthereumSigner, } from '@dha-team/arbundles';
++import { ArweaveSigner, EthereumSigner, HexSolanaSigner, InjectedEthereumSigner, } from '@dha-team/arbundles/web';
+ import { arrayify } from '@ethersproject/bytes';
+ import { recoverPublicKey } from '@ethersproject/signing-key';
+ import { PublicKey } from '@solana/web3.js';
+diff --git a/lib/esm/web/signer.js b/lib/esm/web/signer.js
+index 4ad038242a48ef5ffcf36ec228b4dd49050713b1..e648ad29cdc35c722c9f7ecc35002ea86727e419 100644
+--- a/lib/esm/web/signer.js
++++ b/lib/esm/web/signer.js
+@@ -13,7 +13,7 @@
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
+-import { ArconnectSigner, ArweaveSigner, EthereumSigner, HexSolanaSigner, InjectedEthereumSigner, createData, deepHash, stringToBuffer, } from '@dha-team/arbundles';
++import { ArconnectSigner, ArweaveSigner, EthereumSigner, HexSolanaSigner, InjectedEthereumSigner, createData, deepHash, stringToBuffer, } from '@dha-team/arbundles/web';
+ import { TurboDataItemAbstractSigner } from '../common/signer.js';
+ import { createUint8ArrayReadableStreamFactory } from '../utils/readableStream.js';
+ /**
