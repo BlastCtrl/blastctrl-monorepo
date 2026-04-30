@@ -1,0 +1,4 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "corepack pnpm@10.18.0 install --frozen-lockfile"
+}
