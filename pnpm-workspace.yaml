@@ -18,6 +18,11 @@ minimumReleaseAgeExclude:
   - "@types/react"
   - "@tanstack/react-query"
   - "@tanstack/react-query-devtools"
+patchedDependencies:
+  "@ardrive/turbo-sdk@1.41.1": "patches/@ardrive__turbo-sdk@1.41.1.patch"
+peerDependencyRules:
+  allowedVersions:
+    "@solana/kit": "2 || 5"
 overrides:
   "elliptic@<=6.6.0": "^6.6.1"
   "protobufjs@<7.5.5": "^7.5.5"
