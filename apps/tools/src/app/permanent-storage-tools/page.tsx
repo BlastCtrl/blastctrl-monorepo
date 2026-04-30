@@ -8,7 +8,7 @@ export default function Storage() {
     {
       name: "Upload a file to Arweave",
       href: "/permanent-storage-tools/file-upload",
-      description: "The file will be uploaded via the Irys network.",
+      description: "The file will be uploaded via ArDrive Turbo.",
       active: true,
     },
     {
