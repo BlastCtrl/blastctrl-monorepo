@@ -2,7 +2,7 @@
 "use client";
 
 import { cloneElement, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { HTMLProps, ReactElement, ReactNode, Ref } from "react";
 import type { Placement } from "@floating-ui/react";
 import {
   flip,
@@ -24,7 +24,7 @@ import { cn } from ".";
 
 type Props = {
   content: ReactNode;
-  children: JSX.Element;
+  children: ReactElement<{ ref?: Ref<Element> }>;
   placement?: Placement;
   className?: string;
   arrowClassName?: string;
@@ -34,6 +34,9 @@ const OPEN_DELAY = 200;
 const CLOSE_DELAY = 200;
 const ARROW_HEIGHT = 7;
 // const ARROW_WIDTH = 14;
+type ReferenceProps = HTMLProps<Element> & {
+  "data-state": "open" | "closed";
+};
 
 export function Tooltip({
   content,
@@ -83,7 +86,7 @@ export function Tooltip({
     },
   });
 
-  const childrenRef = (children as any).ref;
+  const childrenRef = children.props.ref;
   const ref = useMergeRefs([refs.setReference, childrenRef]);
 
   return (
@@ -94,7 +97,7 @@ export function Tooltip({
           ref,
           ...children.props,
           "data-state": open ? "open" : "closed",
-        }),
+        } as ReferenceProps),
       )}
       {isMounted && (
         <div

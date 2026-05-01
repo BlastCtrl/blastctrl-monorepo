@@ -26,7 +26,7 @@ export default function RevokeDelegations() {
     const { value } = await retryWithBackoff(() =>
       connection.getLatestBlockhashAndContext({ commitment: "confirmed" }),
     );
-    const token = new PublicKey("BWia4unXYeEZAeZeTQFQ2sKoeQQmeGhGmVQ7z4GZJJnx");
+    // const token = new PublicKey("BWia4unXYeEZAeZeTQFQ2sKoeQQmeGhGmVQ7z4GZJJnx");
     const tokenAccount = new PublicKey(
       "D59omT4FmyyGnegtLCCBNCjNAh7vAWJHn14Ux1faN7Ha",
     );
@@ -37,7 +37,7 @@ export default function RevokeDelegations() {
       createApproveInstruction(tokenAccount, delegate, publicKey, 25 * 1e8),
     );
 
-    (tx.recentBlockhash = value.blockhash), (tx.feePayer = publicKey);
+    ((tx.recentBlockhash = value.blockhash), (tx.feePayer = publicKey));
     const signature = await sendTransaction(tx, connection, {
       preflightCommitment: "confirmed",
       skipPreflight: true,
@@ -77,7 +77,7 @@ export default function RevokeDelegations() {
       ),
     );
 
-    (tx.recentBlockhash = value.blockhash), (tx.feePayer = publicKey);
+    ((tx.recentBlockhash = value.blockhash), (tx.feePayer = publicKey));
     const signature = await sendTransaction(tx, connection, {
       preflightCommitment: "confirmed",
       skipPreflight: true,

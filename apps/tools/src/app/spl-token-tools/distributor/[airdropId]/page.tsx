@@ -7,13 +7,12 @@ import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import {
   ComputeBudgetProgram,
-  LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
   Transaction,
 } from "@solana/web3.js";
 import clsx from "clsx";
-import React from "react";
+import React, { use } from "react";
 import { Box } from "../box";
 import { formatDate, useFadeIn } from "../common";
 import {
@@ -39,8 +38,9 @@ type AirdropIdQueryReturnData = NonNullable<
 export default function AirdropDetails({
   params,
 }: {
-  params: { airdropId: string };
+  params: Promise<{ airdropId: string }>;
 }) {
+  const { airdropId } = use(params);
   const isVisible = useFadeIn();
   const { connection } = useConnection();
   const { publicKey, signAllTransactions } = useWallet();
@@ -48,10 +48,10 @@ export default function AirdropDetails({
     mutate,
     isPending,
     data: startData,
-  } = useStartAirdrop(params.airdropId);
+  } = useStartAirdrop(airdropId);
   const hasStarted = !!startData;
   const [showOnlyPending, setShowOnlyPending] = React.useState(false);
-  const { data, refetch } = useGetAirdropById(params.airdropId, hasStarted);
+  const { data, refetch } = useGetAirdropById(airdropId, hasStarted);
 
   const getAirdropStatusBadgeStyle = (status: AirdropStatus) => {
     switch (status) {

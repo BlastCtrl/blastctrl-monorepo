@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@floating-ui/react": "^0.26.13",
-    "@headlessui/react": "2.1.3",
+    "@headlessui/react": "2.2.0",
     "clsx": "^2.1.1",
     "tailwind-merge": "^2.6.0"
   },
@@ -26,16 +26,16 @@
     "@blastctrl/prettier-config": "workspace:*",
     "@blastctrl/tailwind-config": "workspace:*",
     "@blastctrl/tsconfig": "workspace:*",
-    "@types/react": "18.2.69",
-    "@types/react-dom": "18.3.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
     "eslint": "^8.57.0",
     "prettier": "^3.2.5",
     "tailwindcss": "^3.4.3",
     "typescript": "^5.4.3"
   },
   "peerDependencies": {
-    "next": "14.2.35",
-    "react": "18.3.1"
+    "next": "^15.5.15",
+    "react": "^19.2.5"
   },
   "eslintConfig": {
     "extends": [

@@ -1,13 +1,6 @@
 import { Box } from "./box";
 import type { ReactNode } from "react";
-import dynamic from "next/dynamic";
-
-const DynamicSolaceProvider = dynamic(
-  () => import("./solace-provider").then((mod) => mod.SolaceProvider),
-  {
-    ssr: false,
-  },
-);
+import { SolaceProviderBoundary } from "./solace-provider-boundary";
 
 export default function Distributor({ children }: { children: ReactNode }) {
   return (
@@ -30,7 +23,7 @@ export default function Distributor({ children }: { children: ReactNode }) {
           </p>
         </div>
       </Box>
-      <DynamicSolaceProvider>{children}</DynamicSolaceProvider>
+      <SolaceProviderBoundary>{children}</SolaceProviderBoundary>
     </div>
   );
 }
