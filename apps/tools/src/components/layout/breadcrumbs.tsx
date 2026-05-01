@@ -7,21 +7,25 @@ import { usePathname } from "next/navigation";
 export const Breadcrumbs = () => {
   const pathname = usePathname();
 
-  const paths = pathname?.split("/") || [];
-  const length = paths.length - 1;
-  const breadcrumbs = paths
-    .filter(Boolean)
-    .reduce<any[]>((crumbs, path, index) => {
-      const crumb =
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        index === 0 ? path : crumbs[index - 1].href.concat("/", path);
-      path = path.replaceAll("-", " ");
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return [
-        ...crumbs,
-        { name: path, href: crumb, current: index === length - 1 },
-      ];
-    }, []);
+  type Breadcrumb = {
+    name: string;
+    href: string;
+    current: boolean;
+  };
+
+  const segments = pathname.split("/").filter(Boolean);
+
+  const breadcrumbs: Breadcrumb[] = segments.map((segment, index) => {
+    const href = "/" + segments.slice(0, index + 1).join("/");
+    const name = segment.replaceAll("-", " ");
+    const current = index === segments.length - 1;
+
+    return {
+      name,
+      href,
+      current,
+    };
+  });
 
   // Do not show breadcrumbs if we're on the home page
   if (breadcrumbs.length === 0) {

@@ -17,7 +17,6 @@ const PopoverInternalPanel = React.forwardRef<
           "z-20 overflow-hidden rounded border border-black/5 bg-white px-4 pt-4 shadow-md",
           "sm:absolute sm:inset-x-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2",
           "fixed left-8 top-20",
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           className,
         )}
         ref={ref}

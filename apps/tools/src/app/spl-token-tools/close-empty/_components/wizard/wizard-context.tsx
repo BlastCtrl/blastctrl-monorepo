@@ -16,7 +16,7 @@ interface Store {
   closeDialog: () => void;
 }
 
-const CloseAccountsContext = createContext(null as any as StoreApi<Store>);
+const CloseAccountsContext = createContext(null as unknown as StoreApi<Store>);
 
 export const CloseAccountsProvider = ({
   children,

@@ -98,8 +98,8 @@ export function useDelegatedAssets(address: string) {
           );
         }
         return parsedResults;
-      } catch (err: any) {
-        console.log(err.message);
+      } catch (err) {
+        console.log(err instanceof Error ? err.message : String(err));
         return parsedResults;
       }
     },

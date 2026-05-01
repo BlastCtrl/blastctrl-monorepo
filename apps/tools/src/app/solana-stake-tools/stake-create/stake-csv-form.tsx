@@ -24,7 +24,7 @@ import {
   Transaction,
 } from "@solana/web3.js";
 import Papa from "papaparse";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import toast from "react-hot-toast";
 import { NotificationWindow } from "@/components/notification";
 
@@ -143,7 +143,7 @@ export function StakeCSVForm() {
             message: "Unlock date must be in the future",
           });
         }
-      } catch (e) {
+      } catch {
         errors.push({
           row: index + 1,
           field: "unlock_date",
@@ -393,23 +393,29 @@ export function StakeCSVForm() {
 
         // Don't show individual success toasts for batch - will be handled at batch level
         return { success: true, txId, signature };
-      } catch (error: any) {
+      } catch (error) {
         console.error(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         // Update status to failed
         txActions.updateTransactionStatus(
           txId,
           "failed",
           undefined,
-          error.message,
+          errorMessage,
         );
 
         notify({
           type: "error",
           title: `Failed to create stake account ${txIndex}`,
-          description: error.message,
+          description: errorMessage,
         });
 
-        return { success: false, txId, error: error.message };
+        return {
+          success: false,
+          txId,
+          error: errorMessage,
+        };
       }
     });
 
@@ -467,20 +473,22 @@ export function StakeCSVForm() {
         txActions.updateTransactionStatus(txId, "confirmed", signature);
 
         // Don't show individual success toasts - will be handled at completion
-      } catch (error: any) {
+      } catch (error) {
         console.error(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         // Update status to failed
         txActions.updateTransactionStatus(
           txId,
           "failed",
           undefined,
-          error.message,
+          errorMessage,
         );
 
         notify({
           type: "error",
           title: `Failed to create stake account ${i + 1}`,
-          description: error.message,
+          description: errorMessage,
         });
         // Continue with next transaction even if one fails
       }
@@ -564,11 +572,13 @@ export function StakeCSVForm() {
               ),
               { duration: isLastBatch ? 20000 : 3000 },
             );
-          } catch (error: any) {
+          } catch (error) {
             console.error(
               `Batch ${Math.floor(i / BATCH_SIZE) + 1} failed:`,
               error,
             );
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
 
             // Mark all transactions in this batch as failed
             batchIds.forEach((txId) => {
@@ -576,7 +586,7 @@ export function StakeCSVForm() {
                 txId,
                 "failed",
                 undefined,
-                error.message,
+                errorMessage,
               );
             });
 
@@ -589,7 +599,7 @@ export function StakeCSVForm() {
                 <NotificationWindow
                   type="error"
                   title={`Batch ${batchNum} failed`}
-                  description={error.message}
+                  description={errorMessage}
                   visible={t.visible}
                   onClose={() => toast.dismiss(t.id)}
                 />
@@ -623,12 +633,12 @@ export function StakeCSVForm() {
             ? `Successfully created all ${successCount} stake accounts`
             : `Created ${successCount} stake accounts, ${failedCount} failed`,
       });
-    } catch (error: any) {
+    } catch (error) {
       // Final error message with normal duration
       notify({
         type: "error",
         title: "Batch processing failed",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
       });
     } finally {
       txActions.setProcessing(false);
@@ -710,21 +720,23 @@ export function StakeCSVForm() {
         title: `Retry successful`,
         description: `Stake account ${transaction.index} created successfully`,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Retry failed:", error);
 
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       // Update status back to failed
       txActions.updateTransactionStatus(
         transactionId,
         "failed",
         undefined,
-        error.message,
+        errorMessage,
       );
 
       notify({
         type: "error",
         title: `Retry failed for stake account ${transaction.index}`,
-        description: error.message,
+        description: errorMessage,
       });
     }
   };
@@ -895,7 +907,8 @@ export function StakeCSVForm() {
               <div className="mt-2 space-y-1">
                 {parsedData.errors.map((error, index) => (
                   <p key={index} className="text-sm text-red-700">
-                    Row {error.row}, Field "{error.field}": {error.message}
+                    Row {error.row}, Field &quot;{error.field}&quot;:{" "}
+                    {error.message}
                   </p>
                 ))}
               </div>

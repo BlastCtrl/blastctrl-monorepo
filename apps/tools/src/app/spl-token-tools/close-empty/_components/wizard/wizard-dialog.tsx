@@ -51,7 +51,6 @@ const DialogTitle = () => {
 
 const Step = ({ step }: { step: number }) => {
   const currentStep = useCloseAccountsStore((store) => store.currentStep);
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   const error = useCloseAccountsStore((store) => store.error);
 
   return (

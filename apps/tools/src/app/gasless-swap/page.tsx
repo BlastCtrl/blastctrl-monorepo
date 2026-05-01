@@ -92,13 +92,13 @@ export default function GaslessSwap() {
 
       transaction = swap.transaction;
       quote = swap.quote;
-    } catch (err: any) {
+    } catch (err) {
       setIsSwapping(false);
       if (err instanceof WalletSignTransactionError) return;
       return notify({
         type: "error",
         title: "Error Creating Swap Transaction",
-        description: err?.message,
+        description: err instanceof Error ? err.message : String(err),
       });
     }
 
@@ -131,10 +131,14 @@ export default function GaslessSwap() {
         },
         id,
       );
-    } catch (err: any) {
+    } catch (err) {
       if (err instanceof WalletSignTransactionError) return;
       notify(
-        { type: "error", title: "Swap Error", description: err?.message },
+        {
+          type: "error",
+          title: "Swap Error",
+          description: err instanceof Error ? err.message : String(err),
+        },
         id,
       );
     } finally {

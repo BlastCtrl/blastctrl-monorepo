@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 import { redisClient } from "./redis";
 import type { Config } from "cache-manager";
 import { caching } from "cache-manager";
@@ -26,9 +25,8 @@ function builder() {
   return {
     name: "redis",
     async get<T>(key: string) {
-      const val = await redisClient.get<any>(key);
+      const val = await redisClient.get<string>(key);
       if (val === undefined || val === null) return undefined;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       else return parse(val) as T;
     },
     async set<T>(key: string, value: T, ttl?: number) {

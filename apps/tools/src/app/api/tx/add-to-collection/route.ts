@@ -1,9 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { chunk } from "@/lib/utils";
 import { Networks } from "@/lib/solana/endpoints";
-z;
+
 import { addNftToCollection } from "@/lib/solana/collections";
 import type { Cluster } from "@solana/web3.js";
 import type { NextRequest } from "next/server";

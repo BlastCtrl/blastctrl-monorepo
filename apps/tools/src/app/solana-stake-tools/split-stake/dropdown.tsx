@@ -53,7 +53,6 @@ export function DropdownOption<T>({
     <ListboxOption as={Fragment} {...props}>
       {({ selectedOption }) => {
         return selectedOption ? (
-          // @ts-ignore idk
           <>{children}</>
         ) : (
           <div className="w-full cursor-default rounded-md px-3 py-1 text-base/6 data-[selected]:bg-indigo-500 data-[selected]:text-white sm:text-sm/6 [&:not([data-selected])]:data-[focus]:bg-blue-100">

@@ -131,7 +131,6 @@ export const ManualInput = () => {
       destinationInfo = {
         address: destinationAta,
         ...rest,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         data: AccountLayout.decode(data, 0),
       };
     } catch (err) {
@@ -191,12 +190,12 @@ export const ManualInput = () => {
       setNestedInfo(nestedAtaInfo);
       setDestinationInfo(destinationInfo);
       setMintInfo(mintInfo);
-    } catch (err: any) {
+    } catch (err) {
       console.log({ err });
       notify({
         type: "error",
         title: "Error while asserting account validity",
-        description: err?.message,
+        description: err instanceof Error ? err.message : String(err),
       });
       setIsProcessing(false);
       return;
@@ -263,16 +262,17 @@ export const ManualInput = () => {
         ),
         txid: signature,
       });
-    } catch (err: any) {
+    } catch (err) {
       console.log({ err });
       notify({
         type: "error",
         title: "Error confirming recover nested",
-        description: err?.message ? (
-          <span className="break-all">{err.message}</span>
-        ) : (
-          "Unknown error, check the console for more details"
-        ),
+        description:
+          err instanceof Error ? (
+            <span className="break-all">{err.message}</span>
+          ) : (
+            "Unknown error, check the console for more details"
+          ),
       });
     } finally {
       setNestedInfo(null);

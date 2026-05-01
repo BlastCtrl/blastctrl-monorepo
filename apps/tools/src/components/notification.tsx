@@ -149,7 +149,7 @@ export const notifyPromise = <T,>(
   msgs: {
     loading: NotifyProps;
     success: ValueOrFunction<NotifyProps, T>;
-    error: ValueOrFunction<NotifyProps, any>;
+    error: ValueOrFunction<NotifyProps, Error>;
   },
 ) => {
   const id = notify({ type: "loading", ...msgs.loading });

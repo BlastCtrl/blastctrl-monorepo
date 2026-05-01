@@ -80,7 +80,7 @@ export async function sendSignedTransaction({
     if (result.value.err) {
       throw Error(JSON.stringify(result.value.err));
     }
-  } catch (err: any) {
+  } catch (err) {
     console.error(err);
     if (err instanceof TransactionExpiredBlockheightExceededError) {
       console.log("Timed out awaiting confirmation on transaction");
@@ -102,7 +102,7 @@ export async function sendSignedTransaction({
           })
         ).value;
       }
-    } catch (e) {
+    } catch {
       console.error("Simulation error");
     }
 
@@ -147,7 +147,8 @@ export async function simulateTransaction(
   // @ts-expect-error yes
   const wireTransaction = transaction._serialize(signData);
   const encodedTransaction = wireTransaction.toString("base64");
-  const config: any = { encoding: "base64", commitment };
+
+  const config = { encoding: "base64", commitment };
   const args = [encodedTransaction, config];
 
   // @ts-expect-error yes
@@ -155,6 +156,6 @@ export async function simulateTransaction(
   if (res.error) {
     throw new Error("failed to simulate transaction: " + res.error.message);
   }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+
   return res.result;
 }

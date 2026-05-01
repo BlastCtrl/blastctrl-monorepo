@@ -10,9 +10,8 @@ import type {
   GetAirdrops200Item,
   GetAirdropsId200,
 } from "@blastctrl/solace-sdk";
-import { useState, useCallback, useEffect, useRef, KeyboardEvent } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { useSolace } from "./solace-provider";
 import { useDeleteAirdrop, useGetAirdrops, useSetLabel } from "./state";
 import { formatDate, useFadeIn } from "./common";
@@ -52,11 +51,11 @@ export default function Overview() {
     }
 
     setAuthToken(response.data);
-  }, [publicKey, authToken?.refreshToken]);
+  }, [publicKey, authToken?.refreshToken, setAuthToken]);
 
   const clearAuthToken = useCallback(() => {
     setAuthToken(null);
-  }, []);
+  }, [setAuthToken]);
 
   useEffect(() => {
     if (authToken?.expiresAt) {
@@ -90,7 +89,7 @@ export default function Overview() {
         throw new Error("wallet cannot sign");
       }
 
-      let challenge = await solace.api.getAuthChallenge({
+      const challenge = await solace.api.getAuthChallenge({
         address: publicKey.toString(),
       });
       if (challenge.status !== 200) {
@@ -241,7 +240,7 @@ const SolaceAirdropDashboard = ({
 
         {!isLoading && !isError && airdrops?.length === 0 && (
           <div className="py-6 text-center text-gray-500">
-            <p>You haven't created any airdrops yet.</p>
+            <p>You haven&apos;t created any airdrops yet.</p>
           </div>
         )}
 

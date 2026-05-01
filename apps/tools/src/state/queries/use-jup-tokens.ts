@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQuery, queryOptions } from "@tanstack/react-query";
 
 type TokensResponse = {

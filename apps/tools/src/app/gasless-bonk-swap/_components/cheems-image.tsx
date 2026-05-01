@@ -1,5 +1,3 @@
-/* eslint-disable jsx-a11y/interactive-supports-focus */
-/* eslint-disable jsx-a11y/click-events-have-key-events */
 import CheemsPng from "@/../public/cheems.png";
 import { cn } from "@blastctrl/ui";
 import Image from "next/image";
@@ -20,6 +18,7 @@ export const CheemsImage = () => {
 
     // Trigger the "jello" animation
     cheemsRef.current.style.animation = "none";
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     cheemsRef.current.offsetHeight; /* trigger reflow */
     cheemsRef.current.style.removeProperty("animation");
 

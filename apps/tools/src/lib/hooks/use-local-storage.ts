@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 import { useState, useEffect } from "react";
 
 type UseLocalStorageStateHook<T> = [T, React.Dispatch<React.SetStateAction<T>>];
@@ -25,7 +24,7 @@ export function useLocalStorageState<T>(
 
   useEffect(() => {
     try {
-      let newValue = JSON.stringify(state);
+      const newValue = JSON.stringify(state);
       window.localStorage.setItem(key, newValue);
       window.dispatchEvent(new StorageEvent("storage", { key, newValue }));
     } catch (error) {

@@ -47,7 +47,8 @@ export default function CloseEmpty() {
     const tx = new Transaction().add(
       ...tokens.map((t) => createTokenAccount(new PublicKey(t), publicKey)),
     );
-    (tx.recentBlockhash = value.blockhash), (tx.feePayer = publicKey);
+    tx.recentBlockhash = value.blockhash;
+    tx.feePayer = publicKey;
     const signature = await sendTransaction(tx, connection, {
       preflightCommitment: "confirmed",
       skipPreflight: true,

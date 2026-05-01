@@ -6,7 +6,6 @@ import SolaceAirdropReview from "./airdrop-review";
 import { useSolBalance } from "@/state/queries/use-sol-balance";
 import { useAssetData } from "@/state/queries/use-asset-data";
 import { notify } from "@/components/notification";
-import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { Box } from "../box";
 
 // Define types
@@ -54,7 +53,7 @@ export default function CreateNewFlow() {
   };
 
   const handleTokenDataFetched = (decimals: number): void => {
-    setAirdropDetails(prev => ({ ...prev, decimals }));
+    setAirdropDetails((prev) => ({ ...prev, decimals }));
     setStep(2);
   };
 
@@ -101,7 +100,12 @@ const TokenDataFetcher: React.FC<TokenDataFetcherProps> = ({
   onSuccess,
   onError,
 }) => {
-  const { data: assetData, isLoading, isError, error } = useAssetData(mintAddress);
+  const {
+    data: assetData,
+    isLoading,
+    isError,
+    error,
+  } = useAssetData(mintAddress);
 
   React.useEffect(() => {
     if (isLoading) return;
@@ -110,7 +114,9 @@ const TokenDataFetcher: React.FC<TokenDataFetcherProps> = ({
       notify({
         type: "error",
         title: "Token data fetch failed",
-        description: error?.message || "Could not fetch token information. Please check the mint address.",
+        description:
+          error?.message ||
+          "Could not fetch token information. Please check the mint address.",
       });
       onError();
       return;
@@ -128,9 +134,10 @@ const TokenDataFetcher: React.FC<TokenDataFetcherProps> = ({
       </div>
       <h2 className="mb-2 text-lg font-semibold">Fetching Token Information</h2>
       <p className="text-center text-sm text-gray-500">
-        Getting token details for mint address:<br />
+        Getting token details for mint address:
+        <br />
         <span className="font-mono text-xs">{mintAddress}</span>
       </p>
     </Box>
   );
-}
+};

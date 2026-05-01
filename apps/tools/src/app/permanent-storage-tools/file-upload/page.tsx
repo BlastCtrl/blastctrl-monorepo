@@ -18,7 +18,7 @@ export default function FileUpload() {
       void make();
     }
 
-    () => {
+    return () => {
       setStorage(null);
     };
   }, [storage, wallet, wallet.connected]);
