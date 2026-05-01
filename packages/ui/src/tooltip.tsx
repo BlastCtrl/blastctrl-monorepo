@@ -31,7 +31,7 @@ type Props = {
 };
 
 const OPEN_DELAY = 200;
-const CLOSE_DELAY = 300;
+const CLOSE_DELAY = 200;
 const ARROW_HEIGHT = 7;
 // const ARROW_WIDTH = 14;
 
@@ -68,7 +68,15 @@ export function Tooltip({
   ]);
 
   const { isMounted, styles } = useTransitionStyles(context, {
-    duration: { open: 200, close: 100 },
+    duration: { open: 200, close: 150 },
+    open: {
+      opacity: 1,
+      transform: "scale(1)",
+    },
+    close: {
+      opacity: 0,
+      transform: "scale(0)",
+    },
     initial: {
       opacity: 0,
       transform: "scale(0.8)",
