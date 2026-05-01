@@ -1,6 +1,5 @@
 import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
-import { mplCandyMachine } from "@metaplex-foundation/mpl-candy-machine";
 import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
 import { mplTokenMetadata } from "@metaplex-foundation/mpl-token-metadata";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -18,7 +17,6 @@ const useUmi = (): Umi => {
     () =>
       createUmi(endpoint)
         .use(walletAdapterIdentity(wallet))
-        .use(mplCandyMachine())
         .use(mplTokenMetadata())
         .use(mplCore()),
     [wallet, endpoint],
