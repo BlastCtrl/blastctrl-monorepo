@@ -64,13 +64,14 @@ export const SignStep = () => {
       }
 
       goToStepThree(closedAccounts, null);
-    } catch (err: any) {
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
       notify({
         type: "error",
         title: "Transaction error",
-        description: err.message,
+        description: errorMessage,
       });
-      goToStepThree(closedAccounts, err.message);
+      goToStepThree(closedAccounts, errorMessage);
     } finally {
       setIsConfirming(false);
     }

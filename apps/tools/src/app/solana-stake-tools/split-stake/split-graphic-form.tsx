@@ -3,7 +3,7 @@
 import { useUserStakeAccounts } from "@/state/queries/use-user-stake-accounts";
 import type { StakeAccountType } from "@/state/queries/use-user-stake-accounts";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import type { FormEvent } from "react";
+import type { SyntheticEvent } from "react";
 import { useState } from "react";
 import { lamportsToSol, lamportsToSolString } from "@/lib/solana/common";
 import {
@@ -139,7 +139,7 @@ function SplitFormInner({
     });
   };
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: SyntheticEvent) => {
     e.preventDefault();
     if (!publicKey || !sendTransaction || !selectedAccount) {
       throw Error("publicKey || sendTransaction unsupported");
@@ -210,11 +210,11 @@ function SplitFormInner({
         txid: signature,
       });
       setFormSuccess(stakeAccount.publicKey.toString());
-    } catch (error: any) {
+    } catch (error) {
       notify({
         type: "error",
         title: "Transaction error",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
       });
     } finally {
       setIsConfirming(false);

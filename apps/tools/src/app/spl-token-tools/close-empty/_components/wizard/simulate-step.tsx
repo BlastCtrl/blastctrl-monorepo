@@ -60,10 +60,10 @@ export const SimulateStep = () => {
       ),
     );
 
-    // TODO: fix types here
     const good: ParsedTokenAccount[] = [];
     for (let i = 0; i < simulationResults.length; i++) {
-      const result = simulationResults[i] as any;
+      const result = simulationResults[i];
+      if (!result) continue;
 
       console.log(simulationResults[i]);
       if (result.status === "rejected") continue;

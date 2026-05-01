@@ -13,7 +13,6 @@ export const FinalStep = () => {
     (store) => store.simulatedAccounts,
   );
   const closedAccounts = useCloseAccountsStore((store) => store.closedAccounts);
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   const error = useCloseAccountsStore((store) => store.error);
 
   const handleCloseDialog = async () => {

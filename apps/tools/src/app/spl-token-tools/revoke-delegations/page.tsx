@@ -37,7 +37,8 @@ export default function RevokeDelegations() {
       createApproveInstruction(tokenAccount, delegate, publicKey, 25 * 1e8),
     );
 
-    ((tx.recentBlockhash = value.blockhash), (tx.feePayer = publicKey));
+    tx.recentBlockhash = value.blockhash;
+    tx.feePayer = publicKey;
     const signature = await sendTransaction(tx, connection, {
       preflightCommitment: "confirmed",
       skipPreflight: true,
@@ -77,7 +78,8 @@ export default function RevokeDelegations() {
       ),
     );
 
-    ((tx.recentBlockhash = value.blockhash), (tx.feePayer = publicKey));
+    tx.recentBlockhash = value.blockhash;
+    tx.feePayer = publicKey;
     const signature = await sendTransaction(tx, connection, {
       preflightCommitment: "confirmed",
       skipPreflight: true,

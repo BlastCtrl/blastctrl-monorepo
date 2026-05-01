@@ -22,7 +22,6 @@ export type UploadedFile = {
 };
 
 function pascalify(text: string) {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
   text = text.replace(/[-_\s.]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ""));
   return text.substring(0, 1).toUpperCase() + text.substring(1);
 }
@@ -106,7 +105,6 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
   };
 
   const handleCancel = (e: any) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     e.preventDefault();
     setFile(null);
     setFilePrice(null);
@@ -156,18 +154,12 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
         ),
       });
       setFile(null);
-    } catch (err: any) {
+    } catch (err) {
       console.log({ err });
       notify({
         title: "Error uploading",
         type: "error",
-        description: (
-          <>
-            {err.message
-              ? err.message
-              : "Unknown error, check the console for more details"}
-          </>
-        ),
+        description: err instanceof Error ? err.message : String(err),
       });
     } finally {
       void refreshBalance();

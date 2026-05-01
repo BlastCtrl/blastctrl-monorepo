@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-
 import type { DataV2 } from "@metaplex-foundation/mpl-token-metadata";
 import {
   createMetadataAccountV3,

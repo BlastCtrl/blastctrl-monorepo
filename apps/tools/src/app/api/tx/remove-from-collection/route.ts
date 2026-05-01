@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { chunk } from "@/lib/utils";
 import { getMetadata } from "@/lib/solana";
 import { unverifyCollectionNft } from "@/lib/solana/collections";
@@ -47,7 +44,8 @@ export async function POST(req: NextRequest) {
 
   const nftMetadata = await fetchMetadata(umi, getMetadata(nfts[0]));
 
-  const collection = (nftMetadata as any).collection?.value?.key;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const collection = (nftMetadata as unknown as any).collection?.value?.key;
 
   if (!collection) {
     return new Response("NFT missing collection key", {

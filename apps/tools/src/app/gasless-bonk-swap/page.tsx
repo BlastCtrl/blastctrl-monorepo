@@ -82,13 +82,13 @@ export default function BonkSwap() {
       );
 
       transaction = swap.transaction;
-    } catch (err: any) {
+    } catch (err) {
       setIsSwapping(false);
       if (err instanceof WalletSignTransactionError) return;
       return notify({
         type: "error",
         title: "Error Creating Swap Transaction",
-        description: err?.message,
+        description: err instanceof Error ? err.message : String(err),
       });
     }
     const signature = await sendTransaction(transaction, connection);

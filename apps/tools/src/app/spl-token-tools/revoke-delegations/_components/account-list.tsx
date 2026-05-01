@@ -28,7 +28,6 @@ export const AccountList = ({
 }: {
   delegatedAccounts: ParsedDelegatedTokenAccount[];
 }) => {
-  const { publicKey } = useWallet();
   const checkboxRef = useRef<HTMLInputElement>(null);
   const [checkboxState, setCheckboxState] = useState<CheckboxState>("empty");
   const [selectedAccounts, setSelectedAccounts] = useState<
@@ -275,7 +274,7 @@ function RevokeDelegationsButton({
   selectedAccounts: ParsedDelegatedTokenAccount[];
 }) {
   const { connection } = useConnection();
-  const { connected, publicKey, sendTransaction } = useWallet();
+  const { publicKey, sendTransaction } = useWallet();
 
   const handleRevokeDelegations = async () => {
     if (!publicKey || !sendTransaction) return;

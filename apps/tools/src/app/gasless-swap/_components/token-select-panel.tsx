@@ -21,6 +21,8 @@ export function TokenSelectPanel({
 }: {
   onSelect: (token: Token) => void;
 }) {
+  "use no memo";
+
   const { publicKey } = useWallet();
   const [enableUnknownTokens, setEnableUnknownTokens] = useState(false);
   const { data, status, error } = useJupTokens(

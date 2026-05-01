@@ -143,16 +143,17 @@ export const NestedInfo = ({
         copy.splice(idx, 1);
         return copy;
       });
-    } catch (err: any) {
+    } catch (err) {
       console.log({ err });
       notify({
         type: "error",
         title: "Error confirming recover nested",
-        description: err?.message ? (
-          <span className="break-all">{err.message}</span>
-        ) : (
-          "Unknown error, check the console for more details"
-        ),
+        description:
+          err instanceof Error ? (
+            <span className="break-all">{err.message}</span>
+          ) : (
+            "Unknown error, check the console for more details"
+          ),
       });
     } finally {
       setConfirming(false);

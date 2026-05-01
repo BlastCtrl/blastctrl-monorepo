@@ -23,7 +23,6 @@ import { useAutoConnect } from "@/state/context/AutoConnectProvider";
 import { Label } from "@blastctrl/ui/fieldset";
 
 export const DesktopWallet = () => {
-  // eslint-disable-next-line @typescript-eslint/unbound-method
   const { publicKey, wallet, disconnect } = useWallet();
   const { setVisible } = useWalletModal();
   const wallet58 = useMemo(() => publicKey?.toBase58() ?? "", [publicKey]);

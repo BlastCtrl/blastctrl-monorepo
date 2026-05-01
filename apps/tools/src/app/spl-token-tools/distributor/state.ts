@@ -116,7 +116,10 @@ export function useCreateTokenAirdrop() {
   return useMutation<PostAirdropsToken201, SolaceError, PostAirdropsTokenBody>({
     mutationKey: ["createTokenAirdrop"],
     mutationFn: async (data) => {
-      const response = await withMinimumTime(sdk.api.postAirdropsToken(data), 500);
+      const response = await withMinimumTime(
+        sdk.api.postAirdropsToken(data),
+        500,
+      );
       if (response.status !== 201) {
         throw new SolaceError(response.data);
       }
@@ -188,8 +191,10 @@ export function useRetryMany(airdropId: string) {
 
       if (
         responses.some((response) => {
-          response.status === "rejected" ||
-            (response.status === "fulfilled" && response.value.status !== 200);
+          return (
+            response.status === "rejected" ||
+            (response.status === "fulfilled" && response.value.status !== 200)
+          );
         })
       ) {
         throw new Error("Some retry requests were rejected.");

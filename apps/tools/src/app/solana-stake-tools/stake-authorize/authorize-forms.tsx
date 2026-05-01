@@ -254,11 +254,11 @@ function AuthorizeTransactionBuilder({
       });
 
       await refetch();
-    } catch (error: any) {
+    } catch (error) {
       notify({
         type: "error",
         title: "Transaction error",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
       });
     } finally {
       setIsConfirming(false);

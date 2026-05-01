@@ -27,11 +27,6 @@ import { notify } from "@/components";
 
 type TokenAction = "transfer" | "burn" | null;
 
-type TokenWithAction = {
-  account: ParsedTokenAccount;
-  action: TokenAction;
-};
-
 export const TokenList = ({
   tokenAccounts,
   sourceWallet,
@@ -211,7 +206,7 @@ export const TokenList = ({
 
       // Clear selections
       setTokenActions(new Map());
-    } catch (err: any) {
+    } catch (err) {
       console.error("Transaction error:", err);
       if (err instanceof SendTransactionError) {
         console.log(err.logs);
@@ -219,7 +214,8 @@ export const TokenList = ({
       notify({
         type: "error",
         title: "Transaction failed",
-        description: err?.message || "An unknown error occurred",
+        description:
+          err instanceof Error ? err.message : "An unknown error occurred",
       });
     } finally {
       setIsProcessing(false);

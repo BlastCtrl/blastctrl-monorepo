@@ -70,7 +70,7 @@ export function SolaceProvider({ children }: { children: React.ReactNode }) {
       window.addEventListener("storage", callback);
       return () => window.removeEventListener("storage", callback);
     }
-  }, []);
+  }, [queryClient]);
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
@@ -86,7 +86,7 @@ export function SolaceProvider({ children }: { children: React.ReactNode }) {
         // redirect the user back to start
       }
     }
-  }, [publicKey]);
+  }, [publicKey, queryClient, push]);
 
   return (
     <SolaceContext.Provider value={instance}>{children}</SolaceContext.Provider>

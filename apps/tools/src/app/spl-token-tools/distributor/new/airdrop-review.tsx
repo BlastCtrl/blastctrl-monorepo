@@ -261,9 +261,9 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
                   <span className="flex items-center text-gray-600">
                     Token account creation
                     <InfoTooltip className="ml-1">
-                      If a recipient doesn't own a token account for this token,
-                      we need to create it for them. The fee is 0.00203928 SOL
-                      per account.
+                      If a recipient does&apos;t own a token account for this
+                      token, we need to create it for them. The fee is
+                      0.00203928 SOL per account.
                     </InfoTooltip>
                   </span>
                   <span>
@@ -403,7 +403,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
               {searchTerm && searchResults.length === 0 && (
                 <tr>
                   <td colSpan={2} className="p-3 text-center text-gray-500">
-                    No addresses found matching "{searchTerm}"
+                    No addresses found matching &quot;{searchTerm}&quot;
                   </td>
                 </tr>
               )}

@@ -189,11 +189,11 @@ function AccountListForm({
         exact: true,
         queryKey: ["user-stake-accounts", publicKey.toString()],
       });
-    } catch (error: any) {
+    } catch (error) {
       notify({
         type: "error",
         title: "Transaction error",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
       });
     } finally {
       setIsConfirming(false);

@@ -27,10 +27,15 @@ export const toOptionBigNumber = (
   return value === null ? null : toBigNumber(value);
 };
 
-export const isBigNumber = (value: any): value is BigNumber => {
-  return value?.__opaque__ === "BigNumber";
+export const isBigNumber = (value: unknown): value is BigNumber => {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "__opaque__" in value &&
+    value.__opaque__ === "BigNumber"
+  );
 };
 
-export function assertBigNumber(value: any): asserts value is BigNumber {
+export function assertBigNumber(value: unknown): asserts value is BigNumber {
   assert(isBigNumber(value), "Expected BigNumber type");
 }

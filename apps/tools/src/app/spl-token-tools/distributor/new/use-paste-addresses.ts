@@ -7,7 +7,7 @@ export function usePasteAddresses(
   >,
 ) {
   React.useEffect(() => {
-    async function handler(event: ClipboardEvent) {
+    async function handler() {
       if (!document.activeElement) return;
       const match = document.activeElement.id.match(
         /^recipient-address-\[(\d+)\]$/,
@@ -34,5 +34,5 @@ export function usePasteAddresses(
     return () => {
       window.removeEventListener("paste", handler);
     };
-  }, [amount]);
+  }, [amount, setRecipients]);
 }

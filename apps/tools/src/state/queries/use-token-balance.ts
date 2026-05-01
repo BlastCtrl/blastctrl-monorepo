@@ -22,7 +22,7 @@ export function useTokenBalance(tokenMint: string | PublicKey) {
           "confirmed",
         );
         return { uiAmount: result.value.uiAmount, amount: result.value.amount };
-      } catch (_e) {
+      } catch {
         return { uiAmount: 0, amount: "0" };
       }
     },

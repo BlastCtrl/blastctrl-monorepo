@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 "use client";
 
 import { InputGroup } from "@/components";
@@ -93,7 +92,7 @@ export default function Mint() {
             imageUrl = `https://arweave.net/${(await turbo.uploadFile(image)).id}`;
           if (animation_url)
             animationUrl = `https://arweave.net/${(await turbo.uploadFile(animation_url)).id}`;
-        } catch (err: any) {
+        } catch (err) {
           setIsConfirming(false);
           return notify({
             type: "error",
@@ -103,7 +102,7 @@ export default function Mint() {
                 <p>
                   There has been an error while uploading with the message:{" "}
                   <span className="break-all font-medium text-yellow-300">
-                    {err?.message}
+                    {err instanceof Error ? err.message : String(err)}
                   </span>
                   .
                 </p>

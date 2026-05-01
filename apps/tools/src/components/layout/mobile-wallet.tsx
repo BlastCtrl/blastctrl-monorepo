@@ -14,7 +14,6 @@ import { useCallback, useMemo, useState } from "react";
 
 export const MobileWallet = () => {
   const { network, setNetwork } = useNetworkConfigurationStore();
-  // eslint-disable-next-line @typescript-eslint/unbound-method
   const { publicKey, wallet, disconnect } = useWallet();
   const { setVisible } = useWalletModal();
   const [copied, setCopied] = useState(false);

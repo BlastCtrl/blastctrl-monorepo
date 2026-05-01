@@ -5,7 +5,7 @@ import { useOwnerAssets } from "@/state/queries/use-owner-assets";
 import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { Keypair, PublicKey } from "@solana/web3.js";
+import { Keypair } from "@solana/web3.js";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import bs58 from "bs58";
@@ -81,13 +81,12 @@ export default function RemoveTokens() {
 
     try {
       const keypair = Keypair.fromSecretKey(secretKey);
-      const address = keypair.publicKey.toString();
 
       setTargetWallet(keypair);
       await refetch();
 
       // Fetch the tokens for this wallet
-    } catch (err) {
+    } catch {
       notify({
         type: "error",
         title: "Invalid private key",

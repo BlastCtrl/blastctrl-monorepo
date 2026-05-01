@@ -24,7 +24,10 @@ export function getSetLockupInstruction(
   lockupData: SetLockupClientData,
   authorityPubkey: PublicKey,
 ): TransactionInstruction {
+  // hacky way to create the fields
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fields: Layout<any>[] = [u32("instruction")];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const lockupFields: any = {};
 
   if (lockupData.unixTimestamp !== undefined) {
@@ -57,6 +60,7 @@ export function getSetLockupInstruction(
     lockupFields.presenceCustodian = 0;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const INSTRUCTION_LAYOUT = struct<any>(fields);
 
   const data = Buffer.alloc(INSTRUCTION_LAYOUT.span);

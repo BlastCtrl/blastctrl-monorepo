@@ -108,7 +108,6 @@ export function SolanaProvider({ children }: { children: ReactNode }) {
 }
 
 export function getEndpoint(
-  // eslint-disable-next-line @typescript-eslint/ban-types
   endpoint: "mainnet-beta" | "testnet" | "devnet" | (string & {}),
 ): string {
   endpoint = endpoint.toLowerCase();

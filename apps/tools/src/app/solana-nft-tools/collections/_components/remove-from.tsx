@@ -120,11 +120,11 @@ export const RemoveFrom = () => {
         title: "Confirming multiple transactions",
         promises: transactionPromises,
       });
-    } catch (err: any) {
+    } catch (err) {
       notify({
         type: "error",
         title: "Remove from collection Error",
-        description: err?.message,
+        description: err instanceof Error ? err.message : String(err),
       });
     } finally {
       setIsConfirming(false);

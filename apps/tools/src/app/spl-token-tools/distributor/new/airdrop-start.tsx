@@ -29,8 +29,8 @@ type TokenType = "sol" | "custom";
 
 interface CSVParseResult {
   data: string[][];
-  errors: any[];
-  meta: any;
+  errors: unknown[];
+  meta: unknown;
 }
 
 interface AirdropData {
@@ -368,7 +368,9 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
 
           {tokenType === "custom" && (
             <div className="flex items-center">
-              <label className="mr-2 font-medium sm:text-sm">Mint Address:</label>
+              <label className="mr-2 font-medium sm:text-sm">
+                Mint Address:
+              </label>
               <div className="flex w-80">
                 <input
                   type="text"
@@ -378,9 +380,13 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                   placeholder="Enter SPL token mint address"
                 />
               </div>
-              {tokenType === "custom" && mintAddress && !validateMintAddress(mintAddress) && (
-                <p className="ml-2 text-xs text-red-500">Invalid mint address</p>
-              )}
+              {tokenType === "custom" &&
+                mintAddress &&
+                !validateMintAddress(mintAddress) && (
+                  <p className="ml-2 text-xs text-red-500">
+                    Invalid mint address
+                  </p>
+                )}
             </div>
           )}
         </div>
@@ -594,7 +600,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
               ) : (
                 <>
                   <p className="mb-1 text-gray-600">
-                    Format: "address,amount" (each on a new line)
+                    Format: &quot;address,amount&quot; (each on a new line)
                   </p>
                   <p className="break-all text-gray-600">
                     Example: 7X16ca3B9Gg9MnJ2w4EKjJHRWH5NXH8igzyeAW9Vxw3x,0.05

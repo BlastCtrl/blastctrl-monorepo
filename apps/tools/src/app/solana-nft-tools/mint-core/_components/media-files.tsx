@@ -1,5 +1,4 @@
 import type { CreateFormInputs } from "../page";
-// import { Tooltip } from "@/components";
 import { abbreviatedNumber, mimeTypeToCategory } from "@/lib/utils";
 import { cn } from "@blastctrl/ui";
 import { InformationCircleIcon } from "@heroicons/react/20/solid";
@@ -25,7 +24,7 @@ export const MediaFiles = ({ setValue, watch }: MediaFilesProps) => {
   };
   const handleRemoveImage = () => {
     setValue("image", null);
-    imagePreview && URL.revokeObjectURL(imagePreview);
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImagePreview(null);
   };
 
@@ -207,7 +206,6 @@ export const MediaFiles = ({ setValue, watch }: MediaFilesProps) => {
         </div>
       </div>
 
-      {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
       {(image || animationUrl) && (
         <div className="mt-4 flex flex-col">
           <dd className="inline-flex items-center px-3 py-0.5 text-gray-600">

@@ -133,11 +133,11 @@ export const AddTo = () => {
         title: "Confirming multiple transactions",
         promises: transactionPromises,
       });
-    } catch (err: any) {
+    } catch (err) {
       notify({
         type: "error",
         title: "Add to collection error",
-        description: err?.message,
+        description: err instanceof Error ? err.message : String(err),
       });
     } finally {
       setIsConfirming(false);

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 "use client";
 
 import {
@@ -122,7 +121,7 @@ export default function CreateToken() {
         {
           loading: { description: "Uploading image to Arweave..." },
           success: { description: "Image upload complete" },
-          error: (err: any) => {
+          error: (err) => {
             setIsConfirming(false);
             console.log(err);
             return {
@@ -170,7 +169,7 @@ export default function CreateToken() {
       {
         loading: { description: "Uploading metadata file to Arweave..." },
         success: { description: "JSON upload complete" },
-        error: (err: any) => {
+        error: (err) => {
           setIsConfirming(false);
           console.log({ err });
           return {
@@ -246,7 +245,7 @@ export default function CreateToken() {
           description: err?.message,
         }),
       });
-    } catch (err: any) {
+    } catch (err) {
       if (err instanceof WalletError) {
         // The onError callback in the walletconnect context will handle it
         return;
@@ -255,7 +254,7 @@ export default function CreateToken() {
       notify({
         type: "error",
         title: "Error Creating Metadata",
-        description: err?.message,
+        description: err instanceof Error ? err.message : String(err),
       });
     } finally {
       setIsConfirming(false);
