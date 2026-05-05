@@ -19,6 +19,8 @@ export function Topbar() {
   const [modifierKey, setModifierKey] = useState("⌘");
 
   useEffect(() => {
+    // we need useEffect because SSR
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setModifierKey(
       navigator.platform.startsWith("Mac") || navigator.platform === "iPhone"
         ? "⌘" // command key

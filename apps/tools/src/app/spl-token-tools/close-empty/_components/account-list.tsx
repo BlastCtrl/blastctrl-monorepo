@@ -21,28 +21,33 @@ export const AccountList = ({
   tokenAccounts: ParsedTokenAccount[];
 }) => {
   const checkboxRef = useRef<HTMLInputElement>(null);
-  const [checkboxState, setCheckboxState] = useState<CheckboxState>("empty");
   const [selectedAccounts, setSelectedAccounts] = useState<
     typeof tokenAccounts
   >([]);
   const [openWizard, setOpenWizard] = useState(false);
 
+  const isIndeterminate =
+    selectedAccounts.length > 0 &&
+    selectedAccounts.length < selectedAccounts.length;
+
+  const isChecked =
+    selectedAccounts.length > 0 &&
+    selectedAccounts.length === selectedAccounts.length;
+
+  const checkboxState: CheckboxState = isIndeterminate
+    ? "indeterminate"
+    : isChecked
+      ? "checked"
+      : "empty";
+
   useLayoutEffect(() => {
-    const isIndeterminate =
-      selectedAccounts.length > 0 &&
-      selectedAccounts.length < tokenAccounts.length;
-    const isChecked = selectedAccounts.length === tokenAccounts.length;
-    setCheckboxState(
-      isIndeterminate ? "indeterminate" : isChecked ? "checked" : "empty",
-    );
     if (checkboxRef.current) {
       checkboxRef.current.indeterminate = isIndeterminate;
     }
-  }, [selectedAccounts, tokenAccounts.length]);
+  }, [isIndeterminate]);
 
   const toggleAll = () => {
-    setSelectedAccounts(checkboxState === "empty" ? tokenAccounts : []);
-    setCheckboxState(checkboxState === "empty" ? "checked" : "empty");
+    setSelectedAccounts(isChecked || isIndeterminate ? [] : tokenAccounts);
   };
 
   return (
