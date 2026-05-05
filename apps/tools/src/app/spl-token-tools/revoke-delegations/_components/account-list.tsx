@@ -29,27 +29,32 @@ export const AccountList = ({
   delegatedAccounts: ParsedDelegatedTokenAccount[];
 }) => {
   const checkboxRef = useRef<HTMLInputElement>(null);
-  const [checkboxState, setCheckboxState] = useState<CheckboxState>("empty");
   const [selectedAccounts, setSelectedAccounts] = useState<
     typeof delegatedAccounts
   >([]);
 
+  const isIndeterminate =
+    selectedAccounts.length > 0 &&
+    selectedAccounts.length < delegatedAccounts.length;
+
+  const isChecked =
+    delegatedAccounts.length > 0 &&
+    selectedAccounts.length === delegatedAccounts.length;
+
+  const checkboxState: CheckboxState = isIndeterminate
+    ? "indeterminate"
+    : isChecked
+      ? "checked"
+      : "empty";
+
   useLayoutEffect(() => {
-    const isIndeterminate =
-      selectedAccounts.length > 0 &&
-      selectedAccounts.length < delegatedAccounts.length;
-    const isChecked = selectedAccounts.length === delegatedAccounts.length;
-    setCheckboxState(
-      isIndeterminate ? "indeterminate" : isChecked ? "checked" : "empty",
-    );
     if (checkboxRef.current) {
       checkboxRef.current.indeterminate = isIndeterminate;
     }
-  }, [selectedAccounts, delegatedAccounts.length]);
+  }, [isIndeterminate]);
 
   const toggleAll = () => {
-    setSelectedAccounts(checkboxState === "empty" ? delegatedAccounts : []);
-    setCheckboxState(checkboxState === "empty" ? "checked" : "empty");
+    setSelectedAccounts(isChecked || isIndeterminate ? [] : delegatedAccounts);
   };
 
   return (
