@@ -71,7 +71,6 @@
     "@blastctrl/prettier-config": "workspace:*",
     "@blastctrl/tailwind-config": "workspace:*",
     "@blastctrl/tsconfig": "workspace:*",
-    "@eslint/eslintrc": "^3.3.5",
     "@tailwindcss/forms": "^0.5.3",
     "@types/bn.js": "^5.1.5",
     "@types/bs58": "^4.0.1",
