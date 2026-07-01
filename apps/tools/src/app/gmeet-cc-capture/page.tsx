@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 
 const BOOKMARKLET_HREF =
-  "javascript:(()=>{const s=document.createElement('script');s.src='https://tools.blastctrl.com/gmeet-cc-capture.js';document.documentElement.appendChild(s)})()";
+  "javascript:(()=>{const u='https://tools.blastctrl.com/gmeet-cc-capture.js';const p=trustedTypes.createPolicy('blastctrl-gmeet-cc',{createScriptURL:x=>x});const s=document.createElement('script');s.src=p.createScriptURL(u);document.documentElement.appendChild(s)})()";
 
 export default function GmeetCcCapture() {
   const linkRef = useRef<HTMLAnchorElement>(null);
