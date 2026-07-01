@@ -18,7 +18,7 @@ export default function GmeetCcCapture() {
     <div className="mx-auto max-w-xl overflow-visible bg-white pb-5 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow">
       <header className="border-b border-gray-200 pb-4">
         <h1 className="font-display text-3xl font-semibold">
-          Gmeet Bookmarklet
+          GMeet CC Capture Bookmarklet
         </h1>
         <p className="mt-4 text-sm text-gray-500">
           Drag and drop this button to your bookmarks bar, then click it when
@@ -31,7 +31,7 @@ export default function GmeetCcCapture() {
           ref={linkRef}
           className="inline-flex cursor-grab select-none items-center justify-center gap-x-2 rounded-lg bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow hover:bg-indigo-500 active:cursor-grabbing"
         >
-          GMeet CC Capture
+          BlastCtrl GMeet CC Capture
         </a>
       </div>
     </div>
