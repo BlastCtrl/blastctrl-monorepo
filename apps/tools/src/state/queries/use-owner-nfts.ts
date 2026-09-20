@@ -1,19 +1,21 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useDasApi } from "./das";
 import type { HeliusResponse } from "./types";
 import { assetDataQueryKey } from "./use-asset-data";
 
-const url = process.env.NEXT_PUBLIC_DAS_API!;
-
-export const ownerNftsKey = (address: string) =>
-  ["owner-nfts", address] as const;
+export const ownerNftsKey = (address: string, network: string) =>
+  ["owner-nfts", address, network] as const;
 
 export function useOwnerNfts(address: string) {
   const queryClient = useQueryClient();
+  const { network, url } = useDasApi();
 
   return useQuery<Array<NftAsset>>({
-    enabled: !!address,
-    queryKey: ownerNftsKey(address),
+    enabled: !!address && !!url,
+    queryKey: ownerNftsKey(address, network),
     queryFn: async () => {
+      if (!url) throw Error(`DAS API is not available on ${network}`);
+
       const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -44,7 +46,7 @@ export function useOwnerNfts(address: string) {
       );
 
       for (const asset of filtered) {
-        queryClient.setQueryData(assetDataQueryKey(asset.id), asset);
+        queryClient.setQueryData(assetDataQueryKey(asset.id, network), asset);
       }
 
       return filtered;
