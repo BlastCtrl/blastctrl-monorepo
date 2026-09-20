@@ -10,9 +10,12 @@ interface Store {
   initialAccounts: ParsedTokenAccount[]; // token accounts to close that we pass initially to the store
   simulatedAccounts: ParsedTokenAccount[]; // token accounts that were succesfully simulated so we can use them in the final transactions
   closedAccounts: ParsedTokenAccount[]; // token accounts that were actually closed
-  error: any;
+  error: string | null;
   goToStepTwo: (accountsToBeClosed: ParsedTokenAccount[]) => void;
-  goToStepThree: (closedAccounts: ParsedTokenAccount[], error?: any) => void;
+  goToStepThree: (
+    closedAccounts: ParsedTokenAccount[],
+    error?: string | null,
+  ) => void;
   closeDialog: () => void;
 }
 
@@ -38,7 +41,11 @@ export const CloseAccountsProvider = ({
       goToStepTwo: (accounts) =>
         set(() => ({ simulatedAccounts: accounts, currentStep: 1 })),
       goToStepThree: (accounts, error) =>
-        set(() => ({ currentStep: 2, error, closedAccounts: accounts })),
+        set(() => ({
+          currentStep: 2,
+          error: error ?? null,
+          closedAccounts: accounts,
+        })),
     }));
     return store;
   });

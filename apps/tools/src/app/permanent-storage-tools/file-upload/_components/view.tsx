@@ -10,7 +10,7 @@ import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { useLocalStorage, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { formatRelative } from "date-fns";
-import type { ChangeEvent, DragEvent } from "react";
+import type { ChangeEvent, DragEvent, MouseEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { Uploads } from "./uploads";
 
@@ -104,7 +104,7 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
     }
   };
 
-  const handleCancel = (e: any) => {
+  const handleCancel = (e: MouseEvent) => {
     e.preventDefault();
     setFile(null);
     setFilePrice(null);

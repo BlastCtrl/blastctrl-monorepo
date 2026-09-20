@@ -179,17 +179,23 @@ export default function Mint() {
         type: "success",
         txid: base58.encode(signature),
       });
-    } catch (err: any) {
+    } catch (err) {
       if (err instanceof WalletError) {
         // The onError callback in the walletconnect context will handle it
         return;
       }
       console.log({ err });
-      console.log(await err.getLogs());
+      if (
+        err instanceof Error &&
+        "getLogs" in err &&
+        typeof err.getLogs === "function"
+      ) {
+        console.log(await err.getLogs());
+      }
       notify({
         type: "error",
         title: "Error minting",
-        description: err?.message,
+        description: err instanceof Error ? err.message : String(err),
       });
     } finally {
       setIsConfirming(false);
