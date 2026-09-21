@@ -12,13 +12,12 @@ onlyBuiltDependencies:
   - bigint-buffer
   - bufferutil
   - sharp
+blockExoticSubdeps: true
 minimumReleaseAge: 2880
 minimumReleaseAgeExclude:
   - react
   - "@blastctrl/*"
   - "@types/react"
-  - "@tanstack/react-query"
-  - "@tanstack/react-query-devtools"
 patchedDependencies:
   "@ardrive/turbo-sdk@1.41.1": "patches/@ardrive__turbo-sdk@1.41.1.patch"
 peerDependencyRules:
