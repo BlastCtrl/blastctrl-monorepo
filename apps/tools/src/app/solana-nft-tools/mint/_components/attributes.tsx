@@ -7,7 +7,7 @@ import { cn } from "@blastctrl/ui";
 
 export type AttributesProps = {
   register: UseFormRegister<CreateFormInputs>;
-  control: Control<CreateFormInputs, any>;
+  control: Control<CreateFormInputs>;
 };
 
 export const Attributes = ({ control, register }: AttributesProps) => {
