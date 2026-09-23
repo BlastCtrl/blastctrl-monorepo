@@ -56,6 +56,7 @@ export function ReclaimDialog({
   const stepsLeft = remainingSteps(useRentRate().lamportsPerByte);
   const [phase, setPhase] = useState<Phase>("review");
   const [batches, setBatches] = useState(() => toBatches(accounts));
+  const [signingCount, setSigningCount] = useState(0);
 
   const total = batches.reduce((sum, b) => sum + b.lamports, 0);
   const fees = batches.length * FEE_PER_TRANSACTION;
@@ -87,6 +88,7 @@ export function ReclaimDialog({
 
   const run = async (indexes: number[]) => {
     setPhase("signing");
+    setSigningCount(indexes.length);
     indexes.forEach((i) =>
       setStatus(i, { status: "sending", error: undefined }),
     );
@@ -115,9 +117,9 @@ export function ReclaimDialog({
   const title = () => {
     if (phase === "review") return `Reclaim ${formatSol(total - fees)} SOL`;
     if (phase === "signing") {
-      return batches.length === 1
+      return signingCount === 1
         ? "Approve the transaction in your wallet"
-        : `Approve ${batches.length} transactions in your wallet`;
+        : `Approve ${signingCount} transactions in your wallet`;
     }
     if (phase === "sending") return "Reclaiming";
     if (failed.length > 0) {

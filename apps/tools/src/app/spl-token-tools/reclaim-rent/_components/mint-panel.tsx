@@ -129,7 +129,7 @@ function describe(result: Exclude<MintLookup, { status: "ok" }>) {
     case "not-found":
       return "There is no account at that address.";
     case "not-a-mint":
-      return "That address isn't a token mint. Token accounts are on the other tab.";
+      return "That address isn't a token mint. Token accounts are found on their own, above.";
     case "other-authority":
       return `Only the mint authority can reclaim from ${result.name}, and that is ${compress(result.authority, 4)}, not your wallet.`;
     case "no-authority":

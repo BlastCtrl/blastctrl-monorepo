@@ -174,9 +174,6 @@ function AccountRow({
             <div className="whitespace-nowrap font-medium tabular-nums text-zinc-900">
               {formatSol(excess, 6, 6)} SOL
             </div>
-            {account.note && (
-              <div className="text-xs text-indigo-700">{account.note}</div>
-            )}
           </div>
         )}
       </td>

@@ -262,19 +262,29 @@ export async function fetchAssets(url: string | null, mints: string[]) {
   if (!url || mints.length === 0) return assets;
 
   try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: "reclaimable-accounts",
-        method: "getAssetBatch",
-        params: { ids: [...new Set(mints)] },
+    // getAssetBatch takes at most 1000 ids per call.
+    const batches = await Promise.all(
+      chunk([...new Set(mints)], 1000).map(async (ids) => {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: "reclaimable-accounts",
+            method: "getAssetBatch",
+            params: { ids },
+          }),
+        });
+        if (!response.ok) {
+          throw Error(`getAssetBatch failed: ${response.status}`);
+        }
+        const data = (await response.json()) as HeliusResponse<
+          (DasAsset | null)[]
+        >;
+        return data.result;
       }),
-    });
-    if (!response.ok) throw Error(`getAssetBatch failed: ${response.status}`);
-    const data = (await response.json()) as HeliusResponse<(DasAsset | null)[]>;
-    for (const asset of data.result) {
+    );
+    for (const asset of batches.flat()) {
       if (asset) assets.set(asset.id, asset);
     }
   } catch (err) {

@@ -11,9 +11,11 @@ export type BatchResult =
   | { index: number; status: "confirmed"; signature: string }
   | { index: number; status: "failed"; error: string };
 
+type Batch = { index: number; accounts: ReclaimableAccount[] };
+
 type Variables = {
   /** Batches to send, keyed by their index in the dialog's list. */
-  batches: { index: number; accounts: ReclaimableAccount[] }[];
+  batches: Batch[];
 };
 
 type Options = {
@@ -22,9 +24,9 @@ type Options = {
 };
 
 /**
- * Signs and sends one transaction per batch, confirming each in turn. A batch
- * that fails doesn't stop the others: every batch reports its own result.
- * Throws only when nothing was sent, e.g. the wallet rejected signing.
+ * Sends one transaction per batch and reports each batch's own result; one
+ * failing doesn't stop the others. Throws only when nothing was sent, e.g.
+ * the wallet rejected signing.
  */
 export function useReclaimExcess({ onBatchResult, onSettled }: Options) {
   const { connection } = useConnection();
@@ -34,72 +36,96 @@ export function useReclaimExcess({ onBatchResult, onSettled }: Options) {
     mutationFn: async ({ batches }: Variables) => {
       if (!publicKey) throw Error("Wallet is not connected");
 
-      const { blockhash, lastValidBlockHeight } = await retryWithBackoff(() =>
-        connection.getLatestBlockhash("confirmed"),
-      );
-      const transactions = batches.map(({ accounts }) => {
-        const tx = new Transaction({
-          feePayer: publicKey,
-          blockhash,
-          lastValidBlockHeight,
-        });
-        tx.add(...accounts.map((a) => toInstruction(a, publicKey)));
-        return tx;
-      });
+      const report = (index: number, promise: Promise<string>) =>
+        promise.then(
+          (signature) =>
+            onBatchResult({ index, status: "confirmed", signature }),
+          (err: unknown) =>
+            onBatchResult({
+              index,
+              status: "failed",
+              error: err instanceof Error ? err.message : String(err),
+            }),
+        );
 
-      // One wallet prompt for everything when the wallet supports it.
-      const signed = signAllTransactions
-        ? await signAllTransactions(transactions)
-        : null;
+      if (signAllTransactions) {
+        // One wallet prompt for everything. The batches share a blockhash,
+        // which stays valid for about a minute, so they are all sent right
+        // away and confirmed side by side rather than one after another.
+        const lifetime = await latestBlockhash(connection);
+        const signed = await signAllTransactions(
+          batches.map((b) => build(b, publicKey, lifetime)),
+        );
+        await Promise.all(
+          batches.map(({ index }, i) =>
+            report(
+              index,
+              connection
+                .sendRawTransaction(signed[i]!.serialize(), SEND_OPTIONS)
+                .then((signature) => confirm(connection, signature, lifetime)),
+            ),
+          ),
+        );
+        return;
+      }
 
-      for (const [i, { index }] of batches.entries()) {
-        try {
-          const signature = signed
-            ? await connection.sendRawTransaction(signed[i]!.serialize(), {
-                preflightCommitment: "confirmed",
-                maxRetries: 0,
-              })
-            : await sendTransaction(transactions[i]!, connection, {
-                preflightCommitment: "confirmed",
-                maxRetries: 0,
-              });
-
-          await confirm(connection, signature, blockhash, lastValidBlockHeight);
-          onBatchResult({ index, status: "confirmed", signature });
-        } catch (err) {
-          onBatchResult({
-            index,
-            status: "failed",
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
+      // Wallets without signAllTransactions prompt once per batch, so each
+      // batch gets its own fresh blockhash.
+      for (const batch of batches) {
+        const lifetime = await latestBlockhash(connection);
+        await report(
+          batch.index,
+          sendTransaction(
+            build(batch, publicKey, lifetime),
+            connection,
+            SEND_OPTIONS,
+          ).then((signature) => confirm(connection, signature, lifetime)),
+        );
       }
     },
     onSettled,
   });
 }
 
-function toInstruction(account: ReclaimableAccount, wallet: PublicKey) {
-  return createWithdrawExcessLamportsInstruction(
-    new PublicKey(account.address),
-    wallet,
-    wallet,
-    [],
-    account.program === "token-2022" ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID,
+const SEND_OPTIONS = {
+  preflightCommitment: "confirmed",
+  maxRetries: 0,
+} as const;
+
+type Lifetime = { blockhash: string; lastValidBlockHeight: number };
+
+const latestBlockhash = (connection: Connection) =>
+  retryWithBackoff(() => connection.getLatestBlockhash("confirmed"));
+
+function build(batch: Batch, wallet: PublicKey, lifetime: Lifetime) {
+  const tx = new Transaction({ feePayer: wallet, ...lifetime });
+  tx.add(
+    ...batch.accounts.map((account) =>
+      createWithdrawExcessLamportsInstruction(
+        new PublicKey(account.address),
+        wallet,
+        wallet,
+        [],
+        account.program === "token-2022"
+          ? TOKEN_2022_PROGRAM_ID
+          : TOKEN_PROGRAM_ID,
+      ),
+    ),
   );
+  return tx;
 }
 
 async function confirm(
   connection: Connection,
   signature: string,
-  blockhash: string,
-  lastValidBlockHeight: number,
+  lifetime: Lifetime,
 ) {
   const result = await connection.confirmTransaction(
-    { signature, blockhash, lastValidBlockHeight },
+    { signature, ...lifetime },
     "confirmed",
   );
   if (result.value.err) {
     throw Error(`Transaction failed: ${JSON.stringify(result.value.err)}`);
   }
+  return signature;
 }

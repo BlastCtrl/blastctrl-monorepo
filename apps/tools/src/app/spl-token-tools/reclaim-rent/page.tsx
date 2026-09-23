@@ -3,7 +3,7 @@
 import { useReclaimableAccounts } from "@/state/queries/use-reclaimable-accounts";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import Link from "next/link";
 import { useState } from "react";
@@ -28,6 +28,7 @@ const byExcess = (a: ReclaimableAccount, b: ReclaimableAccount) =>
   excessLamports(b) - excessLamports(a);
 
 export default function ReclaimRent() {
+  const { connection } = useConnection();
   const { connected, publicKey } = useWallet();
   const { setVisible } = useWalletModal();
   const queryClient = useQueryClient();
@@ -41,11 +42,14 @@ export default function ReclaimRent() {
   const [reclaimedIds, setReclaimedIds] = useState(new Set<string>());
   const [checkout, setCheckout] = useState<ReclaimableAccount[] | null>(null);
 
-  // Selection and results belong to one wallet. Start over when it changes.
+  // Selection and results belong to one wallet on one network. Start over
+  // when either changes: a wallet's token accounts have the same addresses
+  // on every cluster, so a reclaimed set from mainnet must not leak to devnet.
   const owner = publicKey?.toBase58() ?? "";
-  const [stateOwner, setStateOwner] = useState(owner);
-  if (stateOwner !== owner) {
-    setStateOwner(owner);
+  const scope = `${owner} ${connection.rpcEndpoint}`;
+  const [stateScope, setStateScope] = useState(scope);
+  if (stateScope !== scope) {
+    setStateScope(scope);
     setAddedMints([]);
     setSelectedIds(new Set());
     setReclaimedIds(new Set());
@@ -155,7 +159,7 @@ export default function ReclaimRent() {
               </p>
               <p>
                 Every account with excess SOL starts out selected. Uncheck any
-                you&apos;d rather leave as they are before you refund.
+                you&apos;d rather leave as they are before you reclaim.
               </p>
             </div>
 
@@ -187,13 +191,23 @@ export default function ReclaimRent() {
       {data && (
         <>
           <div className="border-t border-zinc-200 px-4 py-6 sm:px-6">
-            <h2 className="text-lg font-medium text-zinc-900">
-              {openTokenAccounts.length + openMints.length > 0
-                ? `${summarise(openTokenAccounts.length, openMints.length)} hold ${formatSol(availableLamports, 5)} SOL more than they need`
-                : tokenAccounts.length + mints.length > 0
-                  ? "Everything is down to its minimum"
-                  : "Nothing to reclaim right now"}
-            </h2>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+              <h2 className="text-lg font-medium text-zinc-900">
+                {openTokenAccounts.length + openMints.length > 0
+                  ? `${summarise(openTokenAccounts.length, openMints.length)} hold ${formatSol(availableLamports, 5)} SOL more than they need`
+                  : tokenAccounts.length + mints.length > 0
+                    ? "Everything is down to its minimum"
+                    : "Nothing to reclaim right now"}
+              </h2>
+              <button
+                type="button"
+                onClick={scan}
+                disabled={isFetching}
+                className="text-sm font-medium text-indigo-700 underline decoration-indigo-300 underline-offset-2 hover:decoration-indigo-700 disabled:opacity-50"
+              >
+                {isFetching ? "Checking again" : "Check again"}
+              </button>
+            </div>
 
             <section
               aria-labelledby="token-accounts-heading"
@@ -207,9 +221,11 @@ export default function ReclaimRent() {
               </h3>
               {tokenAccounts.length === 0 ? (
                 <p className="max-w-prose rounded-md border border-dashed border-zinc-300 p-6 text-sm text-zinc-600">
-                  All {atMinimum} token accounts in this wallet hold exactly the
-                  deposit they need.
-                  {stepsLeft > 0 &&
+                  {scanned.length === 0
+                    ? "This wallet has no token accounts."
+                    : `All ${atMinimum} token accounts in this wallet hold exactly the deposit they need.`}
+                  {scanned.length > 0 &&
+                    stepsLeft > 0 &&
                     " Rent drops again in November, so check back then."}
                 </p>
               ) : (

@@ -16,7 +16,6 @@ export type ReclaimableAccount = {
   lamports: number;
   /** Rent-exempt minimum for its size, from the RPC. */
   minimum: number;
-  note?: string;
   blockedReason?: string;
 };
 
