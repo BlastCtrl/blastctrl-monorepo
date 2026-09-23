@@ -18,6 +18,8 @@ minimumReleaseAgeExclude:
   - react
   - "@blastctrl/*"
   - "@types/react"
+  - next
+  - "@next/*"
 patchedDependencies:
   "@ardrive/turbo-sdk@1.41.1": "patches/@ardrive__turbo-sdk@1.41.1.patch"
 peerDependencyRules:
