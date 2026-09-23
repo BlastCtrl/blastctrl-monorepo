@@ -1,11 +1,15 @@
 import { compress, isPublicKey } from "@/lib/solana/common";
+import { useDasApi } from "@/state/queries/das";
+import { lookupMint } from "@/state/queries/use-reclaimable-accounts";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
+import { useConnection } from "@solana/wallet-adapter-react";
+import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { AccountTable } from "./account-table";
-import { EXAMPLE_MINTS, lookupMockMint } from "./mock-data";
-import type { ReclaimableAccount } from "./types";
+import type { MintLookup, ReclaimableAccount } from "./types";
 
 type Props = {
+  owner: string;
   mints: ReclaimableAccount[];
   selectedIds: Set<string>;
   reclaimedIds: Set<string>;
@@ -15,6 +19,7 @@ type Props = {
 };
 
 export function MintPanel({
+  owner,
   mints,
   selectedIds,
   reclaimedIds,
@@ -22,12 +27,27 @@ export function MintPanel({
   onToggle,
   onToggleAll,
 }: Props) {
+  const { connection } = useConnection();
+  const { url } = useDasApi();
   const [address, setAddress] = useState("");
-  const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const check = async (value: string) => {
-    const trimmed = value.trim();
+  const check = useMutation({
+    mutationFn: (mint: string) => lookupMint(connection, url, mint, owner),
+    onSuccess: (result) => {
+      if (result.status === "ok") {
+        onAdd(result.account);
+        setAddress("");
+      } else {
+        setError(describe(result));
+      }
+    },
+    onError: () =>
+      setError("Couldn't load that account. Check the address and try again."),
+  });
+
+  const submit = () => {
+    const trimmed = address.trim();
     setError(null);
     if (!isPublicKey(trimmed)) {
       setError("That isn't a Solana address. Paste the mint address in full.");
@@ -37,42 +57,24 @@ export function MintPanel({
       setError("That mint is already in the list.");
       return;
     }
-
-    setChecking(true);
-    await new Promise((r) => setTimeout(r, 900));
-    setChecking(false);
-
-    const result = lookupMockMint(trimmed);
-    if (result.status === "ok") {
-      onAdd(result.account);
-      setAddress("");
-    } else if (result.status === "not-a-mint") {
-      setError(
-        "That address isn't a token mint. Token accounts are on the other tab.",
-      );
-    } else if (result.status === "other-authority") {
-      setError(
-        `Only the mint authority can reclaim from ${result.name}, and that is ${compress(result.authority, 4)}, not your wallet.`,
-      );
-    } else {
-      setError(
-        `${result.name} has no mint authority any more. Reclaiming would need the mint's own keypair, which a wallet can't provide.`,
-      );
-    }
+    check.mutate(trimmed);
   };
 
   return (
     <div className="space-y-4">
       <p className="max-w-prose text-sm text-zinc-600">
-        Mints hold a deposit too. A wallet can&apos;t list the mints it
-        controls, so paste each address. You need to be the mint authority.
+        Mints hold a deposit too, and only the mint authority can take it back.
+        {mints.length > 0
+          ? " These are the mints you control among the tokens in your wallet."
+          : " None of the tokens in your wallet have a mint you control."}{" "}
+        A mint you control but hold no tokens of can be added by address.
       </p>
 
       <form
         className="flex flex-col gap-2 sm:flex-row"
         onSubmit={(e) => {
           e.preventDefault();
-          void check(address);
+          submit();
         }}
       >
         <label htmlFor="mint-address" className="sr-only">
@@ -92,9 +94,13 @@ export function MintPanel({
           aria-describedby={error ? "mint-error" : undefined}
           className="form-input grow rounded-lg border-zinc-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
         />
-        <Button type="submit" outline disabled={checking || !address.trim()}>
-          {checking && <SpinnerIcon className="size-4 animate-spin" />}
-          {checking ? "Checking" : "Check mint"}
+        <Button
+          type="submit"
+          outline
+          disabled={check.isPending || !address.trim()}
+        >
+          {check.isPending && <SpinnerIcon className="size-4 animate-spin" />}
+          {check.isPending ? "Checking" : "Add mint"}
         </Button>
       </form>
 
@@ -103,24 +109,6 @@ export function MintPanel({
           {error}
         </p>
       )}
-
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
-        <span>Demo addresses:</span>
-        {EXAMPLE_MINTS.map((example) => (
-          <button
-            key={example.address}
-            type="button"
-            disabled={checking}
-            onClick={() => {
-              setAddress(example.address);
-              void check(example.address);
-            }}
-            className="text-indigo-700 underline decoration-indigo-300 underline-offset-2 hover:decoration-indigo-700 disabled:opacity-50"
-          >
-            {example.label}
-          </button>
-        ))}
-      </div>
 
       {mints.length > 0 && (
         <AccountTable
@@ -133,4 +121,17 @@ export function MintPanel({
       )}
     </div>
   );
+}
+
+function describe(result: Exclude<MintLookup, { status: "ok" }>) {
+  switch (result.status) {
+    case "not-found":
+      return "There is no account at that address.";
+    case "not-a-mint":
+      return "That address isn't a token mint. Token accounts are on the other tab.";
+    case "other-authority":
+      return `Only the mint authority can reclaim from ${result.name}, and that is ${compress(result.authority, 4)}, not your wallet.`;
+    case "no-authority":
+      return `${result.name} has no mint authority any more. Reclaiming would need the mint's own keypair, which a wallet can't provide.`;
+  }
 }

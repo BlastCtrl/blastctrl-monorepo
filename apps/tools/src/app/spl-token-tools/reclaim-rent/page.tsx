@@ -3,7 +3,6 @@
 import { useReclaimableAccounts } from "@/state/queries/use-reclaimable-accounts";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
-import { Tab, TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import Link from "next/link";
@@ -37,12 +36,13 @@ export default function ReclaimRent() {
   const { data, isFetching, error, refetch } = useReclaimableAccounts(
     publicKey?.toBase58() ?? "",
   );
-  const [mints, setMints] = useState<ReclaimableAccount[]>([]);
+  const [addedMints, setAddedMints] = useState<ReclaimableAccount[]>([]);
   const [selectedIds, setSelectedIds] = useState(new Set<string>());
   const [reclaimedIds, setReclaimedIds] = useState(new Set<string>());
   const [checkout, setCheckout] = useState<ReclaimableAccount[] | null>(null);
 
-  const tokenAccounts = (data ?? [])
+  const scanned = (data ?? []).filter((a) => a.kind === "token-account");
+  const tokenAccounts = scanned
     .filter(
       (a) => a.blockedReason || excessLamports(a) > 0 || reclaimedIds.has(a.id),
     )
@@ -51,7 +51,11 @@ export default function ReclaimRent() {
     .sort(
       (a, b) => Number(reclaimedIds.has(a.id)) - Number(reclaimedIds.has(b.id)),
     );
-  const atMinimum = (data?.length ?? 0) - tokenAccounts.length;
+  const atMinimum = scanned.length - tokenAccounts.length;
+  const mints = [
+    ...(data ?? []).filter((a) => a.kind === "mint"),
+    ...addedMints,
+  ];
 
   const isOpen = (a: ReclaimableAccount) =>
     !a.blockedReason && !reclaimedIds.has(a.id);
@@ -63,7 +67,8 @@ export default function ReclaimRent() {
     (sum, a) => sum + excessLamports(a),
     0,
   );
-  const availableLamports = openTokenAccounts.reduce(
+  const openMints = mints.filter(isOpen);
+  const availableLamports = [...openTokenAccounts, ...openMints].reduce(
     (sum, a) => sum + excessLamports(a),
     0,
   );
@@ -76,7 +81,7 @@ export default function ReclaimRent() {
       return;
     }
     setReclaimedIds(new Set());
-    setMints([]);
+    setAddedMints([]);
     const { data } = await refetch();
     setSelectedIds(
       new Set(
@@ -171,79 +176,70 @@ export default function ReclaimRent() {
       {data && (
         <>
           <div className="border-t border-zinc-200 px-4 py-6 sm:px-6">
-            <TabGroup>
-              <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-                <h2 className="text-lg font-medium text-zinc-900">
-                  {openTokenAccounts.length > 0
-                    ? `${openTokenAccounts.length} token accounts hold ${formatSol(availableLamports, 5)} SOL more than they need`
-                    : tokenAccounts.length > 0
-                      ? "Every token account is down to its minimum"
-                      : "Nothing to reclaim right now"}
-                </h2>
-                <TabList className="flex gap-1 rounded-lg bg-zinc-100 p-1 text-sm font-medium">
-                  {[
-                    `Token accounts`,
-                    mints.length > 0 ? `Mints (${mints.length})` : "Mints",
-                  ].map((label, i) => (
-                    <Tab
-                      key={i}
-                      className="rounded-md px-3 py-1 text-zinc-600 focus:outline-none data-[selected]:bg-white data-[selected]:text-zinc-900 data-[selected]:shadow-sm data-[focus]:outline data-[focus]:outline-2 data-[focus]:outline-offset-2 data-[focus]:outline-blue-500"
-                    >
-                      {label}
-                    </Tab>
-                  ))}
-                </TabList>
-              </div>
+            <h2 className="text-lg font-medium text-zinc-900">
+              {openTokenAccounts.length + openMints.length > 0
+                ? `${summarise(openTokenAccounts.length, openMints.length)} hold ${formatSol(availableLamports, 5)} SOL more than they need`
+                : tokenAccounts.length + mints.length > 0
+                  ? "Everything is down to its minimum"
+                  : "Nothing to reclaim right now"}
+            </h2>
 
-              <TabPanels className="mt-4">
-                <TabPanel className="space-y-4 focus:outline-none">
-                  {tokenAccounts.length === 0 ? (
-                    <p className="max-w-prose rounded-md border border-dashed border-zinc-300 p-6 text-sm text-zinc-600">
-                      All {atMinimum} token accounts in this wallet hold exactly
-                      the deposit they need.{" "}
-                      {stepsLeft > 0 &&
-                        "Rent drops again in November, so check back then. "}
-                      If you control a mint, you can still check it on the Mints
-                      tab.
-                    </p>
-                  ) : (
-                    <>
-                      {emptyCount > 0 && (
-                        <EmptyAccountsHint count={emptyCount} />
-                      )}
-                      <AccountTable
-                        accounts={tokenAccounts}
-                        selectedIds={selectedIds}
-                        reclaimedIds={reclaimedIds}
-                        onToggle={toggle}
-                        onToggleAll={(select) =>
-                          toggleMany(tokenAccounts, select)
-                        }
-                      />
-                      {atMinimum > 0 && (
-                        <p className="text-xs text-zinc-500">
-                          {atMinimum} newer accounts already hold the minimum
-                          and aren&apos;t listed.
-                        </p>
-                      )}
-                    </>
-                  )}
-                </TabPanel>
-                <TabPanel className="focus:outline-none">
-                  <MintPanel
-                    mints={mints}
+            <section
+              aria-labelledby="token-accounts-heading"
+              className="mt-6 space-y-4"
+            >
+              <h3
+                id="token-accounts-heading"
+                className="font-medium text-zinc-900"
+              >
+                Token accounts
+              </h3>
+              {tokenAccounts.length === 0 ? (
+                <p className="max-w-prose rounded-md border border-dashed border-zinc-300 p-6 text-sm text-zinc-600">
+                  All {atMinimum} token accounts in this wallet hold exactly the
+                  deposit they need.
+                  {stepsLeft > 0 &&
+                    " Rent drops again in November, so check back then."}
+                </p>
+              ) : (
+                <>
+                  {emptyCount > 0 && <EmptyAccountsHint count={emptyCount} />}
+                  <AccountTable
+                    accounts={tokenAccounts}
                     selectedIds={selectedIds}
                     reclaimedIds={reclaimedIds}
-                    onAdd={(mint) => {
-                      setMints((prev) => [...prev, mint]);
-                      setSelectedIds((prev) => new Set(prev).add(mint.id));
-                    }}
                     onToggle={toggle}
-                    onToggleAll={(select) => toggleMany(mints, select)}
+                    onToggleAll={(select) => toggleMany(tokenAccounts, select)}
                   />
-                </TabPanel>
-              </TabPanels>
-            </TabGroup>
+                  {atMinimum > 0 && (
+                    <p className="text-xs text-zinc-500">
+                      {atMinimum} newer accounts already hold the minimum and
+                      aren&apos;t listed.
+                    </p>
+                  )}
+                </>
+              )}
+            </section>
+
+            <section aria-labelledby="mints-heading" className="mt-8 space-y-4">
+              <h3 id="mints-heading" className="font-medium text-zinc-900">
+                Mints
+              </h3>
+              <MintPanel
+                owner={publicKey?.toBase58() ?? ""}
+                mints={mints}
+                selectedIds={selectedIds}
+                reclaimedIds={reclaimedIds}
+                onAdd={(mint) => {
+                  setAddedMints((prev) => [...prev, mint]);
+                  if (excessLamports(mint) > 0) {
+                    setSelectedIds((prev) => new Set(prev).add(mint.id));
+                  }
+                }}
+                onToggle={toggle}
+                onToggleAll={(select) => toggleMany(mints, select)}
+              />
+            </section>
           </div>
 
           <div className="sticky bottom-0 z-[2] flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-zinc-200 bg-white/95 px-4 py-4 backdrop-blur sm:rounded-b-lg sm:px-6">
@@ -285,6 +281,15 @@ export default function ReclaimRent() {
       )}
     </div>
   );
+}
+
+function summarise(tokenAccounts: number, mints: number) {
+  const parts = [
+    tokenAccounts > 0 &&
+      `${tokenAccounts} token ${tokenAccounts === 1 ? "account" : "accounts"}`,
+    mints > 0 && `${mints} ${mints === 1 ? "mint" : "mints"}`,
+  ].filter(Boolean);
+  return parts.join(" and ");
 }
 
 function EmptyAccountsHint({ count }: { count: number }) {
