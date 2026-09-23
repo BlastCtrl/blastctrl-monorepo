@@ -191,7 +191,7 @@ export default function ReclaimRent() {
         <>
           <div className="border-t border-zinc-200 px-4 py-6 sm:px-6">
             <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-              <h2 className="text-lg font-medium text-zinc-900">
+              <h2 className="text-base font-semibold text-zinc-900">
                 {openTokenAccounts.length + openMints.length > 0
                   ? `${summarise(openTokenAccounts.length, openMints.length)} hold ${formatSol(availableLamports, 5)} SOL more than they need`
                   : tokenAccounts.length + mints.length > 0
@@ -208,18 +208,15 @@ export default function ReclaimRent() {
               </button>
             </div>
 
-            <section
-              aria-labelledby="token-accounts-heading"
-              className="mt-6 space-y-4"
-            >
+            <section aria-labelledby="token-accounts-heading" className="mt-6 ">
               <h3
                 id="token-accounts-heading"
-                className="font-medium text-zinc-900"
+                className="text-sm font-semibold text-zinc-900"
               >
                 Token accounts
               </h3>
               {tokenAccounts.length === 0 ? (
-                <p className="max-w-prose rounded-md border border-dashed border-zinc-300 p-6 text-sm text-zinc-600">
+                <p className="mt-4 max-w-prose rounded-md border border-dashed border-zinc-300 p-6 text-sm text-zinc-600">
                   {scanned.length === 0
                     ? "This wallet has no token accounts."
                     : "Every token account in this wallet is already at the minimum."}
@@ -239,7 +236,7 @@ export default function ReclaimRent() {
                     onToggleAll={(select) => toggleMany(tokenAccounts, select)}
                   />
                   {atMinimum > 0 && (
-                    <p className="text-xs text-zinc-500">
+                    <p className="ml-12 mt-2 text-sm text-zinc-500">
                       {atMinimum} other{" "}
                       {atMinimum === 1 ? "account is" : "accounts are"} already
                       at the minimum.
@@ -250,7 +247,10 @@ export default function ReclaimRent() {
             </section>
 
             <section aria-labelledby="mints-heading" className="mt-8 space-y-4">
-              <h3 id="mints-heading" className="font-medium text-zinc-900">
+              <h3
+                id="mints-heading"
+                className="text-sm font-semibold text-zinc-900"
+              >
                 Mints
               </h3>
               <MintPanel
@@ -322,7 +322,7 @@ function summarise(tokenAccounts: number, mints: number) {
 
 function EmptyAccountsHint({ count }: { count: number }) {
   return (
-    <p className="max-w-prose rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-900">
+    <p className="mt-4 max-w-prose rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-900">
       {count === 1
         ? "One of these accounts holds no tokens."
         : `${count} of these accounts hold no tokens.`}{" "}

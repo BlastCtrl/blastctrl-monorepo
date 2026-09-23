@@ -33,7 +33,7 @@ export function CollapsibleTable({ noun, ...table }: Props) {
     .join(", ");
 
   return (
-    <details className="group rounded-md border border-zinc-200">
+    <details className="group mt-4 rounded-md border border-zinc-200">
       <summary className="flex cursor-pointer select-none items-center gap-3 rounded-md px-3 py-2.5 text-sm marker:hidden hover:bg-zinc-50 focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 [&::-webkit-details-marker]:hidden">
         <ChevronRightIcon
           aria-hidden="true"
