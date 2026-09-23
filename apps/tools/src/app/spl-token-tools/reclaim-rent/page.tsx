@@ -41,6 +41,17 @@ export default function ReclaimRent() {
   const [reclaimedIds, setReclaimedIds] = useState(new Set<string>());
   const [checkout, setCheckout] = useState<ReclaimableAccount[] | null>(null);
 
+  // Selection and results belong to one wallet. Start over when it changes.
+  const owner = publicKey?.toBase58() ?? "";
+  const [stateOwner, setStateOwner] = useState(owner);
+  if (stateOwner !== owner) {
+    setStateOwner(owner);
+    setAddedMints([]);
+    setSelectedIds(new Set());
+    setReclaimedIds(new Set());
+    setCheckout(null);
+  }
+
   const scanned = (data ?? []).filter((a) => a.kind === "token-account");
   const tokenAccounts = scanned
     .filter(
