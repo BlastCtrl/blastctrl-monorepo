@@ -60,4 +60,9 @@ export const navigation = [
     href: "/spl-token-tools/close-empty",
     in: "Tokens",
   },
+  {
+    name: "Reclaim excess rent",
+    href: "/spl-token-tools/reclaim-rent",
+    in: "Tokens",
+  },
 ];
