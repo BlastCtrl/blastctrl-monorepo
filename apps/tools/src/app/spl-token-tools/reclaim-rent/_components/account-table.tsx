@@ -58,9 +58,7 @@ export function AccountTable({
             <th className="hidden px-3 py-2 font-medium sm:table-cell">
               Program
             </th>
-            <th className="hidden px-3 py-2 font-medium md:table-cell">
-              Deposit
-            </th>
+            <th className="hidden px-3 py-2 font-medium md:table-cell">Rent</th>
             <th className="px-3 py-2 text-right font-medium">Reclaimable</th>
           </tr>
         </thead>

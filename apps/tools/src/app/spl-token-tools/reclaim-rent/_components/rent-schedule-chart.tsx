@@ -41,7 +41,7 @@ export function RentScheduleChart({
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         role="img"
-        aria-label={`The required deposit for a token account falls from ${formatSol(paid)} SOL to ${formatSol(currentMin)} SOL today, and to ${formatSol(lastMin)} SOL after the last step.`}
+        aria-label={`The required rent for a token account falls from ${formatSol(paid)} SOL to ${formatSol(currentMin)} SOL today, and to ${formatSol(lastMin)} SOL after the last step.`}
         className="h-auto w-full text-[11px]"
       >
         {/* What was paid when the account was created */}
@@ -54,7 +54,7 @@ export function RentScheduleChart({
           strokeDasharray="2 3"
         />
         <text x={LEFT} y={TOP - 8} className="fill-zinc-500">
-          Deposit paid, {formatSol(paid, 5)} SOL
+          Rent paid, {formatSol(paid, 5)} SOL
         </text>
 
         {RENT_STEPS.map((step, i) => {
@@ -182,8 +182,8 @@ export function RentScheduleChart({
         </text>
       </svg>
       <figcaption className="mt-1 text-xs text-zinc-500">
-        The deposit one token account has to hold. The shaded space above the
-        line is SOL you can take back, per account.
+        The rent one token account has to hold. The shaded space above the line
+        is SOL you can take back, per account.
       </figcaption>
     </figure>
   );

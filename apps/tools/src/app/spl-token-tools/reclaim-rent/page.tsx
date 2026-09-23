@@ -132,7 +132,7 @@ export default function ReclaimRent() {
             <div className="mt-4 max-w-prose space-y-2 text-pretty text-gray-500">
               <p>
                 Every account on Solana holds a SOL deposit (rent), and the
-                required deposit is{" "}
+                required rent is{" "}
                 <a
                   href="https://solana.com/upgrades/reduced-rent"
                   target="_blank"
@@ -141,12 +141,11 @@ export default function ReclaimRent() {
                 >
                   being lowered in five steps
                 </a>
-                . Token accounts you opened earlier still hold the old, larger
-                amount.
+                . Token accounts and mints you created earlier still hold the
+                old, larger amount.
               </p>
               <p>
-                This tool moves the difference back to your wallet. Your tokens
-                don&apos;t move and nothing gets closed. Today that is{" "}
+                This tool sends the difference back to your wallet: about{" "}
                 {formatSol(
                   minimumBalance(
                     TOKEN_ACCOUNT_SIZE,
@@ -154,12 +153,12 @@ export default function ReclaimRent() {
                   ) - minimumBalance(TOKEN_ACCOUNT_SIZE, lamportsPerByte),
                   5,
                 )}{" "}
-                SOL for a typical token account
-                {stepsLeft > 0 && ", and it grows with each step"}.
+                SOL per token account today, and more with each step. Your
+                tokens don‘t move and nothing gets closed.
               </p>
               <p>
-                Every account with excess SOL starts out selected. Uncheck any
-                you&apos;d rather leave as they are before you reclaim.
+                Accounts with excess SOL are selected by default. You can
+                uncheck any that you wish to skip.
               </p>
             </div>
 
@@ -172,7 +171,7 @@ export default function ReclaimRent() {
                   {!connected
                     ? "Connect your wallet"
                     : isFetching
-                      ? "Checking your accounts"
+                      ? "Checking…"
                       : "Check my accounts"}
                 </Button>
                 {error && (
@@ -196,7 +195,7 @@ export default function ReclaimRent() {
                 {openTokenAccounts.length + openMints.length > 0
                   ? `${summarise(openTokenAccounts.length, openMints.length)} hold ${formatSol(availableLamports, 5)} SOL more than they need`
                   : tokenAccounts.length + mints.length > 0
-                    ? "Everything is down to its minimum"
+                    ? "Nothing left to reclaim"
                     : "Nothing to reclaim right now"}
               </h2>
               <button
@@ -223,7 +222,7 @@ export default function ReclaimRent() {
                 <p className="max-w-prose rounded-md border border-dashed border-zinc-300 p-6 text-sm text-zinc-600">
                   {scanned.length === 0
                     ? "This wallet has no token accounts."
-                    : `All ${atMinimum} token accounts in this wallet hold exactly the deposit they need.`}
+                    : "Every token account in this wallet is already at the minimum."}
                   {scanned.length > 0 &&
                     stepsLeft > 0 &&
                     " Rent drops again in November, so check back then."}
@@ -241,8 +240,9 @@ export default function ReclaimRent() {
                   />
                   {atMinimum > 0 && (
                     <p className="text-xs text-zinc-500">
-                      {atMinimum} newer accounts already hold the minimum and
-                      aren&apos;t listed.
+                      {atMinimum} other{" "}
+                      {atMinimum === 1 ? "account is" : "accounts are"} already
+                      at the minimum.
                     </p>
                   )}
                 </>
@@ -277,7 +277,7 @@ export default function ReclaimRent() {
               </div>
               <div className="text-sm text-zinc-500">
                 {selected.length === 0
-                  ? "Pick at least one account"
+                  ? "Select at least one account"
                   : `${selected.length} ${selected.length === 1 ? "account" : "accounts"}, ${transactions} ${transactions === 1 ? "transaction" : "transactions"}`}
               </div>
             </div>
@@ -326,18 +326,18 @@ function EmptyAccountsHint({ count }: { count: number }) {
       {count === 1
         ? "One of these accounts holds no tokens."
         : `${count} of these accounts hold no tokens.`}{" "}
-      This tool only takes back the excess. Closing an empty account returns its
-      whole deposit, about{" "}
+      This tool only reclaims the excess. Closing an empty account returns its
+      whole rent (about{" "}
       {formatSol(
         minimumBalance(TOKEN_ACCOUNT_SIZE, ORIGINAL_LAMPORTS_PER_BYTE),
         5,
       )}{" "}
-      SOL.{" "}
+      SOL).{" "}
       <Link
         href="/spl-token-tools/close-empty"
         className="font-medium underline underline-offset-2"
       >
-        Go to the Close empty accounts tool
+        Close empty accounts →
       </Link>
     </p>
   );

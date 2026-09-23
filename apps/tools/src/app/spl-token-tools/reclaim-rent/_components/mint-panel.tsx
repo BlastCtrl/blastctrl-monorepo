@@ -63,7 +63,7 @@ export function MintPanel({
   return (
     <div className="space-y-4">
       <p className="max-w-prose text-sm text-zinc-600">
-        Mints hold a deposit too, and only the mint authority can take it back.
+        Mints hold rent too, and only the mint authority can take it back.
         {mints.length > 0
           ? " These are the mints you control among the tokens in your wallet."
           : " None of the tokens in your wallet have a mint you control."}{" "}

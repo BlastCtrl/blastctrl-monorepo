@@ -236,8 +236,7 @@ function Review({
     <>
       <p className="text-sm text-zinc-600">
         Your tokens stay where they are and no account is closed. Each account
-        keeps exactly the deposit it needs today, and the rest goes to your
-        wallet.
+        keeps exactly the rent it needs today, and the rest goes to your wallet.
       </p>
       <dl className="mt-4 divide-y divide-zinc-100 rounded-md border border-zinc-200 text-sm">
         <Row label="From">
@@ -253,7 +252,7 @@ function Review({
           <span className="tabular-nums">{compress(wallet, 4)}</span>, your
           wallet
         </Row>
-        <Row label="Excess deposit">{formatSol(total)} SOL</Row>
+        <Row label="Excess rent">{formatSol(total)} SOL</Row>
         <Row
           label={`Network fees, ${batches.length} ${batches.length === 1 ? "transaction" : "transactions"}`}
         >
