@@ -123,7 +123,7 @@ export default function ReclaimRent() {
         <div className="grid items-start gap-x-10 gap-y-6 md:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
           <div>
             <h1 className="font-display text-3xl font-semibold">
-              Refund excess rent
+              Reclaim excess rent
             </h1>
             <div className="mt-4 max-w-prose space-y-2 text-pretty text-gray-500">
               <p>
