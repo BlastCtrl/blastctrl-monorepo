@@ -7,7 +7,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import Link from "next/link";
 import { useState } from "react";
-import { AccountTable } from "./_components/account-table";
+import { CollapsibleTable } from "./_components/collapsible-table";
 import { MintPanel } from "./_components/mint-panel";
 import { ReclaimDialog } from "./_components/reclaim-dialog";
 import {
@@ -215,7 +215,8 @@ export default function ReclaimRent() {
               ) : (
                 <>
                   {emptyCount > 0 && <EmptyAccountsHint count={emptyCount} />}
-                  <AccountTable
+                  <CollapsibleTable
+                    noun="accounts"
                     accounts={tokenAccounts}
                     selectedIds={selectedIds}
                     reclaimedIds={reclaimedIds}

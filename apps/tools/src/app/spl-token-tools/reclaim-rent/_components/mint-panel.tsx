@@ -5,7 +5,7 @@ import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import { AccountTable } from "./account-table";
+import { CollapsibleTable } from "./collapsible-table";
 import type { MintLookup, ReclaimableAccount } from "./types";
 
 type Props = {
@@ -111,7 +111,8 @@ export function MintPanel({
       )}
 
       {mints.length > 0 && (
-        <AccountTable
+        <CollapsibleTable
+          noun="mints"
           accounts={mints}
           selectedIds={selectedIds}
           reclaimedIds={reclaimedIds}
