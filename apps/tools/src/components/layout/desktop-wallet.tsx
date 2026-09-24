@@ -79,7 +79,7 @@ export const DesktopWallet = () => {
         leaveFrom="transform opacity-100 scale-100"
         leaveTo="transform opacity-0 scale-95"
       >
-        <Menu.Items className="ring-opacity-5 absolute right-0 z-10 mt-2 w-fit origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black focus:outline-hidden">
+        <Menu.Items className="absolute right-0 z-10 mt-2 w-fit origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black/5 focus:outline-hidden">
           <div className="border-b border-gray-300 px-3 py-2 text-sm text-gray-600">
             <div className="text-sm text-gray-600">Connected as</div>
             <CopyButton

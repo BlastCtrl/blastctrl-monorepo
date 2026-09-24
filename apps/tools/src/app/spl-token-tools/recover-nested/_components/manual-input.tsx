@@ -411,7 +411,7 @@ export const ManualInput = () => {
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <div className="bg-opacity-75 fixed inset-0 bg-gray-900 transition-opacity" />
+            <div className="fixed inset-0 bg-gray-900/75 transition-opacity" />
           </Transition.Child>
 
           <div className="fixed inset-0 z-10 overflow-y-auto">
@@ -453,7 +453,7 @@ export const ManualInput = () => {
                               <div className="mt-4 flex-col">
                                 <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
                                   <div className="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
-                                    <div className="ring-opacity-5 overflow-hidden shadow-sm ring-1 ring-black md:rounded-lg">
+                                    <div className="overflow-hidden shadow-sm ring-1 ring-black/5 md:rounded-lg">
                                       <table className="min-w-full divide-y divide-gray-300">
                                         <thead className="bg-gray-50">
                                           <tr>
