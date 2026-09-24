@@ -98,7 +98,7 @@ export function NotificationWindow({
       data-testid={testId}
       className={cn(
         visible ? "animate-enter" : "animate-leave",
-        "ring-opacity-5 pointer-events-auto mb-4 w-full max-w-sm overflow-hidden rounded-lg bg-zinc-800 shadow-lg ring-1 ring-black sm:max-w-lg",
+        "pointer-events-auto mb-4 w-full max-w-sm overflow-hidden rounded-lg bg-zinc-800 shadow-lg ring-1 ring-black/5 sm:max-w-lg",
       )}
     >
       <div className="p-4">
