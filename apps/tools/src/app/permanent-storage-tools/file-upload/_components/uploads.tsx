@@ -74,7 +74,7 @@ export const Uploads = memo(function Uploads({ files }: UploadsProps) {
 
   return (
     <div>
-      <h2 className="font-xl mb-2 font-semibold text-slate-700 sm:mb-4">
+      <h2 className="mb-2 font-semibold text-slate-700 sm:mb-4">
         Previous uploads
       </h2>
       <ul className="space-y-3">

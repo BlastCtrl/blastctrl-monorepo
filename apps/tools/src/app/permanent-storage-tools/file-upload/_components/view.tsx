@@ -346,7 +346,7 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
 
       {balance?.basisPoints.gtn(0) && (
         <div className="mx-auto my-3 max-w-sm rounded-md border border-gray-300 px-3 py-2 shadow-xs">
-          <div className="font-base text-sm text-gray-900">
+          <div className="text-sm text-gray-900">
             <span className="mb-1 block text-xs tracking-wider text-gray-500 uppercase">
               {network}
             </span>

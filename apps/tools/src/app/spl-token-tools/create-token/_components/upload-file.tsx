@@ -51,7 +51,7 @@ export const UploadFile = ({ label, onDrop, onRemove }: UploadFileProps) => {
         })}
       >
         {imagePreview ? (
-          <div className="bg-red h-full w-full">
+          <div className="h-full w-full">
             <Image
               src={imagePreview}
               alt=""
