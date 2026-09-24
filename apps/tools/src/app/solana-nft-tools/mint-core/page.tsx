@@ -8,7 +8,7 @@ import { useForm } from "react-hook-form";
 import { InputMultiline, notify } from "@/components";
 import { TurboStorage } from "@/lib/turbo";
 import { mimeTypeToCategory } from "@/lib/utils";
-import { Button, SpinnerIcon } from "@blastctrl/ui";
+import { Button, Checkbox, SpinnerIcon } from "@blastctrl/ui";
 import { WalletError } from "@solana/wallet-adapter-base";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { MediaFiles } from "./_components/media-files";
@@ -225,15 +225,14 @@ export default function Mint() {
             </h3>
             <div className="relative flex items-start">
               <div className="flex h-5 items-center">
-                <input
+                <Checkbox
                   id="use-json"
                   name="use-json"
-                  type="checkbox"
                   checked={!createJson}
                   onChange={() => {
                     setCreateJson((prev) => !prev);
                   }}
-                  className="form-checkbox size-4 rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />
               </div>
               <div className="ml-3 text-sm">

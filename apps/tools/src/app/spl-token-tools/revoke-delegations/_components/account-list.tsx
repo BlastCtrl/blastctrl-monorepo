@@ -4,7 +4,7 @@ import {
   type ParsedDelegatedTokenAccount,
 } from "@/state/queries/use-delegated-assets";
 import { compress, normalizeTokenAmount } from "@/lib/solana";
-import { Button, CopyButton, cn } from "@blastctrl/ui";
+import { Button, Checkbox, CopyButton, cn } from "@blastctrl/ui";
 import {
   Table,
   TableBody,
@@ -75,12 +75,11 @@ export const AccountList = ({
           <TableRow className="bg-zinc-100 font-medium text-zinc-500">
             <TableHeader className="sticky top-0">
               <div className="grid w-full place-content-center">
-                <input
+                <Checkbox
                   ref={checkboxRef}
                   checked={checkboxState === "checked"}
                   onChange={toggleAll}
-                  type="checkbox"
-                  className="mx-auto form-checkbox rounded-sm accent-blue-600"
+                  className="mx-auto"
                 />
               </div>
             </TableHeader>
@@ -114,8 +113,7 @@ export const AccountList = ({
               >
                 <TableCell>
                   <div className="grid w-full place-content-center">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       value={account.token_account}
                       checked={isSelected}
                       onChange={(e) =>
@@ -125,7 +123,6 @@ export const AccountList = ({
                             : selectedAccounts.filter((a) => a !== account),
                         )
                       }
-                      className="form-checkbox rounded-sm accent-blue-600"
                     />
                   </div>
                 </TableCell>
