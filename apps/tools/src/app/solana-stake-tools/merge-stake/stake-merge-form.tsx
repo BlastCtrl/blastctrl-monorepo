@@ -95,13 +95,13 @@ export function StakeMergeForm() {
                   <div className="flex flex-wrap items-start justify-end gap-1 justify-self-end">
                     {stake.data.info.meta.authorized.withdrawer ===
                       publicKey?.toString() && (
-                      <span className="rounded border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold uppercase text-gray-700">
+                      <span className="rounded-sm border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold text-gray-700 uppercase">
                         Withdrawer
                       </span>
                     )}
                     {stake.data.info.meta.authorized.staker ===
                       publicKey?.toString() && (
-                      <span className="rounded border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold uppercase text-gray-700">
+                      <span className="rounded-sm border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold text-gray-700 uppercase">
                         Staker
                       </span>
                     )}
@@ -147,13 +147,13 @@ export function StakeMergeForm() {
                 <div className="flex flex-wrap items-start justify-end gap-1 justify-self-end">
                   {stake.data.info.meta.authorized.withdrawer ===
                     publicKey?.toString() && (
-                    <span className="rounded border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold uppercase text-gray-700">
+                    <span className="rounded-sm border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold text-gray-700 uppercase">
                       Withdrawer
                     </span>
                   )}
                   {stake.data.info.meta.authorized.staker ===
                     publicKey?.toString() && (
-                    <span className="rounded border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold uppercase text-gray-700">
+                    <span className="rounded-sm border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold text-gray-700 uppercase">
                       Staker
                     </span>
                   )}
@@ -164,7 +164,7 @@ export function StakeMergeForm() {
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="flex items-center gap-4 rounded-lg bg-indigo-100 p-4 shadow-sm">
+          <div className="flex items-center gap-4 rounded-lg bg-indigo-100 p-4 shadow-xs">
             <div>
               <p className="text-sm font-medium">Secondary</p>
               <p className="text-xs">
@@ -243,7 +243,7 @@ export function StakeMergeForm() {
                 className={`flex-1 ${isPending ? "pointer-events-none" : ""}`}
               >
                 {isPending && (
-                  <SpinnerIcon className="-ml-1 mr-1 inline size-[1em] animate-spin" />
+                  <SpinnerIcon className="mr-1 -ml-1 inline size-[1em] animate-spin" />
                 )}
                 Submit
               </Button>
@@ -283,7 +283,7 @@ function ValidatorInfo({ account }: { account: StakeAccountType }) {
   }
 
   return (
-    <div className="flex items-start space-x-2 text-pretty text-left">
+    <div className="flex items-start space-x-2 text-left text-pretty">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={data.image}

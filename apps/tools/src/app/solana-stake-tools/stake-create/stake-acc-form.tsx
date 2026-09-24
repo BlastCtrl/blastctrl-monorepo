@@ -363,7 +363,7 @@ export function StakeAccountForm() {
                   onClick={() =>
                     setValue("custodian", PublicKey.default.toString())
                   }
-                  className="!absolute right-0 top-0 scale-90"
+                  className="absolute! right-0 top-0 scale-90"
                   plain
                 >
                   Set to empty pubkey
@@ -401,7 +401,7 @@ export function StakeAccountForm() {
             className="w-[min(320px,100%)]"
           >
             {isConfirming ? (
-              <SpinnerIcon className="-ml-1 mr-1 inline h-5 w-5 animate-spin" />
+              <SpinnerIcon className="mr-1 -ml-1 inline h-5 w-5 animate-spin" />
             ) : (
               "Submit"
             )}
@@ -420,11 +420,11 @@ export function StakeAccountForm() {
         open={isConfirmDialogOpen}
         onClose={closeConfirmDialog}
         transition
-        className="fixed inset-0 flex w-screen items-center justify-center bg-black/30 p-4 transition duration-300 ease-out data-[closed]:opacity-0"
+        className="fixed inset-0 flex w-screen items-center justify-center bg-black/30 p-4 transition duration-300 ease-out data-closed:opacity-0"
       >
         <div className="fixed inset-0 w-screen overflow-y-auto p-4">
           <div className="flex min-h-full items-center justify-center">
-            <DialogPanel className="min-w-[300px] max-w-lg space-y-4 rounded-lg bg-white p-4 shadow">
+            <DialogPanel className="max-w-lg min-w-[300px] space-y-4 rounded-lg bg-white p-4 shadow-sm">
               <DialogTitle className="font-bold">
                 Confirm Stake Account Creation
               </DialogTitle>
@@ -524,8 +524,8 @@ export function StakeAccountForm() {
 
 const inputClass = cn(
   "mt-2 block w-full rounded-lg border border-zinc-300 bg-white/5 px-3 py-1 text-sm/6 text-zinc-900",
-  "focus:outline-none data-[focus]:outline-2 data-[focus]:-outline-offset-2 data-[focus]:outline-white/25",
+  "focus:outline-hidden data-focus:outline-2 data-focus:-outline-offset-2 data-focus:outline-white/25",
   "h-[36px] grow",
-  "data-[disabled]:bg-zinc-100 data-[disabled]:text-zinc-500",
-  "data-[invalid]:border-red-600 data-[invalid]:text-red-600 data-[invalid]:data-[focus]:outline-red-600",
+  "data-disabled:bg-zinc-100 data-disabled:text-zinc-500",
+  "data-invalid:border-red-600 data-invalid:text-red-600 data-invalid:data-focus:outline-red-600",
 );

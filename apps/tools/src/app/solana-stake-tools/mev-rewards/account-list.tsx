@@ -230,7 +230,7 @@ function AccountListForm({
                       <div className="font-semibold text-zinc-800">
                         {lamportsToSolString(unclaimedLamports)} SOL
                       </div>
-                      <div className="text-wrap text-sm text-zinc-500">
+                      <div className="text-sm text-wrap text-zinc-500">
                         Total in account: {lamportsToSol(account.lamports)} SOL
                       </div>
                     </div>
@@ -291,10 +291,10 @@ function AccountListForm({
               invalid={isInvalid}
               className={cn(
                 "mt-2 block w-full rounded-lg border border-zinc-300 bg-white/5 px-3 py-1 text-sm/6 text-zinc-900",
-                "focus:outline-none data-[focus]:outline-2 data-[focus]:-outline-offset-2 data-[focus]:outline-white/25",
+                "focus:outline-hidden data-focus:outline-2 data-focus:-outline-offset-2 data-focus:outline-white/25",
                 "h-[36px] grow",
-                "data-[disabled]:bg-zinc-100 data-[disabled]:text-zinc-500",
-                "data-[invalid]:text-red-600 data-[invalid]:data-[focus]:outline-red-600 data-[invalid]:ring-red-600",
+                "data-disabled:bg-zinc-100 data-disabled:text-zinc-500",
+                "data-invalid:text-red-600 data-invalid:ring-red-600 data-invalid:data-focus:outline-red-600",
               )}
               placeholder="Enter the address of the recipient"
             />
@@ -322,7 +322,7 @@ function AccountAddress({ address }: { address: PublicKey }) {
   return (
     <CopyButton
       clipboard={address.toString()}
-      className="flex items-center gap-1 "
+      className="flex items-center gap-1"
     >
       <span>{compress(address.toString(), 4)}</span>
       <DocumentDuplicateIcon className="size-4 text-zinc-400" />
@@ -345,7 +345,7 @@ function ValidatorInfo({ account }: { account: StakeAccountType }) {
 
   if (isPending) {
     return (
-      <div className="hidden h-5 w-[140px] animate-pulse rounded bg-indigo-200 sm:block" />
+      <div className="hidden h-5 w-[140px] animate-pulse rounded-sm bg-indigo-200 sm:block" />
     );
   }
 

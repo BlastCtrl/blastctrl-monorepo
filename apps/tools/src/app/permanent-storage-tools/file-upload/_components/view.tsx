@@ -145,7 +145,7 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
               href={uri}
               rel="noreferrer"
               target="_blank"
-              className="break-all font-medium text-blue-300 underline"
+              className="font-medium break-all text-blue-300 underline"
             >
               {uri}
             </a>{" "}
@@ -169,7 +169,7 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
 
   // TODO: add FAQ, disclosures
   return (
-    <div className="mx-auto flex flex-col md:max-w-screen-sm md:p-1">
+    <div className="mx-auto flex flex-col md:max-w-(--breakpoint-sm) md:p-1">
       {/* Drop upload */}
       <div>
         <Transition
@@ -185,7 +185,7 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
             <div className="mt-1 sm:col-span-2 sm:mt-0">
               <div
                 className={cn(
-                  "mx-auto flex max-w-lg justify-center rounded-md border-2 border-dashed border-gray-300 px-6 pb-6 pt-5 transition-colors",
+                  "mx-auto flex max-w-lg justify-center rounded-md border-2 border-dashed border-gray-300 px-6 pt-5 pb-6 transition-colors",
                   dragActive && "bg-accent/30",
                 )}
               >
@@ -207,7 +207,7 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
                   <div className="flex justify-center text-sm text-gray-600">
                     <label
                       htmlFor="file-upload"
-                      className="border-b-secondary text-secondary focus-within:ring-secondary hover:text-secondary-focus relative cursor-pointer border-b-2 font-medium focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2"
+                      className="relative cursor-pointer border-b-2 border-b-secondary font-medium text-secondary focus-within:ring-2 focus-within:ring-secondary focus-within:ring-offset-2 focus-within:outline-hidden hover:text-secondary-focus"
                     >
                       <span>Upload a file</span>
                       <input
@@ -249,9 +249,9 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
           enterTo="translate-x-0 opacity-100"
         >
           {file && (
-            <div className="overflow-hidden bg-white shadow sm:rounded-lg">
+            <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
               <div className="px-4 py-5 sm:px-6">
-                <h3 className="text-lg font-medium leading-6 text-gray-900">
+                <h3 className="text-lg leading-6 font-medium text-gray-900">
                   File Information
                 </h3>
                 <p className="mt-1 max-w-2xl text-sm text-gray-500">
@@ -264,7 +264,7 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
                     <dt className="text-sm font-medium text-gray-500">
                       File name
                     </dt>
-                    <dd className="mt-1 break-all text-sm text-gray-900 sm:col-span-2 sm:mt-0">
+                    <dd className="mt-1 text-sm break-all text-gray-900 sm:col-span-2 sm:mt-0">
                       {file.name}
                     </dd>
                   </div>
@@ -331,7 +331,7 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
                   >
                     {isUploading && (
                       <SpinnerIcon
-                        className="-ml-1 mr-3 h-5 w-5 animate-spin"
+                        className="mr-3 -ml-1 h-5 w-5 animate-spin"
                         aria-hidden="true"
                       />
                     )}
@@ -345,9 +345,9 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
       </div>
 
       {balance?.basisPoints.gtn(0) && (
-        <div className="mx-auto my-3 max-w-sm rounded-md border border-gray-300 px-3 py-2 shadow-sm">
+        <div className="mx-auto my-3 max-w-sm rounded-md border border-gray-300 px-3 py-2 shadow-xs">
           <div className="font-base text-sm text-gray-900">
-            <span className="mb-1 block text-xs uppercase tracking-wider text-gray-500">
+            <span className="mb-1 block text-xs tracking-wider text-gray-500 uppercase">
               {network}
             </span>
             <span className="font-medium text-gray-500">Turbo Credits </span>
@@ -355,7 +355,7 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
               {formatAmount(balance)}
             </span>
           </div>
-          <p className="pb-1 pt-2 text-xs text-gray-500">
+          <p className="pt-2 pb-1 text-xs text-gray-500">
             Leftover credits from previous uploads. Turbo Credits are
             non-refundable but roll over to cover future uploads.
           </p>

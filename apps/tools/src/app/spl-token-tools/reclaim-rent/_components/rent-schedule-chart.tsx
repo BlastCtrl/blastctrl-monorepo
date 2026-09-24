@@ -81,8 +81,8 @@ export function RentScheduleChart({
                   isCurrent
                     ? "fill-indigo-500/25"
                     : isUpcoming
-                      ? "fill-indigo-500/[7%]"
-                      : "fill-zinc-500/[7%]"
+                      ? "fill-indigo-500/7"
+                      : "fill-zinc-500/7"
                 }
               />
               {/* Deposit that has to stay */}

@@ -42,7 +42,7 @@ export const InputGroup = React.forwardRef<HTMLInputElement, InputGroupProps>(
             </span>
           )}
         </label>
-        <div className="relative mt-2 rounded-md shadow-sm sm:mt-1">
+        <div className="relative mt-2 rounded-md shadow-xs sm:mt-1">
           {leadingAddOn}
           <input
             ref={ref}
@@ -53,7 +53,7 @@ export const InputGroup = React.forwardRef<HTMLInputElement, InputGroupProps>(
               "block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
               leading && "pl-7",
               !!error &&
-                "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:outline-none focus:ring-red-500",
+                "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500 focus:outline-hidden",
             )}
             aria-invalid={error ? "true" : "false"}
           />

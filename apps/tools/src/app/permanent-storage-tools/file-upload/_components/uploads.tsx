@@ -81,13 +81,13 @@ export const Uploads = memo(function Uploads({ files }: UploadsProps) {
         {files.slice(0, length).map((item, idx) => (
           <li
             key={idx}
-            className="overflow-hidden bg-white px-4 py-3 shadow sm:rounded-md sm:px-6"
+            className="overflow-hidden bg-white px-4 py-3 shadow-sm sm:rounded-md sm:px-6"
           >
             <div className="flex flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2">
               <div className="flex gap-x-4 self-start sm:self-auto">
-                <div className="flex-shrink-0">{getFilePreview(item)}</div>
+                <div className="shrink-0">{getFilePreview(item)}</div>
                 <div className="min-w-0 flex-1">
-                  <p className="break-all text-sm font-medium text-gray-900 sm:max-w-xs">
+                  <p className="text-sm font-medium break-all text-gray-900 sm:max-w-xs">
                     {item.name}
                   </p>
                   <p
@@ -101,7 +101,7 @@ export const Uploads = memo(function Uploads({ files }: UploadsProps) {
               <div className="inline-flex space-x-1 pt-1 sm:pt-0">
                 <CopyButton
                   clipboard={item.uri}
-                  className="inline-flex h-7 items-center rounded-full border border-gray-300 bg-white px-2.5 py-0.5 text-sm font-medium text-gray-700 shadow-sm hover:cursor-pointer hover:bg-gray-50"
+                  className="inline-flex h-7 items-center rounded-full border border-gray-300 bg-white px-2.5 py-0.5 text-sm font-medium text-gray-700 shadow-xs hover:cursor-pointer hover:bg-gray-50"
                 >
                   {(props) => (props.copied ? "Copied!" : "Copy")}
                 </CopyButton>
@@ -110,7 +110,7 @@ export const Uploads = memo(function Uploads({ files }: UploadsProps) {
                   target="_blank"
                   download={item.name}
                   href={item.uri}
-                  className="inline-flex h-7 items-center justify-center rounded-full border border-gray-300 bg-white px-2.5 py-0.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                  className="inline-flex h-7 items-center justify-center rounded-full border border-gray-300 bg-white px-2.5 py-0.5 text-sm font-medium text-gray-700 shadow-xs hover:bg-gray-50"
                 >
                   Open
                 </a>

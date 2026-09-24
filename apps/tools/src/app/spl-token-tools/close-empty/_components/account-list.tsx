@@ -74,9 +74,9 @@ export const AccountList = ({
 
       <Table
         dense
-        className="scroller h-[500px] max-h-[500px] overflow-auto rounded pb-4"
+        className="scroller h-[500px] max-h-[500px] overflow-auto rounded-sm pb-4"
       >
-        <TableHead className="sticky top-0 z-[1]">
+        <TableHead className="sticky top-0 z-1">
           <TableRow className="bg-zinc-100 font-medium text-zinc-500">
             <TableHeader className="sticky top-0">
               <div className="grid w-full place-content-center">
@@ -85,7 +85,7 @@ export const AccountList = ({
                   checked={checkboxState === "checked"}
                   onChange={toggleAll}
                   type="checkbox"
-                  className="form-checkbox mx-auto rounded accent-blue-600"
+                  className="mx-auto form-checkbox rounded-sm accent-blue-600"
                 />
               </div>
             </TableHeader>
@@ -111,7 +111,7 @@ export const AccountList = ({
                   }
                 }}
                 className={cn(
-                  isSelected ? "bg-blue-600/[5%]" : "hover:bg-blue-600/[2.5%]",
+                  isSelected ? "bg-blue-600/5" : "hover:bg-blue-600/2.5",
                 )}
                 key={account.token_account}
               >
@@ -128,7 +128,7 @@ export const AccountList = ({
                             : selectedAccounts.filter((a) => a !== account),
                         )
                       }
-                      className="form-checkbox rounded accent-blue-600"
+                      className="form-checkbox rounded-sm accent-blue-600"
                     />
                   </div>
                 </TableCell>

@@ -65,7 +65,7 @@ export function SplitGraphicForm() {
               <Button
                 color="indigo"
                 onClick={copyToClipboard}
-                className="flex !size-[36px] items-center !p-0 text-indigo-200"
+                className="flex size-[36px]! items-center p-0! text-indigo-200"
               >
                 {isCopied ? (
                   <ClipboardDocumentCheckIcon className="size-5" />
@@ -242,16 +242,16 @@ function SplitFormInner({
             <Slider.Root
               value={[inputs.percent]}
               onValueChange={(value) => void handleSlider(value[0] ?? 50)}
-              className="group relative mt-1.5 flex w-full touch-none select-none items-center transition-[margin] duration-300 hover:-mx-1 hover:cursor-grab active:cursor-grabbing"
+              className="group relative mt-1.5 flex w-full touch-none items-center transition-[margin] duration-300 select-none hover:-mx-1 hover:cursor-grab active:cursor-grabbing"
               min={0}
               max={100}
               step={0.1}
             >
-              <Slider.Track className="relative h-4 grow rounded-full bg-gradient-to-r from-orange-400 to-yellow-400 duration-300 group-hover:h-[18px]">
-                <Slider.Range className="absolute h-full rounded-l-full bg-gradient-to-r from-indigo-500 to-indigo-600" />
+              <Slider.Track className="relative h-4 grow rounded-full bg-linear-to-r from-orange-400 to-yellow-400 duration-300 group-hover:h-[18px]">
+                <Slider.Range className="absolute h-full rounded-l-full bg-linear-to-r from-indigo-500 to-indigo-600" />
               </Slider.Track>
               <Slider.Thumb
-                className="block h-6 w-3 rounded-sm border border-[#171717] bg-white outline-none transition-[height,width] group-hover:h-7 group-hover:w-[14px]"
+                className="block h-6 w-3 rounded-xs border border-[#171717] bg-white outline-hidden transition-[height,width] group-hover:h-7 group-hover:w-[14px]"
                 aria-label="Total %"
               />
             </Slider.Root>
@@ -259,7 +259,7 @@ function SplitFormInner({
         </div>
 
         <div className="mt-2 grid w-full grid-cols-2 gap-4">
-          <div className="grid aspect-[2/1] place-items-center rounded-3xl bg-indigo-500/25 ring-4 ring-inset ring-white/50">
+          <div className="grid aspect-2/1 place-items-center rounded-3xl bg-indigo-500/25 ring-4 ring-white/50 ring-inset">
             <div className="flex w-4/5 items-center border-b-2 border-indigo-900">
               <input
                 type="text"
@@ -271,12 +271,12 @@ function SplitFormInner({
                     handleLeftInput(target.value);
                   }
                 }}
-                className="min-w-0 grow border-0 bg-transparent py-1.5 pl-0.5 pr-3.5 font-medium text-indigo-950/80 focus:outline-none focus:ring-0"
+                className="min-w-0 grow border-0 bg-transparent py-1.5 pr-3.5 pl-0.5 font-medium text-indigo-950/80 focus:ring-0 focus:outline-hidden"
               />{" "}
               <span className="font-medium text-indigo-950/80">SOL</span>
             </div>
           </div>
-          <div className="grid aspect-[2/1] place-items-center rounded-3xl bg-amber-500/25 ring-4 ring-inset ring-white/50">
+          <div className="grid aspect-2/1 place-items-center rounded-3xl bg-amber-500/25 ring-4 ring-white/50 ring-inset">
             <div className="flex w-4/5 items-center border-b-2 border-indigo-900">
               <input
                 type="text"
@@ -288,7 +288,7 @@ function SplitFormInner({
                     handleRightInput(target.value);
                   }
                 }}
-                className="min-w-0 grow border-0 bg-transparent py-1.5 pl-0.5 pr-3.5 font-medium text-indigo-950/80 focus:outline-none focus:ring-0"
+                className="min-w-0 grow border-0 bg-transparent py-1.5 pr-3.5 pl-0.5 font-medium text-indigo-950/80 focus:ring-0 focus:outline-hidden"
               />{" "}
               <span className="font-medium text-indigo-950/80">SOL</span>
             </div>
@@ -315,7 +315,7 @@ function SplitFormInner({
               className="w-full"
             >
               {isConfirming && (
-                <SpinnerIcon className="-ml-1 mr-1 inline size-[1em] animate-spin" />
+                <SpinnerIcon className="mr-1 -ml-1 inline size-[1em] animate-spin" />
               )}
               Submit
             </Button>
@@ -323,7 +323,7 @@ function SplitFormInner({
         )}
 
         {formSuccess && (
-          <div className="mt-8 flex items-center gap-2 rounded-lg p-4 shadow ring-1 ring-black/5">
+          <div className="mt-8 flex items-center gap-2 rounded-lg p-4 shadow-sm ring-1 ring-black/5">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="size-5 text-green-500"

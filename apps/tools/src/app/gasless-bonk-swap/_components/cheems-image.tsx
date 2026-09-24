@@ -74,7 +74,7 @@ export const CheemsImage = () => {
         {/* Eyes */}
         <div
           className={cn(
-            "absolute left-[64%] top-[8%] text-sm",
+            "absolute top-[8%] left-[64%] text-sm",
             bonkCounter >= 20 ? "fire-in" : "opacity-0",
           )}
         >
@@ -82,7 +82,7 @@ export const CheemsImage = () => {
         </div>
         <div
           className={cn(
-            "absolute left-[81%] top-[7.5%] text-sm",
+            "absolute top-[7.5%] left-[81%] text-sm",
             bonkCounter >= 20 ? "fire-in" : "opacity-0",
           )}
         >

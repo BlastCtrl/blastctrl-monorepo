@@ -133,7 +133,7 @@ export default function Overview() {
         <Button
           onClick={() => setVisible(true)}
           color="indigo"
-          className="w-full max-w-fit !px-6"
+          className="w-full max-w-fit px-6!"
         >
           Please connect your wallet and sign in to use this tool
         </Button>
@@ -149,7 +149,7 @@ export default function Overview() {
             await handleRequestAuth();
           }}
           color="indigo"
-          className="w-full max-w-fit !px-6"
+          className="w-full max-w-fit px-6!"
         >
           Click here to sign in
         </Button>
@@ -205,7 +205,7 @@ const SolaceAirdropDashboard = ({
           <Button
             color="indigo"
             href="/spl-token-tools/distributor/new"
-            className="!px-4"
+            className="px-4!"
           >
             Create New Airdrop
           </Button>
@@ -213,13 +213,13 @@ const SolaceAirdropDashboard = ({
 
         {isLoading && (
           <div className="py-8 text-center">
-            <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-b-indigo-200 border-l-indigo-200 border-r-indigo-200 border-t-indigo-600"></div>
+            <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-t-indigo-600 border-r-indigo-200 border-b-indigo-200 border-l-indigo-200"></div>
             <p className="text-sm text-gray-500">Loading your airdrops...</p>
           </div>
         )}
 
         {isError && (
-          <div className="space-y-2 rounded bg-red-50 p-3 text-center text-red-700">
+          <div className="space-y-2 rounded-sm bg-red-50 p-3 text-center text-red-700">
             Failed to load airdrops.
             {error.error === "FST_AUTHENTICATION_ERROR" && (
               <>
@@ -245,23 +245,23 @@ const SolaceAirdropDashboard = ({
         )}
 
         {!isLoading && !isError && airdrops && airdrops.length > 0 && (
-          <div className="rounded border max-sm:overflow-x-auto sm:max-h-[500px] sm:overflow-auto">
+          <div className="rounded-sm border max-sm:overflow-x-auto sm:max-h-[500px] sm:overflow-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                     Name
                   </th>
-                  <th className="hidden px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:table-cell">
+                  <th className="hidden px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase sm:table-cell">
                     Date
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                     Token
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                     Recipients
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                     Status
                   </th>
                   <th className="relative w-0">
@@ -281,30 +281,30 @@ const SolaceAirdropDashboard = ({
                       )
                     }
                   >
-                    <td className="max-w-[140px] whitespace-nowrap px-3 py-2 text-sm sm:max-w-none">
+                    <td className="max-w-[140px] px-3 py-2 text-sm whitespace-nowrap sm:max-w-none">
                       <AirdropName airdrop={airdrop} />
                     </td>
-                    <td className="hidden whitespace-nowrap px-3 py-2 text-sm sm:table-cell">
+                    <td className="hidden px-3 py-2 text-sm whitespace-nowrap sm:table-cell">
                       {formatDate(airdrop.createdAt)}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-sm">
+                    <td className="px-3 py-2 text-sm whitespace-nowrap">
                       {airdrop.mintAddress ? (
                         <MintAddressLink mintAddress={airdrop.mintAddress} />
                       ) : (
                         "SOL"
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-sm">
+                    <td className="px-3 py-2 text-sm whitespace-nowrap">
                       {airdrop.recipientCount}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-sm">
+                    <td className="px-3 py-2 text-sm whitespace-nowrap">
                       <span
-                        className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold leading-5 ${getStatusBadgeStyle(airdrop.status)}`}
+                        className={`inline-flex rounded-full px-2 py-1 text-xs leading-5 font-semibold ${getStatusBadgeStyle(airdrop.status)}`}
                       >
                         {airdrop.status}
                       </span>
                     </td>
-                    <td className="w-0 whitespace-nowrap py-2 pr-2">
+                    <td className="w-0 py-2 pr-2 whitespace-nowrap">
                       <div className="relative flex items-center justify-center">
                         {airdrop.status === "created" && (
                           <button
@@ -400,7 +400,7 @@ const SolaceAirdropDashboard = ({
               </span>
             </div>
 
-            <div className="max-h-48 overflow-y-auto rounded border">
+            <div className="max-h-48 overflow-y-auto rounded-sm border">
               <table className="min-w-full">
                 <thead className="bg-gray-100">
                   <tr>
@@ -488,7 +488,7 @@ function AirdropName({ airdrop }: { airdrop: GetAirdrops200Item }) {
       <div
         ref={wrapperRef}
         className={clsx(
-          "hidden w-full max-w-44 overflow-hidden rounded bg-zinc-50 px-2 py-0.5 ring-1 ring-zinc-300 sm:block",
+          "hidden w-full max-w-44 overflow-hidden rounded-sm bg-zinc-50 px-2 py-0.5 ring-1 ring-zinc-300 sm:block",
           "focus-within:ring-2 focus-within:ring-indigo-500",
         )}
       >
@@ -503,7 +503,7 @@ function AirdropName({ airdrop }: { airdrop: GetAirdrops200Item }) {
             }}
             className="w-full cursor-text truncate text-left"
           >
-            <span className="select-none font-mono text-xs/4 font-medium text-zinc-700">
+            <span className="font-mono text-xs/4 font-medium text-zinc-700 select-none">
               {airdrop.label || airdrop.id}
             </span>
           </button>
@@ -530,7 +530,7 @@ function AirdropName({ airdrop }: { airdrop: GetAirdrops200Item }) {
               maxLength={30}
               className={clsx(
                 "w-full py-px font-mono text-xs/4 font-medium text-zinc-700",
-                "bg-transparent focus:outline-none",
+                "bg-transparent focus:outline-hidden",
               )}
             />
           </form>

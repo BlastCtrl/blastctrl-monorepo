@@ -182,7 +182,7 @@ export default function AirdropDetails({
         <Button
           href="/spl-token-tools/distributor"
           color="dark/zinc"
-          className="whitespace-nowrap !px-4 text-sm"
+          className="whitespace-nowrap px-4! text-sm"
         >
           <ArrowTurnUpLeftIcon aria-hidden="true" className="size-3.5" />
           Back to Airdrops
@@ -344,7 +344,7 @@ export default function AirdropDetails({
               </div>
 
               {/* Batch list */}
-              <div className="max-h-96 overflow-y-auto rounded border">
+              <div className="max-h-96 overflow-y-auto rounded-sm border">
                 <div className="divide-y">
                   {data.transactions.filter(
                     (batch) => !showOnlyPending || batch.status !== "confirmed",
@@ -508,7 +508,7 @@ function Batch({
             onClick={() => handleRetry()}
             disabled={isPending}
             color="indigo"
-            className="!px-3 text-xs !leading-4"
+            className="px-3! text-xs leading-4!"
           >
             {isPending && <SpinnerIcon className="size-4" />}
             Retry

@@ -31,12 +31,12 @@ export default function StakeLockupManagement() {
         </header>
 
         <div className="w-full text-sm/6">
-          <TabList className="mx-auto mt-4 flex w-64 items-stretch rounded-lg p-0.5 text-zinc-700 shadow-sm ring-1 ring-indigo-950/10">
+          <TabList className="mx-auto mt-4 flex w-64 items-stretch rounded-lg p-0.5 text-zinc-700 shadow-xs ring-1 ring-indigo-950/10">
             {["Simple", "Manual"].map((tab, i) => (
               <Tab
                 key={tab}
                 data-index={i}
-                className="flex-1 rounded-md py-1.5 font-semibold data-[index=0]:-mr-2 data-[index=1]:-ml-2 data-[selected]:bg-indigo-500 data-[selected]:text-white data-[selected]:ring-2 data-[selected]:ring-inset data-[selected]:ring-white/50"
+                className="flex-1 rounded-md py-1.5 font-semibold data-selected:bg-indigo-500 data-selected:text-white data-selected:ring-2 data-selected:ring-white/50 data-selected:ring-inset data-[index=0]:-mr-2 data-[index=1]:-ml-2"
               >
                 {tab}
               </Tab>

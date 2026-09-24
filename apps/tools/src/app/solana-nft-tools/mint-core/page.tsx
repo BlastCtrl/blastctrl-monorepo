@@ -101,7 +101,7 @@ export default function Mint() {
               <div className="break-normal">
                 <p>
                   There has been an error while uploading with the message:{" "}
-                  <span className="break-all font-medium text-yellow-300">
+                  <span className="font-medium break-all text-yellow-300">
                     {err instanceof Error ? err.message : String(err)}
                   </span>
                   .
@@ -203,9 +203,9 @@ export default function Mint() {
   };
 
   return (
-    <div className="mx-auto max-w-xl overflow-visible bg-white px-4 pb-5 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow">
+    <div className="mx-auto max-w-xl overflow-visible bg-white px-4 pb-5 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow-sm">
       <div className="border-b border-gray-200 pb-4">
-        <h1 className="font-display mb-4 text-3xl font-semibold">
+        <h1 className="mb-4 font-display text-3xl font-semibold">
           NFT minting
         </h1>
         <p className="text-sm text-gray-500">
@@ -216,11 +216,11 @@ export default function Mint() {
 
       <form
         onSubmit={handleSubmit(submit)}
-        className="space-y-8 divide-y divide-gray-200"
+        className="divide-y divide-gray-200 *:not-last:pb-8"
       >
         <div>
           <div className="mt-4 flex items-center justify-between">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">
+            <h3 className="text-lg leading-6 font-medium text-gray-900">
               Basic Information
             </h3>
             <div className="relative flex items-start">
@@ -233,7 +233,7 @@ export default function Mint() {
                   onChange={() => {
                     setCreateJson((prev) => !prev);
                   }}
-                  className="form-checkbox size-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="form-checkbox size-4 rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />
               </div>
               <div className="ml-3 text-sm">
@@ -312,7 +312,7 @@ export default function Mint() {
           <>
             <div>
               <div className="mt-4">
-                <h3 className="text-lg font-medium leading-6 text-gray-900">
+                <h3 className="text-lg leading-6 font-medium text-gray-900">
                   Image and Files
                 </h3>
                 <p className="mt-1 text-sm text-gray-500">
@@ -341,11 +341,11 @@ export default function Mint() {
               type="submit"
               color="indigo"
               disabled={isConfirming}
-              // className="bg-secondary hover:bg-secondary-focus focus:ring-secondary-focus inline-flex items-center rounded-md px-4 py-2 text-base text-gray-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2"
+              // className="bg-secondary hover:bg-secondary-focus focus:ring-secondary-focus inline-flex items-center rounded-md px-4 py-2 text-base text-gray-50 shadow-xs focus:outline-hidden focus:ring-2 focus:ring-offset-2"
             >
               {isConfirming ? (
                 <>
-                  <SpinnerIcon className="-ml-1 mr-2 h-5 w-5 animate-spin" />
+                  <SpinnerIcon className="mr-2 -ml-1 h-5 w-5 animate-spin" />
                   Confirming
                 </>
               ) : (

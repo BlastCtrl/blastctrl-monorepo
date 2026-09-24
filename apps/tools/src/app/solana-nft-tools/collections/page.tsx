@@ -19,7 +19,7 @@ export default function Collections() {
             className={cn(
               "rounded-tl-md border-b-2 py-1.5 pt-2 hover:bg-indigo-200/50",
               "border-transparent font-normal text-gray-500",
-              "data-[selected]:border-indigo-700 data-[selected]:font-medium data-[selected]:text-gray-900",
+              "data-selected:border-indigo-700 data-selected:font-medium data-selected:text-gray-900",
             )}
           >
             {tab}

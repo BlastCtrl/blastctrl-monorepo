@@ -299,7 +299,7 @@ export const ManualInput = () => {
 
       <div className="my-6">
         <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="grid gap-x-2 gap-y-6 border-b border-gray-200 pb-6 sm:grid-cols-6 ">
+          <div className="grid gap-x-2 gap-y-6 border-b border-gray-200 pb-6 sm:grid-cols-6">
             <div className="relative mt-1 sm:col-span-6">
               <label
                 className="mb-1 block text-sm font-medium text-gray-600"
@@ -310,9 +310,9 @@ export const ManualInput = () => {
               <input
                 id="parentAta"
                 className={cn(
-                  "block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
+                  "block w-full rounded-md border border-gray-300 px-3 py-2 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
                   !!errors?.parentAta &&
-                    "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:outline-none focus:ring-red-500",
+                    "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500 focus:outline-hidden",
                 )}
                 aria-invalid={errors?.parentAta ? "true" : "false"}
                 {...register("parentAta", {
@@ -343,9 +343,9 @@ export const ManualInput = () => {
               <input
                 id="nestedAta"
                 className={cn(
-                  "block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
+                  "block w-full rounded-md border border-gray-300 px-3 py-2 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
                   !!errors?.nestedAta &&
-                    "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:outline-none focus:ring-red-500",
+                    "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500 focus:outline-hidden",
                 )}
                 aria-invalid={errors?.nestedAta ? "true" : "false"}
                 {...register("nestedAta", {
@@ -384,7 +384,7 @@ export const ManualInput = () => {
               <Button color="indigo" type="submit" disabled={isProcessing}>
                 {isProcessing ? (
                   <>
-                    <SpinnerIcon className="-ml-2 mr-1 h-5 w-5 animate-spin" />
+                    <SpinnerIcon className="mr-1 -ml-2 h-5 w-5 animate-spin" />
                     Confirming
                   </>
                 ) : (
@@ -411,7 +411,7 @@ export const ManualInput = () => {
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <div className="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" />
+            <div className="bg-opacity-75 fixed inset-0 bg-gray-900 transition-opacity" />
           </Transition.Child>
 
           <div className="fixed inset-0 z-10 overflow-y-auto">
@@ -425,18 +425,18 @@ export const ManualInput = () => {
                 leaveFrom="opacity-100 translate-y-0 sm:scale-100"
                 leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
               >
-                <Dialog.Panel className="absolute top-[20vh] max-w-[92%] transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:relative sm:top-auto sm:my-8 sm:w-full sm:max-w-xl sm:p-6">
+                <Dialog.Panel className="absolute top-[20vh] max-w-[92%] transform overflow-hidden rounded-lg bg-white px-4 pt-5 pb-4 text-left shadow-xl transition-all sm:relative sm:top-auto sm:my-8 sm:w-full sm:max-w-xl sm:p-6">
                   <div className="sm:flex sm:items-start">
-                    <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <div className="mx-auto flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-indigo-100 sm:mx-0 sm:h-10 sm:w-10">
                       <CheckCircleIcon
                         className="h-6 w-6 text-indigo-600"
                         aria-hidden="true"
                       />
                     </div>
-                    <div className="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
                       <Dialog.Title
                         as="h3"
-                        className="text-lg font-medium leading-6 text-gray-900"
+                        className="text-lg leading-6 font-medium text-gray-900"
                       >
                         Recover nested account available
                       </Dialog.Title>
@@ -453,7 +453,7 @@ export const ManualInput = () => {
                               <div className="mt-4 flex-col">
                                 <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
                                   <div className="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
-                                    <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                                    <div className="ring-opacity-5 overflow-hidden shadow-sm ring-1 ring-black md:rounded-lg">
                                       <table className="min-w-full divide-y divide-gray-300">
                                         <thead className="bg-gray-50">
                                           <tr>
@@ -465,7 +465,7 @@ export const ManualInput = () => {
                                             ].map((col) => (
                                               <th
                                                 key={col}
-                                                className="whitespace-nowrap px-2 pl-4 pr-3 text-left text-sm font-semibold text-gray-900"
+                                                className="px-2 pr-3 pl-4 text-left text-sm font-semibold whitespace-nowrap text-gray-900"
                                                 scope="col"
                                               >
                                                 {col}
@@ -475,10 +475,10 @@ export const ManualInput = () => {
                                         </thead>
                                         <tbody className="divide-y divide-gray-200 bg-white">
                                           <tr>
-                                            <td className="whitespace-nowrap py-2 pl-4 pr-3 text-sm text-gray-500 sm:pl-6">
+                                            <td className="py-2 pr-3 pl-4 text-sm whitespace-nowrap text-gray-500 sm:pl-6">
                                               {compress(wallet?.toBase58(), 4)}
                                             </td>
-                                            <td className="whitespace-nowrap py-2 pl-4 pr-3 text-sm text-gray-500 sm:pl-6">
+                                            <td className="py-2 pr-3 pl-4 text-sm whitespace-nowrap text-gray-500 sm:pl-6">
                                               ◎ SOL
                                             </td>
                                             <td>
@@ -489,7 +489,7 @@ export const ManualInput = () => {
                                                 )}
                                               </span>
                                             </td>
-                                            <td className="whitespace-nowrap py-2 pl-4 pr-3 text-sm text-gray-500 sm:pl-6">
+                                            <td className="py-2 pr-3 pl-4 text-sm whitespace-nowrap text-gray-500 sm:pl-6">
                                               {(balance ?? 0) +
                                                 lamportsToSol(
                                                   nestedInfo.lamports,
@@ -497,13 +497,13 @@ export const ManualInput = () => {
                                             </td>
                                           </tr>
                                           <tr>
-                                            <td className="whitespace-nowrap py-2 pl-4 pr-3 text-sm text-gray-500 sm:pl-6">
+                                            <td className="py-2 pr-3 pl-4 text-sm whitespace-nowrap text-gray-500 sm:pl-6">
                                               {compress(
                                                 destinationInfo.address.toBase58(),
                                                 4,
                                               )}
                                             </td>
-                                            <td className="whitespace-nowrap py-2 pl-4 pr-3 text-sm text-gray-500 sm:pl-6">
+                                            <td className="py-2 pr-3 pl-4 text-sm whitespace-nowrap text-gray-500 sm:pl-6">
                                               {compress(
                                                 destinationInfo.data.mint.toBase58(),
                                                 4,
@@ -520,7 +520,7 @@ export const ManualInput = () => {
                                                 )}
                                               </span>
                                             </td>
-                                            <td className="whitespace-nowrap py-2 pl-4 pr-3 text-sm text-gray-500 sm:pl-6">
+                                            <td className="py-2 pr-3 pl-4 text-sm whitespace-nowrap text-gray-500 sm:pl-6">
                                               {normalizeTokenAmount(
                                                 (
                                                   destinationInfo.data.amount +
@@ -531,13 +531,13 @@ export const ManualInput = () => {
                                             </td>
                                           </tr>
                                           <tr>
-                                            <td className="whitespace-nowrap py-2 pl-4 pr-3 text-sm text-gray-500 sm:pl-6">
+                                            <td className="py-2 pr-3 pl-4 text-sm whitespace-nowrap text-gray-500 sm:pl-6">
                                               {compress(
                                                 nestedInfo.address.toBase58(),
                                                 4,
                                               )}
                                             </td>
-                                            <td className="whitespace-nowrap py-2 pl-4 pr-3 text-sm text-gray-500 sm:pl-6">
+                                            <td className="py-2 pr-3 pl-4 text-sm whitespace-nowrap text-gray-500 sm:pl-6">
                                               ◎ SOL
                                             </td>
                                             <td>
@@ -548,18 +548,18 @@ export const ManualInput = () => {
                                                 )}
                                               </span>
                                             </td>
-                                            <td className="whitespace-nowrap py-2 pl-4 pr-3 text-sm text-gray-500 sm:pl-6">
+                                            <td className="py-2 pr-3 pl-4 text-sm whitespace-nowrap text-gray-500 sm:pl-6">
                                               0
                                             </td>
                                           </tr>
                                           <tr>
-                                            <td className="whitespace-nowrap py-2 pl-4 pr-3 text-sm text-gray-500 sm:pl-6">
+                                            <td className="py-2 pr-3 pl-4 text-sm whitespace-nowrap text-gray-500 sm:pl-6">
                                               {compress(
                                                 nestedInfo.address.toBase58(),
                                                 4,
                                               )}
                                             </td>
-                                            <td className="whitespace-nowrap py-2 pl-4 pr-3 text-sm text-gray-500 sm:pl-6">
+                                            <td className="py-2 pr-3 pl-4 text-sm whitespace-nowrap text-gray-500 sm:pl-6">
                                               {compress(
                                                 nestedInfo.data.mint.toBase58(),
                                                 4,
@@ -574,7 +574,7 @@ export const ManualInput = () => {
                                                 )}
                                               </span>
                                             </td>
-                                            <td className="whitespace-nowrap py-2 pl-4 pr-3 text-sm text-gray-500 sm:pl-6">
+                                            <td className="py-2 pr-3 pl-4 text-sm whitespace-nowrap text-gray-500 sm:pl-6">
                                               0
                                             </td>
                                           </tr>
@@ -593,18 +593,18 @@ export const ManualInput = () => {
                     <button
                       type="button"
                       disabled={confirming}
-                      className="inline-flex w-full justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm"
+                      className="inline-flex w-full justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-base font-medium text-white shadow-xs hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden sm:ml-3 sm:w-auto sm:text-sm"
                       onClick={handleRecover}
                     >
                       {confirming && (
-                        <SpinnerIcon className="-ml-2 mr-1 h-5 w-5 animate-spin" />
+                        <SpinnerIcon className="mr-1 -ml-2 h-5 w-5 animate-spin" />
                       )}
                       {confirming ? "Confirming" : "Recover"}
                     </button>
                     <button
                       type="button"
                       disabled={confirming}
-                      className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:mt-0 sm:w-auto sm:text-sm"
+                      className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-xs hover:text-gray-500 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden sm:mt-0 sm:w-auto sm:text-sm"
                       onClick={() => setOpenDialog(false)}
                     >
                       Cancel

@@ -106,7 +106,7 @@ export default function CreateToken() {
               {selectedAction === "Add" ? "Adding" : "Updating"} metadata to
               this token is not possible due to the error:{" "}
             </p>
-            <code className="break-all py-6">{JSON.stringify(value.err)}</code>
+            <code className="py-6 break-all">{JSON.stringify(value.err)}</code>
           </>
         ),
       });
@@ -130,7 +130,7 @@ export default function CreateToken() {
                 <div className="break-normal">
                   <p>
                     There has been an error while uploading with the message:{" "}
-                    <span className="break-all font-medium text-yellow-300">
+                    <span className="font-medium break-all text-yellow-300">
                       {err?.message}
                     </span>
                     .
@@ -178,7 +178,7 @@ export default function CreateToken() {
               <div className="break-normal">
                 <p>
                   There has been an error while uploading with the message:{" "}
-                  <span className="break-all font-medium text-yellow-300">
+                  <span className="font-medium break-all text-yellow-300">
                     {err?.message}
                   </span>
                   .
@@ -262,9 +262,9 @@ export default function CreateToken() {
   };
 
   return (
-    <div className="mx-auto max-w-xl overflow-visible bg-white px-4 pb-5 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow">
+    <div className="mx-auto max-w-xl overflow-visible bg-white px-4 pb-5 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow-sm">
       <div className="border-b border-gray-200 pb-4">
-        <h1 className="font-display mb-4 text-3xl font-semibold">
+        <h1 className="mb-4 font-display text-3xl font-semibold">
           Add metadata to tokens
         </h1>
         <p className="text-sm text-gray-500">
@@ -276,11 +276,11 @@ export default function CreateToken() {
 
       <form
         onSubmit={handleSubmit(onSubmit)}
-        className="space-y-8 divide-y divide-gray-200"
+        className="divide-y divide-gray-200 *:not-last:pb-8"
       >
         <div>
-          <div className="mt-4 ">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">
+          <div className="mt-4">
+            <h3 className="text-lg leading-6 font-medium text-gray-900">
               Basic Information
             </h3>
             <p className="text-sm text-gray-500">
@@ -371,10 +371,10 @@ export default function CreateToken() {
 
         <div>
           <div className="mt-4">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">
+            <h3 className="text-lg leading-6 font-medium text-gray-900">
               Image
             </h3>
-            <ul className="mb-3 mt-1 list-disc text-sm text-gray-500 sm:ml-5">
+            <ul className="mt-1 mb-3 list-disc text-sm text-gray-500 sm:ml-5">
               <li>Square aspect ratio</li>
               <li>Smaller size (e.g. 200x200 pixels)</li>
               <li>
@@ -398,11 +398,11 @@ export default function CreateToken() {
               and messages.
             </p>
 
-            <div className="bg-secondary group inline-flex min-w-fit rounded-md">
+            <div className="group inline-flex min-w-fit rounded-md bg-secondary">
               <button
                 type="submit"
                 disabled={isConfirming}
-                className="bg-secondary hover:bg-secondary-focus focus:ring-secondary-focus disabled:bg-secondary-focus inline-flex min-w-fit items-center rounded-l-md px-4 py-2 text-base text-gray-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2"
+                className="inline-flex min-w-fit items-center rounded-l-md bg-secondary px-4 py-2 text-base text-gray-50 shadow-xs hover:bg-secondary-focus focus:ring-2 focus:ring-secondary-focus focus:ring-offset-2 focus:outline-hidden disabled:bg-secondary-focus"
               >
                 {selectedAction} metadata
               </button>
@@ -411,7 +411,7 @@ export default function CreateToken() {
                 value={selectedAction}
                 onChange={(v) => setSelectedAction(v)}
               >
-                <Select.Button className="hover:bg-secondary-focus h-full rounded-r-md px-2 text-gray-50">
+                <Select.Button className="h-full rounded-r-md px-2 text-gray-50 hover:bg-secondary-focus">
                   <ChevronUpDownIcon className="h-5 w-5" />
                 </Select.Button>
                 <Select.Options className="min-w-[18ch]">

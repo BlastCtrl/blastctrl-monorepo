@@ -139,12 +139,12 @@ export function ReclaimDialog({
 
   return (
     <Dialog open onClose={busy ? () => {} : onClose}>
-      <div className="fixed inset-0 z-[50] bg-black/30" aria-hidden="true" />
-      <div className="fixed inset-0 z-[50] flex w-screen items-center justify-center p-4">
+      <div className="fixed inset-0 z-50 bg-black/30" aria-hidden="true" />
+      <div className="fixed inset-0 z-50 flex w-screen items-center justify-center p-4">
         <DialogPanel className="flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-lg">
           <DialogTitle
             aria-live="polite"
-            className="font-display flex items-center gap-3 px-6 pt-6 text-xl font-semibold"
+            className="flex items-center gap-3 px-6 pt-6 font-display text-xl font-semibold"
           >
             {phase === "signing" && (
               <SpinnerIcon className="size-5 shrink-0 animate-spin text-indigo-600" />
@@ -152,7 +152,7 @@ export function ReclaimDialog({
             {title()}
           </DialogTitle>
 
-          <div className="overflow-y-auto px-6 pb-2 pt-4">
+          <div className="overflow-y-auto px-6 pt-4 pb-2">
             {phase === "review" ? (
               <Review
                 accounts={accounts}
@@ -179,7 +179,7 @@ export function ReclaimDialog({
             )}
           </div>
 
-          <div className="flex flex-wrap justify-end gap-3 px-6 pb-6 pt-4">
+          <div className="flex flex-wrap justify-end gap-3 px-6 pt-4 pb-6">
             {phase === "review" && (
               <>
                 <Button plain onClick={onClose}>

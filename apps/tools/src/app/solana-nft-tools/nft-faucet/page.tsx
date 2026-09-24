@@ -35,9 +35,9 @@ export default function NftFaucet() {
   >(undefined);
 
   return (
-    <div className="mx-auto w-[min(100%,theme(screens.sm))] p-4 outline outline-red-600">
+    <div className="mx-auto w-[min(100%,var(--breakpoint-sm))] p-4 outline-red-600 outline-solid">
       <div className="pb-4">
-        <h1 className="font-display pb-1 text-2xl font-bold">
+        <h1 className="pb-1 font-display text-2xl font-bold">
           Get a random NFT
         </h1>
         <p className="text-zinc-500">
@@ -58,7 +58,7 @@ export default function NftFaucet() {
                   active
                     ? "border-indigo-600 ring-2 ring-indigo-600"
                     : "border-gray-300",
-                  "relative block cursor-pointer rounded-lg border bg-white px-6 py-4 shadow-sm focus:outline-none sm:flex sm:justify-between",
+                  "relative block cursor-pointer rounded-lg border bg-white px-6 py-4 shadow-xs focus:outline-hidden sm:flex sm:justify-between",
                 )
               }
             >
@@ -93,7 +93,7 @@ export default function NftFaucet() {
                   </span>
                   <RadioGroup.Description
                     as="span"
-                    className="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right"
+                    className="mt-2 flex text-sm sm:mt-0 sm:ml-4 sm:flex-col sm:text-right"
                   >
                     <span className="font-medium text-gray-900">
                       {option.cost}

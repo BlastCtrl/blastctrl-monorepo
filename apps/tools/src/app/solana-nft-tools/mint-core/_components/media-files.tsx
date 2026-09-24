@@ -76,7 +76,7 @@ export const MediaFiles = ({ setValue, watch }: MediaFilesProps) => {
         <div
           {...getRootProps({
             className: cn(
-              "relative flex h-64 w-full justify-center rounded-md border-2 border-dashed border-gray-300 bg-gray-100 px-6 pb-6 pt-5 transition-colors",
+              "relative flex h-64 w-full justify-center rounded-md border-2 border-dashed border-gray-300 bg-gray-100 px-6 pt-5 pb-6 transition-colors",
               isDragActive && "bg-gray-50",
             ),
           })}
@@ -92,13 +92,13 @@ export const MediaFiles = ({ setValue, watch }: MediaFilesProps) => {
               />
               <div
                 title={image?.name}
-                className="absolute bottom-3 left-3 z-10 max-w-[120px] overflow-hidden text-ellipsis rounded-full bg-sky-600 px-1.5 py-0.5 text-sm text-white ring-1"
+                className="absolute bottom-3 left-3 z-10 max-w-[120px] overflow-hidden rounded-full bg-sky-600 px-1.5 py-0.5 text-sm text-ellipsis text-white ring-1"
               >
                 {image?.name}
               </div>
               <button
                 onClick={handleRemoveImage}
-                className="absolute bottom-3 right-3 z-10 overflow-hidden rounded-full bg-sky-600 px-1.5 py-0.5 text-sm text-white ring-1 hover:bg-sky-700"
+                className="absolute right-3 bottom-3 z-10 overflow-hidden rounded-full bg-sky-600 px-1.5 py-0.5 text-sm text-white ring-1 hover:bg-sky-700"
               >
                 Remove
               </button>
@@ -122,7 +122,7 @@ export const MediaFiles = ({ setValue, watch }: MediaFilesProps) => {
               <div className="space-y-2 text-sm text-gray-600">
                 <label
                   htmlFor="file-upload"
-                  className="border-b-secondary text-secondary focus-within:ring-secondary hover:text-secondary-focus relative cursor-pointer border-b-2 text-sm font-medium focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2"
+                  className="relative cursor-pointer border-b-2 border-b-secondary text-sm font-medium text-secondary focus-within:ring-2 focus-within:ring-secondary focus-within:ring-offset-2 focus-within:outline-hidden hover:text-secondary-focus"
                 >
                   <span>Select an image</span>
                   <input
@@ -132,7 +132,7 @@ export const MediaFiles = ({ setValue, watch }: MediaFilesProps) => {
                     {...getInputProps()}
                   />
                 </label>
-                <p className="pl-1">or drag and drop</p>
+                <p className="mt-2 pl-1">or drag and drop</p>
                 <p className="text-gray-500">.jpg, .png, .gif, .webp</p>
               </div>
             </div>
@@ -148,7 +148,7 @@ export const MediaFiles = ({ setValue, watch }: MediaFilesProps) => {
         <div
           {...getRootProps2({
             className: cn(
-              "relative flex h-64 w-full justify-center rounded-md border-2 border-dashed border-gray-300 bg-gray-100 px-6 pb-6 pt-5 transition-colors",
+              "relative flex h-64 w-full justify-center rounded-md border-2 border-dashed border-gray-300 bg-gray-100 px-6 pt-5 pb-6 transition-colors",
               isDragActive2 && "bg-gray-50",
             ),
           })}
@@ -163,7 +163,7 @@ export const MediaFiles = ({ setValue, watch }: MediaFilesProps) => {
               <button
                 type="button"
                 onClick={handleRemoveAnimationFile}
-                className="absolute bottom-3 right-3 z-10 overflow-hidden rounded-full bg-sky-600 px-1.5 py-0.5 text-sm text-white ring-1 hover:bg-sky-700"
+                className="absolute right-3 bottom-3 z-10 overflow-hidden rounded-full bg-sky-600 px-1.5 py-0.5 text-sm text-white ring-1 hover:bg-sky-700"
               >
                 Remove
               </button>
@@ -188,7 +188,7 @@ export const MediaFiles = ({ setValue, watch }: MediaFilesProps) => {
               <div className="space-y-2 text-sm text-gray-600">
                 <label
                   htmlFor="file-upload"
-                  className="border-b-secondary text-secondary focus-within:ring-secondary hover:text-secondary-focus relative cursor-pointer border-b-2 text-sm font-medium focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2"
+                  className="relative cursor-pointer border-b-2 border-b-secondary text-sm font-medium text-secondary focus-within:ring-2 focus-within:ring-secondary focus-within:ring-offset-2 focus-within:outline-hidden hover:text-secondary-focus"
                 >
                   <span>Select a file</span>
                   <input
@@ -198,7 +198,7 @@ export const MediaFiles = ({ setValue, watch }: MediaFilesProps) => {
                     {...getInputProps2()}
                   />
                 </label>
-                <p className="pl-1">or drag and drop</p>
+                <p className="mt-2 pl-1">or drag and drop</p>
                 <p className="text-gray-500">.mp4, .avi, .mp3, .glb, ...</p>
               </div>
             </div>

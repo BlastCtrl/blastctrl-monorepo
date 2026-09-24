@@ -169,7 +169,7 @@ export default function Mint() {
               <div className="break-normal">
                 <p>
                   There has been an error while uploading with the message:{" "}
-                  <span className="break-all font-medium text-yellow-300">
+                  <span className="font-medium break-all text-yellow-300">
                     {err instanceof Error ? err.message : String(err)}
                   </span>
                   .
@@ -286,9 +286,9 @@ export default function Mint() {
   };
 
   return (
-    <div className="mx-auto max-w-xl overflow-visible bg-white px-4 pb-5 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow">
+    <div className="mx-auto max-w-xl overflow-visible bg-white px-4 pb-5 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow-sm">
       <div className="border-b border-gray-200 pb-4">
-        <h1 className="font-display mb-4 text-3xl font-semibold">
+        <h1 className="mb-4 font-display text-3xl font-semibold">
           NFT minting
         </h1>
         <p className="text-sm text-gray-500">
@@ -299,11 +299,11 @@ export default function Mint() {
 
       <form
         onSubmit={handleSubmit(submit)}
-        className="space-y-8 divide-y divide-gray-200"
+        className="divide-y divide-gray-200 *:not-last:pb-8"
       >
         <div>
           <div className="mt-4 flex items-center justify-between">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">
+            <h3 className="text-lg leading-6 font-medium text-gray-900">
               Basic Information
             </h3>
             <div className="relative flex items-start">
@@ -316,7 +316,7 @@ export default function Mint() {
                   onChange={() => {
                     setCreateJson((prev) => !prev);
                   }}
-                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="h-4 w-4 rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />
               </div>
               <div className="ml-3 text-sm">
@@ -404,9 +404,9 @@ export default function Mint() {
                   type="text"
                   id="maxSupply"
                   className={cn(
-                    "block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
+                    "block w-full rounded-md border border-gray-300 px-3 py-2 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
                     !!errors.maxSupply &&
-                      "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:outline-none focus:ring-red-500",
+                      "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500 focus:outline-hidden",
                   )}
                   aria-invalid={errors.maxSupply ? "true" : "false"}
                   {...register("maxSupply", {
@@ -427,7 +427,7 @@ export default function Mint() {
           <>
             <div>
               <div className="mt-4">
-                <h3 className="text-lg font-medium leading-6 text-gray-900">
+                <h3 className="text-lg leading-6 font-medium text-gray-900">
                   Image and Files
                 </h3>
                 <p className="mt-1 text-sm text-gray-500">
@@ -441,7 +441,7 @@ export default function Mint() {
 
             <div>
               <div className="mt-4">
-                <h3 className="text-lg font-medium leading-6 text-gray-900">
+                <h3 className="text-lg leading-6 font-medium text-gray-900">
                   Attributes
                 </h3>
                 <p className="mt-1 text-sm text-gray-500">
@@ -455,7 +455,7 @@ export default function Mint() {
 
         <div>
           <div className="mt-4">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">
+            <h3 className="text-lg leading-6 font-medium text-gray-900">
               Creators
             </h3>
             <p className="mt-1 text-sm text-gray-500">
@@ -479,7 +479,7 @@ export default function Mint() {
                     <legend className="sr-only">
                       Creator address and share
                     </legend>
-                    <div className="mt-1 -space-y-px rounded-md bg-white shadow-sm">
+                    <div className="mt-1 -space-y-px rounded-md bg-white shadow-xs">
                       <div className="grid grid-cols-9 -space-x-px">
                         {idx === 0 && (
                           <>
@@ -506,7 +506,7 @@ export default function Mint() {
                             })}
                             defaultValue=""
                             className={cn(
-                              "relative block w-full rounded-none rounded-bl-md rounded-tl-md border border-gray-300 bg-transparent px-3 py-2 pr-6",
+                              "relative block w-full rounded-none rounded-tl-md rounded-bl-md border border-gray-300 bg-transparent px-3 py-2 pr-6",
                               "focus:z-10 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
                               errors?.creators?.[idx]?.address &&
                                 "border-red-500 focus:border-red-600 focus:ring-red-500",
@@ -541,7 +541,7 @@ export default function Mint() {
                           </label>
                           <button
                             id={`remove-${idx}`}
-                            className="inline-flex h-full w-full items-center justify-center rounded-none rounded-br-md rounded-tr-md border border-gray-300 bg-red-500"
+                            className="inline-flex h-full w-full items-center justify-center rounded-none rounded-tr-md rounded-br-md border border-gray-300 bg-red-500"
                             type="button"
                             onClick={() => remove(idx)}
                           >
@@ -600,7 +600,7 @@ export default function Mint() {
 
         <div>
           <div className="mt-4">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">
+            <h3 className="text-lg leading-6 font-medium text-gray-900">
               Flags
             </h3>
             <p className="mt-1 text-sm text-gray-500">
@@ -614,7 +614,7 @@ export default function Mint() {
                 as="div"
                 className="flex items-center justify-between"
               >
-                <span className="flex flex-grow flex-col">
+                <span className="flex grow flex-col">
                   <Switch.Label
                     as="span"
                     className="text-sm font-medium text-gray-900"
@@ -638,14 +638,14 @@ export default function Mint() {
                       {...rest}
                       className={cn(
                         value ? "bg-indigo-600" : "bg-gray-200",
-                        "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2",
+                        "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden",
                       )}
                     >
                       <span
                         aria-hidden="true"
                         className={cn(
                           value ? "translate-x-5" : "translate-x-0",
-                          "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                          "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out",
                         )}
                       />
                     </Switch>
@@ -659,7 +659,7 @@ export default function Mint() {
                 as="div"
                 className="flex items-center justify-between"
               >
-                <span className="flex flex-grow flex-col">
+                <span className="flex grow flex-col">
                   <Switch.Label
                     as="span"
                     className="text-sm font-medium text-gray-900"
@@ -693,14 +693,14 @@ export default function Mint() {
                       {...rest}
                       className={cn(
                         value ? "bg-indigo-600" : "bg-gray-200",
-                        "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2",
+                        "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden",
                       )}
                     >
                       <span
                         aria-hidden="true"
                         className={cn(
                           value ? "translate-x-5" : "translate-x-0",
-                          "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                          "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out",
                         )}
                       />
                     </Switch>
@@ -714,7 +714,7 @@ export default function Mint() {
                 as="div"
                 className="flex items-center justify-between"
               >
-                <span className="flex flex-grow flex-col">
+                <span className="flex grow flex-col">
                   <Switch.Label
                     as="span"
                     className="text-sm font-medium text-gray-900"
@@ -746,14 +746,14 @@ export default function Mint() {
                       disabled={!watchedIsCollection}
                       className={cn(
                         value ? "bg-indigo-600" : "bg-gray-200",
-                        "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2",
+                        "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden",
                       )}
                     >
                       <span
                         aria-hidden="true"
                         className={cn(
                           value ? "translate-x-5" : "translate-x-0",
-                          "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                          "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out",
                         )}
                       />
                     </Switch>
@@ -779,11 +779,11 @@ export default function Mint() {
               type="submit"
               color="indigo"
               disabled={isConfirming}
-              // className="bg-secondary hover:bg-secondary-focus focus:ring-secondary-focus inline-flex items-center rounded-md px-4 py-2 text-base text-gray-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2"
+              // className="bg-secondary hover:bg-secondary-focus focus:ring-secondary-focus inline-flex items-center rounded-md px-4 py-2 text-base text-gray-50 shadow-xs focus:outline-hidden focus:ring-2 focus:ring-offset-2"
             >
               {isConfirming ? (
                 <>
-                  <SpinnerIcon className="-ml-1 mr-2 h-5 w-5 animate-spin" />
+                  <SpinnerIcon className="mr-2 -ml-1 h-5 w-5 animate-spin" />
                   Confirming
                 </>
               ) : (

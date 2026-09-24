@@ -238,7 +238,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
           <Box enableOnMobile className="h-full">
             <div className="flex justify-between">
               <h2 className="mb-3 text-base font-semibold">Cost Breakdown</h2>
-              <div className="flex items-center rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
+              <div className="flex items-center rounded-sm bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
                 {batchesNeeded} batches × {COST_PER_BATCH} SOL fee
               </div>
             </div>
@@ -347,14 +347,14 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
 
         {/* Search Input */}
         <div className="mb-2 flex">
-          <div className="relative flex-grow">
+          <div className="relative grow">
             <input
               type="search"
               value={searchTerm}
               onChange={handleSearchChange}
               placeholder="Search for an address..."
               // rounded-none is needed for WebKit
-              className="w-full rounded-none rounded-l border p-1.5 text-base focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:text-xs"
+              className="w-full rounded-none rounded-l border p-1.5 text-base focus:ring-1 focus:ring-indigo-500 focus:outline-hidden sm:text-xs"
             />
           </div>
           <button
@@ -367,7 +367,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
           </button>
         </div>
 
-        <div className="max-h-48 overflow-y-auto rounded border">
+        <div className="max-h-48 overflow-y-auto rounded-sm border">
           <table className="min-w-full">
             <thead className="bg-gray-100">
               <tr>
@@ -414,14 +414,14 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
 
       {/* Actions */}
       <div className="flex justify-between max-sm:mt-8">
-        <Button onClick={onBack} color="dark/zinc" className="!px-6">
+        <Button onClick={onBack} color="dark/zinc" className="px-6!">
           Back
         </Button>
         <Button
           onClick={startAirdrop}
           disabled={hasInsufficientFunds}
           color="indigo"
-          className="!px-6"
+          className="px-6!"
         >
           {isPending && <SpinnerIcon className="size-5" />}
           Confirm Airdrop

@@ -109,7 +109,7 @@ export function Tooltip({
           <div
             style={styles}
             className={cn(
-              "max-w-[400px] break-words rounded-lg bg-gray-600 px-3 py-2 text-left text-sm text-white",
+              "max-w-[400px] rounded-lg bg-gray-600 px-3 py-2 text-left text-sm wrap-break-word text-white",
               className,
             )}
           >

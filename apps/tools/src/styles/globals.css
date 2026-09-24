@@ -1,15 +1,107 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-@layer utilities {
-  .no-scrollbar::-webkit-scrollbar {
+@plugin "@tailwindcss/forms" {
+  strategy: "class";
+}
+
+@source "../../../../packages/ui/src/**/*.{ts,tsx}";
+
+@theme {
+  --breakpoint-*: initial;
+  --breakpoint-xs: 475px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+
+  --color-primary: #e22424;
+  --color-primary-focus: #a21515;
+  --color-secondary: #083d77;
+  --color-secondary-focus: #052548;
+  --color-secondary-content: #fdffff;
+  --color-accent: #ffe8e5;
+
+  --font-sans:
+    var(--font-roboto), ui-sans-serif, system-ui, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-display:
+    var(--font-roboto-slab), ui-serif, Georgia, Cambria, "Times New Roman",
+    Times, serif;
+
+  --z-index-dialog: 30;
+  --z-index-toast: 40;
+  --z-index-tooltip: 50;
+
+  --animate-enter: enter 200ms ease-out;
+  --animate-slide-in: slide-in 1.2s cubic-bezier(0.41, 0.73, 0.51, 1.02);
+  --animate-leave: leave 150ms ease-in forwards;
+
+  @keyframes enter {
+    0% {
+      transform: scale(0.9);
+      opacity: 0;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 100%;
+    }
+  }
+  @keyframes leave {
+    0% {
+      transform: scale(1);
+      opacity: 100%;
+    }
+    100% {
+      transform: scale(0.9);
+      opacity: 0;
+    }
+  }
+  @keyframes slide-in {
+    0% {
+      transform: translateY(-100%);
+    }
+    100% {
+      transform: translateY(0);
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+
+  /* Tailwind CSS v4 changed these defaults too, keep the v3 look & feel. */
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-gray-400);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@utility no-scrollbar {
+  &::-webkit-scrollbar {
     display: none;
   }
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* example: override wallet button style */

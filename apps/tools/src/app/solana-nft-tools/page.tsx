@@ -62,7 +62,7 @@ export default function Nfts() {
             href={{ pathname: navItem.href, query: navItem.query }}
             className={cn(
               "block cursor-pointer rounded-md border border-gray-300 bg-white p-4 transition-all duration-75",
-              "hover:bg-indigo-100 hover:ring-2 hover:ring-indigo-600 focus:outline-none",
+              "hover:bg-indigo-100 hover:ring-2 hover:ring-indigo-600 focus:outline-hidden",
               !navItem.active && "pointer-events-none",
             )}
           >

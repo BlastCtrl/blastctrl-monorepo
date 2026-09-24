@@ -34,16 +34,16 @@ export const Breadcrumbs = () => {
 
   return (
     <nav
-      className="bg-accent/20 hidden border-b border-gray-200 lg:flex"
+      className="hidden border-b border-gray-200 bg-accent/20 lg:flex"
       aria-label="Breadcrumb"
     >
-      <ol className="mx-auto flex h-10 w-full max-w-screen-xl space-x-4 px-4 sm:px-6 lg:px-8">
+      <ol className="mx-auto flex h-10 w-full max-w-(--breakpoint-xl) space-x-4 px-4 sm:px-6 lg:px-8">
         <li className="flex">
           <Link
             href="/"
             className="flex items-center text-gray-400 hover:text-gray-500"
           >
-            <HomeIcon className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+            <HomeIcon className="h-5 w-5 shrink-0" aria-hidden="true" />
             <span className="sr-only">Home</span>
           </Link>
         </li>
@@ -51,7 +51,7 @@ export const Breadcrumbs = () => {
           <li key={item.name} className="flex">
             <div className="flex items-center">
               <svg
-                className="h-full w-6 flex-shrink-0 text-gray-200"
+                className="h-full w-6 shrink-0 text-gray-200"
                 preserveAspectRatio="none"
                 viewBox="0 0 24 44"
                 fill="currentColor"
@@ -62,7 +62,7 @@ export const Breadcrumbs = () => {
               </svg>
               <Link
                 href={item.href}
-                className="ml-4 text-sm font-medium uppercase tracking-wider text-gray-500 hover:text-gray-700"
+                className="ml-4 text-sm font-medium tracking-wider text-gray-500 uppercase hover:text-gray-700"
                 aria-current={item.current ? "page" : undefined}
               >
                 {item.name === "mev rewards"

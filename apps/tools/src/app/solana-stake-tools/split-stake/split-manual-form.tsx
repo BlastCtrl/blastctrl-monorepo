@@ -191,7 +191,7 @@ export function SplitManualForm() {
             <div>
               <Button type="submit" color="indigo" className="w-full">
                 {isConfirming && (
-                  <SpinnerIcon className="-ml-1 mr-1  inline size-[1em] animate-spin" />
+                  <SpinnerIcon className="mr-1 -ml-1 inline size-[1em] animate-spin" />
                 )}
                 Submit
               </Button>
@@ -199,7 +199,7 @@ export function SplitManualForm() {
           ))}
       </form>
       {formSuccess && (
-        <div className="mt-8 flex items-center gap-2 rounded-lg p-4 shadow ring-1 ring-black/5">
+        <div className="mt-8 flex items-center gap-2 rounded-lg p-4 shadow-sm ring-1 ring-black/5">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="size-5 text-green-500"
@@ -272,7 +272,7 @@ function FormInner({
           placeholder="Enter SOL amount"
         />
         {formError?.balance && (
-          <Description className="text-red-600 data-[disabled]:opacity-50 sm:text-sm/6">
+          <Description className="text-red-600 data-disabled:opacity-50 sm:text-sm/6">
             {formError.balance}
           </Description>
         )}
@@ -287,7 +287,7 @@ function FormInner({
         <div className="grid items-start gap-4 min-[435px]:grid-cols-2">
           <label
             aria-disabled={data === undefined || data === null}
-            className="my-1 block w-full truncate rounded-lg bg-indigo-500 px-4 py-1.5 text-center font-semibold text-white ring-1 ring-inset ring-indigo-300 hover:bg-indigo-400 aria-disabled:opacity-50"
+            className="my-1 block w-full truncate rounded-lg bg-indigo-500 px-4 py-1.5 text-center font-semibold text-white ring-1 ring-indigo-300 ring-inset hover:bg-indigo-400 aria-disabled:opacity-50"
           >
             {keypairFile ? keypairFile.name : "Upload a keypair"}
 
@@ -323,10 +323,10 @@ function StyledInput({ className, ...props }: InputProps) {
     <Input
       className={cn(
         "mt-1 block w-full",
-        "rounded-lg border-0 bg-white py-1.5 text-zinc-900 shadow-sm ring-1 ring-inset ring-gray-300 sm:text-sm/6",
-        "focus:outline-none data-[focus]:ring-2 data-[focus]:ring-inset data-[focus]:ring-indigo-600",
-        "data-[disabled]:bg-zinc-100 data-[disabled]:text-zinc-500",
-        "data-[invalid]:border-red-600 data-[invalid]:text-red-600",
+        "rounded-lg border-0 bg-white py-1.5 text-zinc-900 shadow-xs ring-1 ring-gray-300 ring-inset sm:text-sm/6",
+        "focus:outline-hidden data-focus:ring-2 data-focus:ring-indigo-600 data-focus:ring-inset",
+        "data-disabled:bg-zinc-100 data-disabled:text-zinc-500",
+        "data-invalid:border-red-600 data-invalid:text-red-600",
         className,
       )}
       {...props}

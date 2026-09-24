@@ -235,9 +235,9 @@ export const TokenList = ({
 
       <Table
         dense
-        className="scroller -mx-4 h-[500px] max-h-[500px] overflow-auto rounded pb-4 sm:-mx-6"
+        className="scroller -mx-4 h-[500px] max-h-[500px] overflow-auto rounded-sm pb-4 sm:-mx-6"
       >
-        <TableHead className="sticky top-0 z-[1]">
+        <TableHead className="sticky top-0 z-1">
           <TableRow className="bg-zinc-100 font-medium text-zinc-500">
             <TableHeader className="sticky top-0">Token Info</TableHeader>
             <TableHeader className="sticky top-0">Balance</TableHeader>
@@ -311,7 +311,7 @@ export const TokenList = ({
         </TableBody>
       </Table>
 
-      <div className="flex items-center justify-end gap-2 pb-4 pt-6">
+      <div className="flex items-center justify-end gap-2 pt-6 pb-4">
         <Button
           color="indigo"
           onClick={handleSubmit}

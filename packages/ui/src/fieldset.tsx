@@ -23,7 +23,7 @@ export function Fieldset({
     <HeadlessFieldset
       {...props}
       className={cn(
-        "[&>*+[data-slot=control]]:mt-6 [&>[data-slot=text]]:mt-1",
+        "*:data-[slot=text]:mt-1 [&>*+[data-slot=control]]:mt-6",
         className,
       )}
     />
@@ -36,7 +36,7 @@ export function Legend({ ...props }: HeadlessLegendProps) {
       {...props}
       data-slot="legend"
       className={cn(
-        "text-base/6 font-semibold text-zinc-950 data-[disabled]:opacity-50 sm:text-sm/6",
+        "text-base/6 font-semibold text-zinc-950 data-disabled:opacity-50 sm:text-sm/6",
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         props.className,
       )}
@@ -67,7 +67,7 @@ export function Field({ className, ...props }: HeadlessFieldProps) {
         "[&>[data-slot=description]+[data-slot=control]]:mt-3",
         "[&>[data-slot=control]+[data-slot=description]]:mt-3",
         "[&>[data-slot=control]+[data-slot=error]]:mt-3",
-        "[&>[data-slot=label]]:font-medium",
+        "*:data-[slot=label]:font-medium",
       )}
       {...props}
     />
@@ -84,7 +84,7 @@ export function Label({
       data-slot="label"
       className={cn(
         className,
-        "select-none text-base/6 text-zinc-950 data-[disabled]:opacity-50 sm:text-sm/6",
+        "text-base/6 text-zinc-950 select-none data-disabled:opacity-50 sm:text-sm/6",
       )}
     />
   );
@@ -100,7 +100,7 @@ export function Description({
       data-slot="description"
       className={cn(
         className,
-        "text-base/6 text-zinc-500 data-[disabled]:opacity-50 sm:text-sm/6",
+        "text-base/6 text-zinc-500 data-disabled:opacity-50 sm:text-sm/6",
       )}
     />
   );
@@ -116,7 +116,7 @@ export function ErrorMessage({
       data-slot="error"
       className={cn(
         className,
-        "text-base/6 text-red-600 data-[disabled]:opacity-50 sm:text-sm/6",
+        "text-base/6 text-red-600 data-disabled:opacity-50 sm:text-sm/6",
       )}
     />
   );

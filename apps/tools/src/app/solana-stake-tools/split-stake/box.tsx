@@ -11,7 +11,7 @@ export function Box({
   return (
     <div
       className={cn(
-        "mx-auto max-w-xl overflow-visible bg-white ring-black/5 sm:rounded-lg sm:p-6 sm:pb-5 sm:shadow sm:ring-1",
+        "mx-auto max-w-xl overflow-visible bg-white ring-black/5 sm:rounded-lg sm:p-6 sm:pb-5 sm:shadow-sm sm:ring-1",
         className,
       )}
     >
