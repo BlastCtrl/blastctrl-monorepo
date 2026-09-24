@@ -28,11 +28,11 @@ export const AccountList = ({
 
   const isIndeterminate =
     selectedAccounts.length > 0 &&
-    selectedAccounts.length < selectedAccounts.length;
+    selectedAccounts.length < tokenAccounts.length;
 
   const isChecked =
     selectedAccounts.length > 0 &&
-    selectedAccounts.length === selectedAccounts.length;
+    selectedAccounts.length === tokenAccounts.length;
 
   const checkboxState: CheckboxState = isIndeterminate
     ? "indeterminate"
