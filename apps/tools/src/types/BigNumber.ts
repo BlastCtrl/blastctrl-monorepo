@@ -7,12 +7,7 @@ import type { Opaque, Option } from "./helper";
 
 export type BigNumber = Opaque<BN, "BigNumber">;
 export type BigNumberValues =
-  | number
-  | string
-  | number[]
-  | Uint8Array
-  | Buffer
-  | BN;
+  number | string | number[] | Uint8Array | Buffer | BN;
 
 export const toBigNumber = (
   value: BigNumberValues,

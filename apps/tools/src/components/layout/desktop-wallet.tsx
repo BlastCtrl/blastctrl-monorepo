@@ -57,7 +57,7 @@ export const DesktopWallet = () => {
 
   return (
     <Menu as="div" className="relative ml-4 shrink-0">
-      <Menu.Button className="bg-primary-focus flex items-center gap-2 rounded-md px-4 py-1.5">
+      <Menu.Button className="flex items-center gap-2 rounded-md bg-primary-focus px-4 py-1.5">
         <span className="sr-only">Open user menu</span>
         <Image
           src={wallet.adapter.icon}
@@ -79,7 +79,7 @@ export const DesktopWallet = () => {
         leaveFrom="transform opacity-100 scale-100"
         leaveTo="transform opacity-0 scale-95"
       >
-        <Menu.Items className="absolute right-0 z-10 mt-2 w-fit origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+        <Menu.Items className="ring-opacity-5 absolute right-0 z-10 mt-2 w-fit origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black focus:outline-hidden">
           <div className="border-b border-gray-300 px-3 py-2 text-sm text-gray-600">
             <div className="text-sm text-gray-600">Connected as</div>
             <CopyButton
@@ -169,9 +169,9 @@ const NetworkPicker = () => {
                 type="button"
                 className={cn(
                   "w-full rounded-md border border-gray-300 px-1.5 py-0.5 text-sm capitalize",
-                  "focus:outline-none focus:ring-1",
+                  "focus:ring-1 focus:outline-hidden",
                   network === item
-                    ? "text-secondary-content border-indigo-600 bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-600"
+                    ? "border-indigo-600 bg-indigo-600 text-secondary-content hover:bg-indigo-700 focus:ring-indigo-600"
                     : "border-gray-300 text-gray-600 hover:bg-gray-50 focus:ring-gray-300",
                 )}
               >
@@ -189,7 +189,7 @@ const NetworkPicker = () => {
             type="text"
             value={customRpc}
             onChange={({ target }) => setCustomRpc(target.value)}
-            className="w-36 min-w-0 rounded border border-zinc-300 px-2.5 py-1 text-sm/6"
+            className="w-36 min-w-0 rounded-sm border border-zinc-300 px-2.5 py-1 text-sm/6"
           />
         </Field>
         <Button

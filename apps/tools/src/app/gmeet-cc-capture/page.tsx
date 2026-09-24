@@ -15,7 +15,7 @@ export default function GmeetCcCapture() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-xl overflow-visible bg-white pb-5 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow">
+    <div className="mx-auto max-w-xl overflow-visible bg-white pb-5 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow-sm">
       <header className="border-b border-gray-200 pb-4">
         <h1 className="font-display text-3xl font-semibold">
           GMeet CC Capture Bookmarklet
@@ -29,7 +29,7 @@ export default function GmeetCcCapture() {
       <div className="flex justify-center pt-8">
         <a
           ref={linkRef}
-          className="inline-flex cursor-grab select-none items-center justify-center gap-x-2 rounded-lg bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow hover:bg-indigo-500 active:cursor-grabbing"
+          className="inline-flex cursor-grab items-center justify-center gap-x-2 rounded-lg bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm select-none hover:bg-indigo-500 active:cursor-grabbing"
         >
           BlastCtrl GMeet CC Capture
         </a>

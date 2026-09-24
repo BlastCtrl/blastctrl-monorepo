@@ -6,8 +6,8 @@ import { fileURLToPath } from "url";
 /** @type { PrettierConfig | TailwindConfig } */
 const config = {
   plugins: ["prettier-plugin-tailwindcss"],
-  tailwindConfig: fileURLToPath(
-    new URL("../../tooling/tailwind/web.ts", import.meta.url),
+  tailwindStylesheet: fileURLToPath(
+    new URL("../../apps/tools/src/styles/globals.css", import.meta.url),
   ),
   tailwindFunctions: ["cn", "cva", "clsx"],
 };

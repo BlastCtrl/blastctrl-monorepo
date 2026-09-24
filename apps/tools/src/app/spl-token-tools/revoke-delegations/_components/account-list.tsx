@@ -69,9 +69,9 @@ export const AccountList = ({
 
       <Table
         dense
-        className="scroller -mx-4 h-[500px] max-h-[500px] overflow-auto rounded pb-4 sm:-mx-6"
+        className="scroller -mx-4 h-[500px] max-h-[500px] overflow-auto rounded-sm pb-4 sm:-mx-6"
       >
-        <TableHead className="sticky top-0 z-[1]">
+        <TableHead className="sticky top-0 z-1">
           <TableRow className="bg-zinc-100 font-medium text-zinc-500">
             <TableHeader className="sticky top-0">
               <div className="grid w-full place-content-center">
@@ -80,7 +80,7 @@ export const AccountList = ({
                   checked={checkboxState === "checked"}
                   onChange={toggleAll}
                   type="checkbox"
-                  className="form-checkbox mx-auto rounded accent-blue-600"
+                  className="mx-auto form-checkbox rounded-sm accent-blue-600"
                 />
               </div>
             </TableHeader>
@@ -108,7 +108,7 @@ export const AccountList = ({
                   }
                 }}
                 className={cn(
-                  isSelected ? "bg-blue-600/[5%]" : "hover:bg-blue-600/[2.5%]",
+                  isSelected ? "bg-blue-600/5" : "hover:bg-blue-600/2.5",
                 )}
                 key={account.token_account}
               >
@@ -125,7 +125,7 @@ export const AccountList = ({
                             : selectedAccounts.filter((a) => a !== account),
                         )
                       }
-                      className="form-checkbox rounded accent-blue-600"
+                      className="form-checkbox rounded-sm accent-blue-600"
                     />
                   </div>
                 </TableCell>
@@ -266,9 +266,9 @@ function RefreshAccountListButton() {
       aria-label="Refresh data"
       data-refetching={isRefetching ? true : undefined}
       disabled={isButtonDisabled || isRefetching}
-      className="group ml-auto !h-[36px] !px-2.5 disabled:cursor-not-allowed disabled:opacity-50"
+      className="group ml-auto h-[36px]! px-2.5! disabled:cursor-not-allowed disabled:opacity-50"
     >
-      <RotateCwIcon className="size-5 group-data-[refetching]:animate-[spin_0.38s_normal_forwards_ease-in-out]" />
+      <RotateCwIcon className="size-5 group-data-refetching:animate-[spin_0.38s_normal_forwards_ease-in-out]" />
     </Button>
   );
 }

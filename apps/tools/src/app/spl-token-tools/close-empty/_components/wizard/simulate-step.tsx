@@ -13,7 +13,7 @@ import { useState } from "react";
 import { useCloseAccountsStore } from "./wizard-context";
 
 const btnSecondary =
-  "rounded bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50";
+  "rounded-sm bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-xs ring-1 ring-inset ring-gray-300 hover:bg-gray-50";
 
 const toPubkey = (address: string) => new PublicKey(address);
 
@@ -79,7 +79,7 @@ export const SimulateStep = () => {
   if (hasSimulated === false) {
     return (
       <>
-        <Dialog.Description className="text-pretty text-base text-zinc-500">
+        <Dialog.Description className="text-base text-pretty text-zinc-500">
           <strong className="text-blue-500">{accountsToClose.length}</strong>{" "}
           token accounts selected. To continue, run the simulation to check
           whether the selected accounts can be succesfully closed.

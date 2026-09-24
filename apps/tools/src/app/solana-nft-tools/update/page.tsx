@@ -208,9 +208,9 @@ export default function Update() {
   };
 
   return (
-    <div className="mx-auto max-w-xl overflow-visible bg-white px-4 pb-5 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow">
+    <div className="mx-auto max-w-xl overflow-visible bg-white px-4 pb-5 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow-sm">
       <div className="border-b border-gray-200 pb-4">
-        <h1 className="font-display mb-4 text-3xl font-semibold">
+        <h1 className="mb-4 font-display text-3xl font-semibold">
           Manual NFT update
         </h1>
         <p className="text-sm text-gray-500">
@@ -221,11 +221,11 @@ export default function Update() {
 
       <form
         onSubmit={handleSubmit(submit)}
-        className="space-y-8 divide-y divide-gray-200"
+        className="divide-y divide-gray-200 *:not-last:pb-8"
       >
         <div>
           <div className="mt-4">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">
+            <h3 className="text-lg leading-6 font-medium text-gray-900">
               Select Token
             </h3>
             <p className="mt-1 text-sm text-gray-500">
@@ -271,7 +271,7 @@ export default function Update() {
 
         <div>
           <div className="mt-4">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">
+            <h3 className="text-lg leading-6 font-medium text-gray-900">
               Basic Information
             </h3>
           </div>
@@ -317,7 +317,7 @@ export default function Update() {
 
         <div>
           <div className="mt-4">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">
+            <h3 className="text-lg leading-6 font-medium text-gray-900">
               Creators
             </h3>
             <p className="mt-1 text-sm text-gray-500">
@@ -340,7 +340,7 @@ export default function Update() {
                     <legend className="sr-only">
                       Creator address and share
                     </legend>
-                    <div className="mt-1 -space-y-px rounded-md bg-white shadow-sm">
+                    <div className="mt-1 -space-y-px rounded-md bg-white shadow-xs">
                       <div className="grid grid-cols-9 -space-x-px">
                         {idx === 0 && (
                           <>
@@ -367,7 +367,7 @@ export default function Update() {
                             })}
                             defaultValue=""
                             className={cn(
-                              "relative block w-full rounded-none rounded-bl-md rounded-tl-md border-gray-300 bg-transparent pr-6",
+                              "relative block w-full rounded-none rounded-tl-md rounded-bl-md border-gray-300 bg-transparent pr-6",
                               "focus:z-10 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
                               errors?.creators?.[idx]?.address &&
                                 "border-red-500 focus:border-red-600 focus:ring-red-500",
@@ -402,7 +402,7 @@ export default function Update() {
                           </label>
                           <button
                             id={`remove-${idx}`}
-                            className="inline-flex h-full w-full items-center justify-center rounded-none rounded-br-md rounded-tr-md border border-gray-300 bg-red-500"
+                            className="inline-flex h-full w-full items-center justify-center rounded-none rounded-tr-md rounded-br-md border border-gray-300 bg-red-500"
                             type="button"
                             onClick={() => remove(idx)}
                           >
@@ -418,7 +418,7 @@ export default function Update() {
                     <button
                       onClick={() => append({ address: "", share: 0 })}
                       type="button"
-                      className="inline-flex w-full items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                      className="inline-flex w-full items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-base font-medium text-white shadow-xs hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden"
                     >
                       Add Creator
                       <PlusCircleIcon
@@ -453,9 +453,9 @@ export default function Update() {
                     valueAsNumber: true,
                   })}
                   className={cn(
-                    "block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
+                    "block w-full rounded-md border border-gray-300 px-3 py-2 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
                     errors?.sellerFeeBasisPoints &&
-                      "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:outline-none focus:ring-red-500",
+                      "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500 focus:outline-hidden",
                   )}
                   aria-invalid={errors?.sellerFeeBasisPoints ? "true" : "false"}
                 />
@@ -482,7 +482,7 @@ export default function Update() {
 
         <div>
           <div className="mt-4">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">
+            <h3 className="text-lg leading-6 font-medium text-gray-900">
               Flags and authority
             </h3>
             <p className="mt-1 text-base text-zinc-500 sm:text-sm/6">
@@ -553,7 +553,7 @@ export default function Update() {
             <Button color="indigo" type="submit">
               {isConfirming ? (
                 <>
-                  <SpinnerIcon className="-ml-1 mr-2 h-5 w-5 animate-spin" />
+                  <SpinnerIcon className="mr-2 -ml-1 h-5 w-5 animate-spin" />
                   Confirming
                 </>
               ) : (

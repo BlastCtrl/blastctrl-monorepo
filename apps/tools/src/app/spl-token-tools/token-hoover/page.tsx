@@ -108,7 +108,7 @@ export default function RemoveTokens() {
     if (isFetching)
       return (
         <>
-          <SpinnerIcon className="-ml-1 mr-2 size-5 animate-spin" />
+          <SpinnerIcon className="mr-2 -ml-1 size-5 animate-spin" />
           Loading tokens
         </>
       );
@@ -119,11 +119,11 @@ export default function RemoveTokens() {
   return (
     <div
       className={cn(
-        "mx-auto w-[min(100%,theme(screens.md))] overflow-visible bg-white px-4 pb-5 sm:rounded-lg sm:p-6 sm:shadow",
-        !!data && "!pb-0",
+        "mx-auto w-[min(100%,var(--breakpoint-md))] overflow-visible bg-white px-4 pb-5 sm:rounded-lg sm:p-6 sm:shadow-sm",
+        !!data && "pb-0!",
       )}
     >
-      <h1 className="font-display mb-4 text-3xl font-semibold">
+      <h1 className="mb-4 font-display text-3xl font-semibold">
         Token Hoover 🧹
       </h1>
 
@@ -158,9 +158,9 @@ export default function RemoveTokens() {
                   // type="password"
                   autoComplete="off"
                   className={cn(
-                    "block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
+                    "block w-full rounded-md border border-gray-300 px-3 py-2 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
                     !!errors?.privateKey &&
-                      "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:outline-none focus:ring-red-500",
+                      "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500 focus:outline-hidden",
                   )}
                   placeholder="Base58 string or [202,64,201,...]"
                   {...register("privateKey", {
@@ -175,7 +175,7 @@ export default function RemoveTokens() {
               </div>
             </div>
 
-            <div className="flex flex-col items-center justify-center gap-2 pb-2 pt-8">
+            <div className="flex flex-col items-center justify-center gap-2 pt-8 pb-2">
               {!connected ? (
                 <Button
                   color="indigo"
@@ -196,7 +196,7 @@ export default function RemoveTokens() {
 
       {data && targetWallet && (
         <>
-          <div className="-ml-3 mb-4 flex items-center justify-between">
+          <div className="mb-4 -ml-3 flex items-center justify-between">
             <Button plain onClick={handleGoBack}>
               Back to private key input
             </Button>

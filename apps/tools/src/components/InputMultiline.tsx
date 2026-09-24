@@ -3,8 +3,7 @@ import { ExclamationCircleIcon } from "@heroicons/react/20/solid";
 import React from "react";
 import type { FieldError } from "react-hook-form";
 
-export interface InputMultilineProps
-  extends React.ComponentPropsWithoutRef<"textarea"> {
+export interface InputMultilineProps extends React.ComponentPropsWithoutRef<"textarea"> {
   label: string;
   description?: string;
   error?: FieldError;
@@ -33,9 +32,9 @@ export const InputMultiline = React.forwardRef<
           {...rest}
           id={rest.name}
           className={cn(
-            "block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
+            "block w-full rounded-md border border-gray-300 px-3 py-2 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
             !!error &&
-              "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:outline-none focus:ring-red-500",
+              "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500 focus:outline-hidden",
           )}
           aria-invalid={error ? "true" : "false"}
         />

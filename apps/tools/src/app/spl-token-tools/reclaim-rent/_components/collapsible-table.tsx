@@ -34,12 +34,12 @@ export function CollapsibleTable({ noun, ...table }: Props) {
 
   return (
     <details className="group mt-4 rounded-md border border-zinc-200">
-      <summary className="flex cursor-pointer select-none items-center gap-3 rounded-md px-3 py-2.5 text-sm marker:hidden hover:bg-zinc-50 focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm select-none marker:hidden hover:bg-zinc-50 focus:outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 focus-visible:outline-solid [&::-webkit-details-marker]:hidden">
         <ChevronRightIcon
           aria-hidden="true"
           className="size-5 shrink-0 text-zinc-400 transition-transform group-open:rotate-90 motion-reduce:transition-none"
         />
-        <span className="grow font-medium tabular-nums text-zinc-900">
+        <span className="grow font-medium text-zinc-900 tabular-nums">
           {summary}
         </span>
         <span className="text-zinc-500">

@@ -130,7 +130,7 @@ const TokenDataFetcher: React.FC<TokenDataFetcherProps> = ({
   return (
     <Box className="flex flex-col items-center justify-center py-12">
       <div className="mb-4">
-        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-b-indigo-200 border-l-indigo-200 border-r-indigo-200 border-t-indigo-600"></div>
+        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-t-indigo-600 border-r-indigo-200 border-b-indigo-200 border-l-indigo-200"></div>
       </div>
       <h2 className="mb-2 text-lg font-semibold">Fetching Token Information</h2>
       <p className="text-center text-sm text-gray-500">

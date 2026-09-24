@@ -98,27 +98,27 @@ export function NotificationWindow({
       data-testid={testId}
       className={cn(
         visible ? "animate-enter" : "animate-leave",
-        "pointer-events-auto mb-4 w-full max-w-sm overflow-hidden rounded-lg bg-zinc-800 shadow-lg ring-1 ring-black ring-opacity-5 sm:max-w-lg",
+        "ring-opacity-5 pointer-events-auto mb-4 w-full max-w-sm overflow-hidden rounded-lg bg-zinc-800 shadow-lg ring-1 ring-black sm:max-w-lg",
       )}
     >
       <div className="p-4">
         <div className="flex items-start">
-          {iconMemo && <div className="mt-1 flex-shrink-0">{iconMemo}</div>}
+          {iconMemo && <div className="mt-1 shrink-0">{iconMemo}</div>}
           <div className="ml-3 w-0 flex-1 pt-0.5">
             <p className="text-lg font-semibold tracking-wide text-gray-50">
               {title}
             </p>
-            <div className="mt-1 break-words text-sm text-gray-300">
+            <div className="mt-1 text-sm wrap-break-word text-gray-300">
               {description}
             </div>
             {txid && (
-              <span className="block pb-3 pt-4 text-gray-200">{linkMemo}</span>
+              <span className="block pt-4 pb-3 text-gray-200">{linkMemo}</span>
             )}
           </div>
-          <div className="ml-4 flex flex-shrink-0">
+          <div className="ml-4 flex shrink-0">
             <button
               type="button"
-              className="inline-flex rounded-md bg-transparent text-gray-300 hover:text-gray-400 focus:outline-none focus:ring focus:ring-white focus:ring-offset-0"
+              className="inline-flex rounded-md bg-transparent text-gray-300 hover:text-gray-400 focus:ring-3 focus:ring-white focus:ring-offset-0 focus:outline-hidden"
               onClick={() => onClose()}
             >
               <span className="sr-only">Close</span>

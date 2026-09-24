@@ -38,7 +38,7 @@ export function PickerDialog({
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="inline-flex w-full items-center justify-between gap-x-2 rounded-lg border border-zinc-950/10 px-[calc(theme(spacing[3.5])-1px)] py-[calc(theme(spacing[2.5])-1px)] text-base/6 font-medium text-zinc-950 data-[active]:bg-zinc-950/[2.5%] data-[hover]:bg-zinc-950/[2.5%] sm:px-[calc(theme(spacing.3)-1px)] sm:py-[calc(theme(spacing[1.5])-1px)] sm:text-sm/6"
+        className="inline-flex w-full items-center justify-between gap-x-2 rounded-lg border border-zinc-950/10 px-[calc(--spacing(3.5)-1px)] py-[calc(--spacing(2.5)-1px)] text-base/6 font-medium text-zinc-950 data-active:bg-zinc-950/2.5 data-hover:bg-zinc-950/2.5 sm:px-[calc(--spacing(3)-1px)] sm:py-[calc(--spacing(1.5)-1px)] sm:text-sm/6"
       >
         {selectedAccount === null ? (
           <div className="opacity-50">Select&hellip;</div>
@@ -61,13 +61,13 @@ export function PickerDialog({
       >
         <DialogBackdrop
           transition
-          className="fixed inset-0 bg-black/50 transition duration-300 data-[closed]:opacity-0"
+          className="fixed inset-0 bg-black/50 transition duration-300 data-closed:opacity-0"
         />
         <div className="fixed inset-0 w-screen overflow-y-auto p-6 sm:p-0">
           <div className="flex min-h-full items-center justify-center">
             <DialogPanel
               transition
-              className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all data-[closed]:translate-y-4 data-[closed]:opacity-0 data-[enter]:duration-300 data-[leave]:duration-200 data-[enter]:ease-out data-[leave]:ease-in sm:my-8 sm:w-full sm:max-w-lg sm:p-6 data-[closed]:sm:translate-y-0 data-[closed]:sm:scale-95"
+              className="relative transform overflow-hidden rounded-lg bg-white px-4 pt-5 pb-4 text-left shadow-xl transition-all data-closed:translate-y-4 data-closed:opacity-0 data-enter:duration-300 data-enter:ease-out data-leave:duration-200 data-leave:ease-in sm:my-8 sm:w-full sm:max-w-lg sm:p-6 sm:data-closed:translate-y-0 sm:data-closed:scale-95"
             >
               <div className="space-y-4">
                 {data
@@ -87,13 +87,13 @@ export function PickerDialog({
                           </span>
                           {stake.data.info.meta.authorized.withdrawer ===
                             publicKey?.toString() && (
-                            <span className="mr-0.5 rounded border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold uppercase text-gray-700">
+                            <span className="mr-0.5 rounded-sm border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold text-gray-700 uppercase">
                               Withdrawer
                             </span>
                           )}
                           {stake.data.info.meta.authorized.staker ===
                             publicKey?.toString() && (
-                            <span className="rounded border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold uppercase text-gray-700">
+                            <span className="rounded-sm border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold text-gray-700 uppercase">
                               Staker
                             </span>
                           )}

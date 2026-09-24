@@ -874,7 +874,7 @@ export function StakeCSVForm() {
         <div className="text-center">
           <div className="inline-flex items-center">
             <svg
-              className="-ml-1 mr-3 h-5 w-5 animate-spin text-blue-600"
+              className="mr-3 -ml-1 h-5 w-5 animate-spin text-blue-600"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -930,7 +930,7 @@ export function StakeCSVForm() {
                     ✓ Total SOL required: {parsedData.totalSol.toLocaleString()}{" "}
                     SOL
                   </p>
-                  <p className="mt-2 text-xs text-green-600">
+                  <p className="text-xs text-green-600">
                     Note: Additional SOL will be required for transaction fees.
                   </p>
                 </div>
@@ -1005,7 +1005,7 @@ export function StakeCSVForm() {
 
       {/* Persistent Transaction Tracking */}
       {txState.transactions.length > 0 && (
-        <div className="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-4">
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
           <h4 className="mb-4 font-medium text-gray-900">
             Transaction Status ({txState.completedTransactions} of{" "}
             {txState.totalTransactions} completed)
@@ -1031,7 +1031,7 @@ export function StakeCSVForm() {
                   )}
                   {tx.status === "processing" && (
                     <div className="flex items-center space-x-2">
-                      <div className="size-3 animate-spin rounded-full border-2 border-b-blue-200 border-l-blue-200 border-r-blue-200 border-t-blue-600"></div>
+                      <div className="size-3 animate-spin rounded-full border-2 border-t-blue-600 border-r-blue-200 border-b-blue-200 border-l-blue-200"></div>
                       <span className="text-blue-700">Processing</span>
                     </div>
                   )}
@@ -1043,7 +1043,7 @@ export function StakeCSVForm() {
                           `https://explorer.solana.com/tx/${tx.signature}`,
                         )}
                         target="_blank"
-                        className="whitespace-pre font-medium text-green-700 visited:text-green-900 hover:underline"
+                        className="font-medium whitespace-pre text-green-700 visited:text-green-900 hover:underline"
                       >
                         {compress(tx.signature, 4)}{" "}
                         <ArrowTopRightOnSquareIcon className="inline-block size-4 -translate-y-px" />
@@ -1057,7 +1057,7 @@ export function StakeCSVForm() {
                       <Button
                         onClick={() => retryTransaction(tx.id)}
                         disabled={txState.isProcessing}
-                        className="ml-2 px-2 py-1 text-xs"
+                        className="px-2 py-1 text-xs"
                         outline
                       >
                         Retry

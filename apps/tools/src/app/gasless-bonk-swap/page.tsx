@@ -123,11 +123,11 @@ export default function BonkSwap() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl overflow-visible bg-white px-4 pb-5 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow">
+    <div className="mx-auto max-w-3xl overflow-visible bg-white px-4 pb-5 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow-sm">
       <div className="border-b border-gray-200 pb-6">
-        <h1 className="font-display mb-4 text-center text-3xl font-semibold">
+        <h1 className="mb-4 text-center font-display text-3xl font-semibold">
           Gasless{" "}
-          <span className="bg-gradient-to-tr from-[#fe5e00] to-[#facc00] bg-clip-text font-sans text-transparent">
+          <span className="bg-linear-to-tr from-[#fe5e00] to-[#facc00] bg-clip-text font-sans text-transparent">
             BONK{" "}
           </span>
           Swap
@@ -145,7 +145,7 @@ export default function BonkSwap() {
           You can swap other tokens on our{" "}
           <Link
             href="/gasless-swap"
-            className="whitespace-nowrap font-medium text-blue-600 hover:underline"
+            className="font-medium whitespace-nowrap text-blue-600 hover:underline"
           >
             gasless swap tool &rarr;
           </Link>
@@ -172,7 +172,7 @@ export default function BonkSwap() {
                   setValue("swapAmount", balanceQuery.data.uiAmount);
                 }
               }}
-              className="mb-2 w-full whitespace-pre border-b pb-2 text-right text-base"
+              className="mb-2 w-full border-b pb-2 text-right text-base whitespace-pre"
             >
               <span className="text-xs text-gray-600">Balance </span>
               <span className="font-medium text-amber-600">
@@ -213,7 +213,7 @@ export default function BonkSwap() {
                 className={cn(
                   "block grow rounded-md border-none border-transparent bg-gray-200 text-right font-medium text-gray-600",
                   "rounded-md px-3 py-2 placeholder:font-medium placeholder:text-gray-400",
-                  "focus:outline-none focus:ring-0 sm:text-base",
+                  "focus:ring-0 focus:outline-hidden sm:text-base",
                 )}
               />
             </div>
@@ -230,7 +230,7 @@ export default function BonkSwap() {
                 You will receive:
               </span>
             </div>
-            <div className="pointer-events-none relative mt-2 flex h-10 w-full items-center justify-between rounded-md bg-gray-200 px-3 shadow-sm sm:mt-1">
+            <div className="pointer-events-none relative mt-2 flex h-10 w-full items-center justify-between rounded-md bg-gray-200 px-3 shadow-xs sm:mt-1">
               <div className="inline-flex items-center">
                 <Image
                   src="/sol_coin.png"
@@ -276,7 +276,7 @@ export default function BonkSwap() {
 
           <div className="mt-6 flex w-full gap-x-2">
             <Select defaultValue={slippages[2]}>
-              <Select.Button className="group h-full flex-grow-0 rounded-md bg-amber-500 px-3 text-white hover:bg-amber-600">
+              <Select.Button className="group h-full grow-0 rounded-md bg-amber-500 px-3 text-white hover:bg-amber-600">
                 {({ open }) => (
                   <CogIcon
                     className={cn(

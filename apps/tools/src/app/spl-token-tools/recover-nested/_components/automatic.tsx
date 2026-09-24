@@ -85,7 +85,7 @@ export const AutomaticRecover = () => {
           onClick={query}
         >
           {isSearching && (
-            <SpinnerIcon className="-ml-1 mr-2 h-5 w-5 animate-spin" />
+            <SpinnerIcon className="mr-2 -ml-1 h-5 w-5 animate-spin" />
           )}
           {isSearching ? "Searching..." : "Start Querying"}
         </Button>

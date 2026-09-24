@@ -64,7 +64,7 @@ export function AuthorizeFormsContainer() {
   };
 
   return (
-    <div className="mt-8 ">
+    <div className="mt-8">
       <form onSubmit={handleSubmit} className="flex items-end gap-2">
         <Field className="w-full" disabled={isSuccess}>
           <Label className="font-medium">Staking Account</Label>
@@ -74,10 +74,10 @@ export function AuthorizeFormsContainer() {
             invalid={isInvalid}
             className={cn(
               "mt-2 block w-full rounded-lg border border-zinc-300 bg-white/5 px-3 py-1 text-sm/6 text-zinc-900",
-              "focus:outline-none data-[focus]:outline-2 data-[focus]:-outline-offset-2 data-[focus]:outline-white/25",
+              "focus:outline-hidden data-focus:outline-2 data-focus:-outline-offset-2 data-focus:outline-white/25",
               "h-[36px] grow",
-              "data-[disabled]:bg-zinc-100 data-[disabled]:text-zinc-500",
-              "data-[invalid]:border-red-600 data-[invalid]:text-red-600 data-[invalid]:data-[focus]:outline-red-600",
+              "data-disabled:bg-zinc-100 data-disabled:text-zinc-500",
+              "data-invalid:border-red-600 data-invalid:text-red-600 data-invalid:data-focus:outline-red-600",
             )}
             placeholder="Address of a staking account you have signing authority over"
           />
@@ -276,10 +276,10 @@ function AuthorizeTransactionBuilder({
             <Checkbox
               checked={withdrawCheckbox}
               onChange={setWithdrawCheckbox}
-              className="group block size-4 rounded border bg-white data-[disabled]:cursor-not-allowed data-[checked]:bg-indigo-500 data-[checked]:data-[disabled]:bg-gray-500 data-[disabled]:opacity-50"
+              className="group block size-4 rounded-sm border bg-white data-checked:bg-indigo-500 data-disabled:cursor-not-allowed data-disabled:opacity-50 data-checked:data-disabled:bg-gray-500"
             >
               <svg
-                className="scale-0 stroke-white opacity-0 transition-all group-data-[checked]:scale-100 group-data-[checked]:opacity-100"
+                className="scale-0 stroke-white opacity-0 transition-all group-data-checked:scale-100 group-data-checked:opacity-100"
                 viewBox="0 0 14 14"
                 fill="none"
               >
@@ -297,10 +297,10 @@ function AuthorizeTransactionBuilder({
             <Checkbox
               checked={stakeCheckbox}
               onChange={setStakeCheckbox}
-              className="group block size-4 rounded border bg-white data-[disabled]:cursor-not-allowed data-[checked]:bg-indigo-500 data-[checked]:data-[disabled]:bg-gray-500 data-[disabled]:opacity-50"
+              className="group block size-4 rounded-sm border bg-white data-checked:bg-indigo-500 data-disabled:cursor-not-allowed data-disabled:opacity-50 data-checked:data-disabled:bg-gray-500"
             >
               <svg
-                className="scale-0 stroke-white opacity-0 transition-all group-data-[checked]:scale-100 group-data-[checked]:opacity-100"
+                className="scale-0 stroke-white opacity-0 transition-all group-data-checked:scale-100 group-data-checked:opacity-100"
                 viewBox="0 0 14 14"
                 fill="none"
               >
@@ -325,10 +325,10 @@ function AuthorizeTransactionBuilder({
             invalid={authority !== "" && !isPublicKey(authority)}
             className={cn(
               "mt-2 block w-full rounded-lg border border-zinc-300 bg-white/5 px-3 py-1 text-sm/6 text-zinc-900",
-              "focus:outline-none data-[focus]:outline-2 data-[focus]:-outline-offset-2 data-[focus]:outline-white/25",
+              "focus:outline-hidden data-focus:outline-2 data-focus:-outline-offset-2 data-focus:outline-white/25",
               "h-[36px] grow",
-              "data-[disabled]:bg-zinc-100 data-[disabled]:text-zinc-500",
-              "data-[invalid]:border-red-600 data-[invalid]:text-red-600 data-[invalid]:data-[focus]:outline-red-600",
+              "data-disabled:bg-zinc-100 data-disabled:text-zinc-500",
+              "data-invalid:border-red-600 data-invalid:text-red-600 data-invalid:data-focus:outline-red-600",
             )}
             placeholder="Address of the new signing authority"
           />

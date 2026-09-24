@@ -77,7 +77,7 @@ export function LockupFormContainer() {
   };
 
   return (
-    <div className="mt-8 ">
+    <div className="mt-8">
       <form onSubmit={handleSubmit} className="flex items-end gap-2">
         <Field className="w-full" disabled={isSuccess}>
           <Label className="font-semibold">Staking Account</Label>
@@ -87,10 +87,10 @@ export function LockupFormContainer() {
             invalid={isInvalid}
             className={cn(
               "mt-2 block w-full rounded-lg border border-zinc-300 bg-white/5 px-3 py-1 text-sm/6 text-zinc-900",
-              "focus:outline-none data-[focus]:outline-2 data-[focus]:-outline-offset-2 data-[focus]:outline-white/25",
+              "focus:outline-hidden data-focus:outline-2 data-focus:-outline-offset-2 data-focus:outline-white/25",
               "h-[36px] grow",
-              "data-[disabled]:bg-zinc-100 data-[disabled]:text-zinc-500",
-              "data-[invalid]:text-red-600 data-[invalid]:data-[focus]:outline-red-600 data-[invalid]:ring-red-600",
+              "data-disabled:bg-zinc-100 data-disabled:text-zinc-500",
+              "data-invalid:text-red-600 data-invalid:ring-red-600 data-invalid:data-focus:outline-red-600",
             )}
             placeholder="Enter a staking account where you are the custodian"
           />
@@ -160,7 +160,7 @@ function StakeAccountDescription({
   const isLockupActive = getLockupStatus(stakeData, epochData?.epoch);
 
   return (
-    <DescriptionList className="relative w-full rounded-lg border border-zinc-200 px-4 font-normal underline-offset-4 shadow *:decoration-green-500/50 *:decoration-[3px]">
+    <DescriptionList className="relative w-full rounded-lg border border-zinc-200 px-4 font-normal underline-offset-4 shadow-sm *:decoration-green-500/50 *:decoration-[3px]">
       <DescriptionTerm>Balance</DescriptionTerm>
       <DescriptionDetails className="truncate">
         {lamportsToSolString(stakeData.lamports)} SOL
@@ -358,7 +358,7 @@ function SetLockupTransactionBuilder({
 
           <Field className="w-full">
             <Label className="font-medium sm:text-sm/6">Lockup timestamp</Label>
-            <div className="flex rounded-lg bg-white/5 shadow-sm">
+            <div className="flex rounded-lg bg-white/5 shadow-xs">
               <StyledInput
                 autoCorrect="false"
                 value={timestamp}
@@ -385,7 +385,7 @@ function SetLockupTransactionBuilder({
               Lockup epoch
               {data?.epoch !== undefined ? ` (current: ${data.epoch})` : null}
             </Label>
-            <div className="flex rounded-lg bg-white/5 shadow-sm">
+            <div className="flex rounded-lg bg-white/5 shadow-xs">
               <StyledInput
                 autoCorrect="false"
                 value={epoch}
@@ -409,7 +409,7 @@ function SetLockupTransactionBuilder({
 
           <Field className="w-full">
             <Label className="font-medium sm:text-sm/6">Lockup custodian</Label>
-            <div className="flex rounded-lg bg-white/5 shadow-sm">
+            <div className="flex rounded-lg bg-white/5 shadow-xs">
               <StyledInput
                 autoCorrect="false"
                 value={custodian}
@@ -447,7 +447,7 @@ function SetLockupTransactionBuilder({
             </Button>
           </div>
         ) : (
-          <div className="flex justify-end gap-2 ">
+          <div className="flex justify-end gap-2">
             <Button
               type="button"
               onClick={reset}
@@ -458,7 +458,7 @@ function SetLockupTransactionBuilder({
             </Button>
             <Button type="submit" color="indigo" className="flex-1">
               {isConfirming && (
-                <SpinnerIcon className="-ml-1 mr-1 inline size-[1em] animate-spin" />
+                <SpinnerIcon className="mr-1 -ml-1 inline size-[1em] animate-spin" />
               )}
               Submit
             </Button>
@@ -482,7 +482,7 @@ function InsetButton({
       title="Use previous value"
       aria-label="Use previous value"
       onClick={handleClick}
-      className="relative -ml-px inline-flex items-center gap-x-1.5 rounded-r-md px-3 py-2 text-sm font-semibold text-zinc-600 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 [&:has(+button)]:rounded-r-none"
+      className="relative -ml-px inline-flex items-center gap-x-1.5 rounded-r-md px-3 py-2 text-sm font-semibold text-zinc-600 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 [&:has(+button)]:rounded-r-none"
     >
       {children ?? <ArrowUturnLeftIcon className="size-4" />}
     </button>
@@ -493,11 +493,11 @@ function StyledInput({ className, ...props }: InputProps) {
   return (
     <Input
       className={cn(
-        "grow items-stretch data-[focus]:z-10",
-        "rounded-none rounded-l-lg border-0 px-3 py-1.5 text-zinc-900 ring-1 ring-inset ring-gray-300 sm:text-sm/6",
-        "focus:outline-none data-[focus]:ring-2 data-[focus]:ring-inset data-[focus]:ring-indigo-600",
-        "data-[disabled]:bg-zinc-100 data-[disabled]:text-zinc-500",
-        "data-[invalid]:border-red-600 data-[invalid]:text-red-600",
+        "grow items-stretch data-focus:z-10",
+        "rounded-none rounded-l-lg border-0 px-3 py-1.5 text-zinc-900 ring-1 ring-gray-300 ring-inset sm:text-sm/6",
+        "focus:outline-hidden data-focus:ring-2 data-focus:ring-indigo-600 data-focus:ring-inset",
+        "data-disabled:bg-zinc-100 data-disabled:text-zinc-500",
+        "data-invalid:border-red-600 data-invalid:text-red-600",
         className,
       )}
       {...props}

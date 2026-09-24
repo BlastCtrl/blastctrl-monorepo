@@ -52,17 +52,17 @@ export const NftSelector = ({ control }: UseControllerProps<FormInputs>) => {
 
         <ComboboxOptions
           anchor="bottom"
-          className="max-h-56 w-[var(--input-width)] overflow-auto rounded-lg border border-gray-300 bg-white p-1 [--anchor-gap:6px] empty:hidden"
+          className="max-h-56 w-(--input-width) overflow-auto rounded-lg border border-gray-300 bg-white p-1 [--anchor-gap:6px] empty:hidden"
         >
           {query.length > 0 && (
             <ComboboxOption
               value={query}
-              className="group relative w-full select-none truncate rounded py-2 pl-3 pr-9 text-gray-900 data-[focus]:bg-indigo-600 data-[focus]:text-white"
+              className="group relative w-full truncate rounded-sm py-2 pr-9 pl-3 text-gray-900 select-none data-focus:bg-indigo-600 data-focus:text-white"
             >
               Use <span className="font-bold">{query}</span>
               <span
                 aria-hidden="true"
-                className="absolute inset-y-0 right-0 hidden items-center pr-4 group-data-[selected]:flex"
+                className="absolute inset-y-0 right-0 hidden items-center pr-4 group-data-selected:flex"
               >
                 <CheckIcon className="size-5" />
               </span>
@@ -72,7 +72,7 @@ export const NftSelector = ({ control }: UseControllerProps<FormInputs>) => {
             <ComboboxOption
               key={userNft.id}
               value={userNft.id}
-              className="group relative select-none rounded py-2 pl-3 pr-9 text-gray-900 data-[focus]:bg-indigo-600 data-[focus]:text-white"
+              className="group relative rounded-sm py-2 pr-9 pl-3 text-gray-900 select-none data-focus:bg-indigo-600 data-focus:text-white"
             >
               <span className="flex items-center gap-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -87,7 +87,7 @@ export const NftSelector = ({ control }: UseControllerProps<FormInputs>) => {
               </span>
               <span
                 aria-hidden="true"
-                className="absolute inset-y-0 right-0 hidden items-center pr-4 group-data-[selected]:flex"
+                className="absolute inset-y-0 right-0 hidden items-center pr-4 group-data-selected:flex"
               >
                 <CheckIcon className="size-5" />
               </span>
@@ -134,7 +134,7 @@ const NftComboboxInput = ({
         )}
       />
       <ComboboxButton className="group absolute inset-y-0 right-0 px-2.5">
-        <ChevronUpDownIcon className="size-4 text-gray-500 group-data-[hover]:text-gray-900" />
+        <ChevronUpDownIcon className="size-4 text-gray-500 group-data-hover:text-gray-900" />
       </ComboboxButton>
     </div>
   );

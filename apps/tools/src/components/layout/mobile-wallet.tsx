@@ -35,21 +35,21 @@ export const MobileWallet = () => {
 
   if (!wallet) {
     return (
-      <div className="border-t border-white px-4 pb-3 pt-4">
+      <div className="border-t border-white px-4 pt-4 pb-3">
         <WalletModalButton />
       </div>
     );
   }
   if (!publicKey) {
     return (
-      <div className="border-t border-white px-4 pb-3 pt-4">
+      <div className="border-t border-white px-4 pt-4 pb-3">
         <WalletConnectButton />
       </div>
     );
   }
 
   return (
-    <div className="border-t border-white pb-3 pt-4">
+    <div className="border-t border-white pt-4 pb-3">
       <div className="flex items-center justify-between gap-x-3 px-4">
         <div className="inline-flex items-center gap-x-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white">
@@ -89,11 +89,11 @@ export const MobileWallet = () => {
               {({ checked }) => (
                 <button
                   className={cn(
-                    "rounded-md border border-gray-300 px-3 py-2 font-sans tracking-wide text-gray-100 shadow transition-colors hover:cursor-pointer",
-                    "focus:outline-none focus:ring-2",
+                    "rounded-md border border-gray-300 px-3 py-2 font-sans tracking-wide text-gray-100 shadow-sm transition-colors hover:cursor-pointer",
+                    "focus:ring-2 focus:outline-hidden",
                     checked
                       ? "border-secondary bg-secondary text-secondary-content hover:bg-secondary-focus focus:ring-secondary"
-                      : "hover:bg-primary-focus border-gray-300 focus:ring-gray-300",
+                      : "border-gray-300 hover:bg-primary-focus focus:ring-gray-300",
                   )}
                 >
                   Mainnet
@@ -105,11 +105,11 @@ export const MobileWallet = () => {
                 <button
                   type="button"
                   className={cn(
-                    "rounded-md border border-gray-300 px-3 py-2 font-sans tracking-wide text-gray-100 shadow transition-colors hover:cursor-pointer",
-                    "focus:outline-none focus:ring-2",
+                    "rounded-md border border-gray-300 px-3 py-2 font-sans tracking-wide text-gray-100 shadow-sm transition-colors hover:cursor-pointer",
+                    "focus:ring-2 focus:outline-hidden",
                     checked
                       ? "border-secondary bg-secondary text-secondary-content hover:bg-secondary-focus focus:ring-secondary"
-                      : "hover:bg-primary-focus border-gray-300 focus:ring-gray-300",
+                      : "border-gray-300 hover:bg-primary-focus focus:ring-gray-300",
                   )}
                 >
                   Testnet
@@ -121,11 +121,11 @@ export const MobileWallet = () => {
                 <button
                   type="button"
                   className={cn(
-                    "rounded-md border border-gray-300 px-3 py-2 font-sans tracking-wide text-gray-100 shadow transition-colors hover:cursor-pointer",
-                    "focus:outline-none focus:ring-2",
+                    "rounded-md border border-gray-300 px-3 py-2 font-sans tracking-wide text-gray-100 shadow-sm transition-colors hover:cursor-pointer",
+                    "focus:ring-2 focus:outline-hidden",
                     checked
                       ? "border-secondary bg-secondary text-secondary-content hover:bg-secondary-focus focus:ring-secondary"
-                      : "hover:bg-primary-focus border-gray-300 focus:ring-gray-300",
+                      : "border-gray-300 hover:bg-primary-focus focus:ring-gray-300",
                   )}
                 >
                   Devnet
@@ -137,13 +137,13 @@ export const MobileWallet = () => {
         <button
           type="button"
           onClick={openModal}
-          className="hover:bg-primary-focus block w-full rounded-md px-3 py-2 text-left text-base font-medium text-gray-50 hover:text-white"
+          className="block w-full rounded-md px-3 py-2 text-left text-base font-medium text-gray-50 hover:bg-primary-focus hover:text-white"
         >
           Change wallet
         </button>
         <button
           onClick={() => disconnect()}
-          className=" hover:bg-primary-focus block w-full rounded-md px-3 py-2 text-left text-base font-medium text-gray-50 hover:text-white"
+          className="block w-full rounded-md px-3 py-2 text-left text-base font-medium text-gray-50 hover:bg-primary-focus hover:text-white"
         >
           Sign out
         </button>

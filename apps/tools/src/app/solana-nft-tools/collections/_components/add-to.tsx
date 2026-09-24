@@ -145,9 +145,9 @@ export const AddTo = () => {
   };
 
   return (
-    <div className="mx-auto max-w-xl overflow-visible bg-white px-4 pb-5 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow">
+    <div className="mx-auto max-w-xl overflow-visible bg-white px-4 pb-5 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow-sm">
       <div className="border-b border-gray-200 pb-4">
-        <h1 className="font-display mb-4 text-3xl font-semibold">
+        <h1 className="mb-4 font-display text-3xl font-semibold">
           Add to collection
         </h1>
         <p className="text-sm text-gray-500">
@@ -195,7 +195,7 @@ export const AddTo = () => {
         <div className="my-4 flex items-center justify-end py-2">
           <Button color="indigo" type="submit" disabled={isConfirming}>
             {isConfirming && (
-              <SpinnerIcon className="-ml-1 mr-1 inline h-5 w-5 animate-spin" />
+              <SpinnerIcon className="mr-1 -ml-1 inline h-5 w-5 animate-spin" />
             )}
             Submit
           </Button>

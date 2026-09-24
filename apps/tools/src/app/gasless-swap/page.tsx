@@ -157,9 +157,9 @@ export default function GaslessSwap() {
   }
 
   return (
-    <div className="mx-auto max-w-lg overflow-visible bg-white px-4 py-4 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow">
+    <div className="mx-auto max-w-lg overflow-visible bg-white px-4 py-4 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow-sm">
       <div className="border-b border-gray-200 pb-6">
-        <h1 className="font-display mb-4 text-center text-3xl font-semibold">
+        <h1 className="mb-4 text-center font-display text-3xl font-semibold">
           Gasless Swap
         </h1>
         <p className="mx-4 text-sm text-gray-500">
@@ -174,7 +174,7 @@ export default function GaslessSwap() {
           You can swap $BONK with our{" "}
           <Link
             href="/gasless-bonk-swap"
-            className="whitespace-nowrap font-medium text-blue-600 hover:underline"
+            className="font-medium whitespace-nowrap text-blue-600 hover:underline"
           >
             gasless BONK Swap utility &rarr;
           </Link>
@@ -192,7 +192,7 @@ export default function GaslessSwap() {
               setValue("swapAmount", Number(balanceQuery.data.uiAmount));
             }
           }}
-          className="w-full whitespace-pre py-2 text-right text-base"
+          className="w-full py-2 text-right text-base whitespace-pre"
         >
           <span className="text-xs text-gray-600">Balance </span>
           {balanceQuery.data?.uiAmount ? (
@@ -240,7 +240,7 @@ export default function GaslessSwap() {
                 },
               })}
               placeholder="0.00"
-              className="min-w-0 grow rounded-md border-transparent bg-gray-200 px-3 py-2 text-right font-medium text-gray-600 placeholder:text-gray-400 focus:outline-none focus:ring-0"
+              className="min-w-0 grow rounded-md border-transparent bg-gray-200 px-3 py-2 text-right font-medium text-gray-600 placeholder:text-gray-400 focus:ring-0 focus:outline-hidden"
             />
           </div>
           <span className="text-sm text-red-600">
@@ -256,7 +256,7 @@ export default function GaslessSwap() {
               You will receive:
             </span>
           </div>
-          <div className="pointer-events-none relative mt-2 flex h-10 w-full items-center justify-between rounded-md bg-gray-200 px-3 shadow-sm sm:mt-1">
+          <div className="pointer-events-none relative mt-2 flex h-10 w-full items-center justify-between rounded-md bg-gray-200 px-3 shadow-xs sm:mt-1">
             <div className="inline-flex items-center">
               <Image
                 unoptimized={true}

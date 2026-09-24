@@ -39,9 +39,9 @@ export function AccountTable({
   }, [someSelected]);
 
   return (
-    <div className="rounded-md border border-zinc-200 [overflow:clip]">
+    <div className="overflow-clip rounded-md border border-zinc-200">
       <table className="w-full border-collapse text-left text-sm">
-        <thead className="sticky top-0 z-[1] bg-zinc-100 text-zinc-600">
+        <thead className="sticky top-0 z-1 bg-zinc-100 text-zinc-600">
           <tr>
             <th className="w-10 py-2 pl-3 font-medium">
               <input
@@ -51,7 +51,7 @@ export function AccountTable({
                 checked={allSelected}
                 disabled={selectable.length === 0}
                 onChange={() => onToggleAll(!allSelected)}
-                className="form-checkbox rounded accent-indigo-600"
+                className="form-checkbox rounded-sm accent-indigo-600"
               />
             </th>
             <th className="px-3 py-2 font-medium">Account</th>
@@ -98,7 +98,7 @@ function AccountRow({
       className={cn(
         "transition-colors",
         disabled ? "text-zinc-400" : "cursor-pointer",
-        !disabled && (selected ? "bg-indigo-600/[5%]" : "hover:bg-zinc-50"),
+        !disabled && (selected ? "bg-indigo-600/5" : "hover:bg-zinc-50"),
       )}
     >
       <td className="py-2 pl-3">
@@ -109,7 +109,7 @@ function AccountRow({
           disabled={disabled}
           onChange={onToggle}
           onClick={(e) => e.stopPropagation()}
-          className="form-checkbox rounded accent-indigo-600 disabled:opacity-40"
+          className="form-checkbox rounded-sm accent-indigo-600 disabled:opacity-40"
         />
       </td>
       <td className="px-3 py-2">
@@ -169,7 +169,7 @@ function AccountRow({
           </span>
         ) : (
           <div>
-            <div className="whitespace-nowrap font-medium tabular-nums text-zinc-900">
+            <div className="font-medium whitespace-nowrap text-zinc-900 tabular-nums">
               {formatSol(excess, 6, 6)} SOL
             </div>
           </div>
@@ -200,7 +200,7 @@ function DepositBar({
           style={{ width: reclaimed ? "0%" : `${100 - neededShare}%` }}
         />
       </div>
-      <div className="mt-1 whitespace-nowrap text-xs tabular-nums text-zinc-500">
+      <div className="mt-1 text-xs whitespace-nowrap text-zinc-500 tabular-nums">
         {reclaimed
           ? `Holds ${formatSol(needed, 5, 5)}, the minimum`
           : `Holds ${formatSol(needed + excess, 5, 5)}, needs ${formatSol(needed, 5, 5)}`}

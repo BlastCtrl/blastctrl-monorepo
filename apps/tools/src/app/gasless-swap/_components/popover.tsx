@@ -14,9 +14,9 @@ const PopoverInternalPanel = React.forwardRef<
       <PopoverBackdrop className="fixed inset-0 isolate z-10 bg-black/60 xs:hidden" />
       <PopoverPanel
         className={cn(
-          "z-20 overflow-hidden rounded border border-black/5 bg-white px-4 pt-4 shadow-md",
-          "sm:absolute sm:inset-x-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "fixed left-8 top-20",
+          "z-20 overflow-hidden rounded-sm border border-black/5 bg-white px-4 pt-4 shadow-md",
+          "sm:absolute sm:inset-x-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2",
+          "fixed top-20 left-8",
           className,
         )}
         ref={ref}

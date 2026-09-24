@@ -124,7 +124,7 @@ export default function ReclaimRent() {
     });
 
   return (
-    <div className="mx-auto w-[min(100%,theme(screens.lg))] bg-white sm:rounded-lg sm:shadow">
+    <div className="mx-auto w-[min(100%,var(--breakpoint-lg))] bg-white sm:rounded-lg sm:shadow-sm">
       <div className="px-4 pb-6 sm:p-6">
         <div className="grid items-start gap-x-10 gap-y-6 md:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
           <div>
@@ -210,7 +210,7 @@ export default function ReclaimRent() {
               </button>
             </div>
 
-            <section aria-labelledby="token-accounts-heading" className="mt-6 ">
+            <section aria-labelledby="token-accounts-heading" className="mt-6">
               <h3
                 id="token-accounts-heading"
                 className="text-sm font-semibold text-zinc-900"
@@ -238,7 +238,7 @@ export default function ReclaimRent() {
                     onToggleAll={(select) => toggleMany(tokenAccounts, select)}
                   />
                   {atMinimum > 0 && (
-                    <p className="ml-12 mt-2 text-sm text-zinc-500">
+                    <p className="mt-2 ml-12 text-sm text-zinc-500">
                       {atMinimum} other{" "}
                       {atMinimum === 1 ? "account is" : "accounts are"} already
                       at the minimum.
@@ -272,9 +272,9 @@ export default function ReclaimRent() {
             </section>
           </div>
 
-          <div className="sticky bottom-0 z-[2] flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-zinc-200 bg-white/95 px-4 py-4 backdrop-blur sm:rounded-b-lg sm:px-6">
+          <div className="sticky bottom-0 z-2 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-zinc-200 bg-white/95 px-4 py-4 backdrop-blur-sm sm:rounded-b-lg sm:px-6">
             <div aria-live="polite">
-              <div className="text-base font-medium tabular-nums text-zinc-900">
+              <div className="text-base font-medium text-zinc-900 tabular-nums">
                 {formatSol(selectedLamports, 5)} SOL selected
               </div>
               <div className="text-sm text-zinc-500">

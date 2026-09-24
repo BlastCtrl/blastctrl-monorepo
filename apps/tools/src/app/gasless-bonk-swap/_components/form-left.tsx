@@ -18,7 +18,7 @@ export const FormLeft = () => {
   return (
     <div
       ref={cheemsWrapRef}
-      className="relative hidden flex-1 flex-shrink-0 px-2 sm:block"
+      className="relative hidden flex-1 shrink-0 px-2 sm:block"
     >
       <CheemsImage />
       {error && (

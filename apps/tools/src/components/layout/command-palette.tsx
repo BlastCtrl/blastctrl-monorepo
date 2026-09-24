@@ -98,7 +98,7 @@ export const CommandPalette = ({
                   <Combobox.Input
                     autoFocus
                     onChange={(event) => setQuery(event.target.value)}
-                    className="h-12 w-full border-0 bg-transparent text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-0"
+                    className="h-12 w-full border-0 bg-transparent text-sm text-gray-800 placeholder:text-gray-400 focus:ring-0 focus:outline-hidden"
                     placeholder="Search..."
                   />
                 </div>

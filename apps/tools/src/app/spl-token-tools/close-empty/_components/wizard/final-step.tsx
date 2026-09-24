@@ -41,7 +41,7 @@ export const FinalStep = () => {
             that succesfully simulated. Check the error message below for the
             cause of the error.
           </span>
-          <code className="block w-full max-w-full overflow-x-auto p-1 text-xs shadow-sm">
+          <code className="block w-full max-w-full overflow-x-auto p-1 text-xs shadow-xs">
             {String(error) ?? "There was no error message"}
           </code>
         </Dialog.Description>

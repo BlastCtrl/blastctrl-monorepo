@@ -376,7 +376,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                   type="text"
                   value={mintAddress}
                   onChange={(e) => setMintAddress(e.target.value)}
-                  className="w-full rounded border p-1.5 focus:border-blue-600 focus:outline-none sm:text-sm"
+                  className="w-full rounded-sm border p-1.5 focus:border-blue-600 focus:outline-hidden sm:text-sm"
                   placeholder="Enter SPL token mint address"
                 />
               </div>
@@ -429,7 +429,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                   inputMode="decimal"
                   onChange={(e) => handleSetAmount(e.target.value)}
                   // rounded-none is required for WebKit
-                  className="w-full rounded-none rounded-l border p-1.5 focus:border-blue-600 focus:outline-none sm:text-sm"
+                  className="w-full rounded-none rounded-l border p-1.5 focus:border-blue-600 focus:outline-hidden sm:text-sm"
                   placeholder="0.1"
                 />
                 <span className="flex items-center rounded-none rounded-r border border-l-0 bg-gray-100 px-2 py-1.5 text-sm">
@@ -453,7 +453,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
             {calculateTotalSol()} {tokenType === "sol" ? "SOL" : "Tokens"}
           </div>
         </div>
-        <p className="mb-3 mt-1 text-stone-500 sm:text-sm">
+        <p className="mt-1 mb-3 text-stone-500 sm:text-sm">
           Maximum number of recipients is {MAX_RECIPIENTS}. If you need to do
           more, split it into multiple airdrops.
         </p>
@@ -494,13 +494,13 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
 
         {airdropType === "same" && inputMethod === "manual" ? (
           <div>
-            <div className="mb-3 max-h-64 overflow-y-auto rounded border">
+            <div className="mb-3 max-h-64 overflow-y-auto rounded-sm border">
               {recipients.map((recipient, index) => (
                 <div
                   key={index}
                   className="flex items-center gap-2 border-b p-2 last:border-b-0"
                 >
-                  <div className="flex-grow">
+                  <div className="grow">
                     <input
                       type="text"
                       id={`recipient-address-[${index}]`}
@@ -509,7 +509,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                       onChange={(e) =>
                         handleRecipientChange(index, "address", e.target.value)
                       }
-                      className="w-full rounded border p-1.5 sm:text-sm"
+                      className="w-full rounded-sm border p-1.5 sm:text-sm"
                       placeholder={`Recipient wallet address.${index === 0 ? " You can paste in multiple addresses." : ""}`}
                     />
                     {errors.recipients[index]?.address && (
@@ -521,7 +521,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
 
                   <button
                     onClick={() => removeRecipient(index)}
-                    className="flex size-9 items-center justify-center rounded bg-gray-200 p-1.5 hover:bg-gray-300 sm:size-8"
+                    className="flex size-9 items-center justify-center rounded-sm bg-gray-200 p-1.5 hover:bg-gray-300 sm:size-8"
                     disabled={recipients.length === 1}
                   >
                     ✕
@@ -558,7 +558,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                 <div className="flex items-center">
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="whitespace-nowrap rounded-md bg-gray-200 px-3 py-1.5 hover:bg-gray-300 sm:text-sm"
+                    className="rounded-md bg-gray-200 px-3 py-1.5 whitespace-nowrap hover:bg-gray-300 sm:text-sm"
                   >
                     {csvFile ? "Change CSV File" : "Choose CSV File"}
                   </button>
@@ -577,7 +577,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
                 </div>
               </div>
 
-              <div className="whitespace-nowrap text-sm text-gray-500">
+              <div className="text-sm whitespace-nowrap text-gray-500">
                 {csvData.length}{" "}
                 {csvData.length === 1 ? "recipient" : "recipients"}
               </div>
@@ -587,7 +587,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
               <p className="mb-2 text-xs text-red-500">{errors.csv}</p>
             )}
 
-            <div className="mb-3 rounded border bg-gray-50 p-2 text-xs">
+            <div className="mb-3 rounded-sm border bg-gray-50 p-2 text-xs">
               {airdropType === "same" ? (
                 <>
                   <p className="mb-1 text-gray-600">
@@ -611,7 +611,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
 
             {csvData.length > 0 && (
               <div>
-                <div className="max-h-64 overflow-y-auto rounded border">
+                <div className="max-h-64 overflow-y-auto rounded-sm border">
                   <table className="min-w-full">
                     <thead className="bg-gray-100">
                       <tr>
@@ -666,7 +666,7 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
           onClick={handleNext}
           color="indigo"
           disabled={!validateAll()}
-          className="!px-6"
+          className="px-6!"
         >
           Review
         </Button>

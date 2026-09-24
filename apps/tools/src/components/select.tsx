@@ -49,7 +49,7 @@ const CustomSelectOptions = (
         {...rest}
         className={cn(
           "absolute left-1/2 z-20 mt-3 w-full min-w-fit -translate-x-1/2 space-y-1.5 rounded-md",
-          "bg-white p-1 shadow-xl ring-1 ring-black/20 focus:outline-none",
+          "bg-white p-1 shadow-xl ring-1 ring-black/20 focus:outline-hidden",
           typeof className === "function" ? "" : className,
         )}
       >

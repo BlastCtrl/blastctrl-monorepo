@@ -20,10 +20,10 @@ export function CloseAccountWizard({ accountsToClose, open, onClose }: Props) {
     >
       <Dialog open={open} onClose={() => {}}>
         <div
-          className="pointer-events-none fixed inset-0 z-[50] bg-black/30"
+          className="pointer-events-none fixed inset-0 z-50 bg-black/30"
           aria-hidden="true"
         />
-        <div className="fixed inset-0 z-[50] flex w-screen items-center justify-center">
+        <div className="fixed inset-0 z-50 flex w-screen items-center justify-center">
           <Dialog.Panel className="mx-5 h-[300px] w-full max-w-[536px] rounded-lg bg-white p-4 shadow-lg sm:mx-auto">
             <div className="flex size-full flex-col gap-4">
               <DialogTitle />

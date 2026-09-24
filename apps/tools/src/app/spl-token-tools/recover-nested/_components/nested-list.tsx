@@ -29,14 +29,14 @@ export const NestedList = ({
 }: NestedListProps) => {
   if (!nestedTokenAccounts || nestedTokenAccounts?.length === 0) {
     return (
-      <div className="pb-1 pt-4 font-normal">No nested accounts found ✔</div>
+      <div className="pt-4 pb-1 font-normal">No nested accounts found ✔</div>
     );
   }
 
   const singleOrMany = nestedTokenAccounts.length === 1;
 
   return (
-    <div className="mt-4 border-t border-gray-200 pb-1 pt-4">
+    <div className="mt-4 border-t border-gray-200 pt-4 pb-1">
       <h3 className="text-center font-medium text-indigo-600">
         {nestedTokenAccounts.length} nested token account
         {singleOrMany ? "" : "s"} found.
@@ -161,7 +161,7 @@ export const NestedInfo = ({
   };
 
   return (
-    <div className="divide-y divide-gray-200 overflow-hidden rounded-lg bg-white shadow ring-1 ring-black/5">
+    <div className="divide-y divide-gray-200 overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-black/5">
       <div className="px-4 py-5 sm:p-6">
         <div className="grid gap-y-4 xs:grid-cols-2">
           {[parent, nested].map((account, idx) => {
@@ -169,7 +169,7 @@ export const NestedInfo = ({
 
             return (
               <div key={idx} className="flex">
-                <div className="mr-4 mt-2 flex-shrink-0 self-start">
+                <div className="mt-2 mr-4 shrink-0 self-start">
                   {tokenInfo ? (
                     <Image
                       src={tokenInfo.image}
@@ -183,17 +183,17 @@ export const NestedInfo = ({
                   )}
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold uppercase tracking-wider text-gray-700">
+                  <h4 className="text-sm font-bold tracking-wider text-gray-700 uppercase">
                     {idx === 0 ? "Parent" : "Nested"}
                   </h4>
                   {tokenInfo ? (
                     <p className="text-sm text-gray-700">{tokenInfo.ticker}</p>
                   ) : (
-                    <p className="font-mono font-medium leading-5 tracking-tighter text-gray-700">
+                    <p className="font-mono leading-5 font-medium tracking-tighter text-gray-700">
                       {compress(account.mint.toBase58(), 6)}
                     </p>
                   )}
-                  <p className="tracking-tigher font-mono font-medium leading-5 text-gray-500">
+                  <p className="tracking-tigher font-mono leading-5 font-medium text-gray-500">
                     {compress(account.address.toBase58(), 6)}
                   </p>
                   <div className="mt-2 inline-flex w-full items-center justify-end">
@@ -221,7 +221,7 @@ export const NestedInfo = ({
           >
             {confirming ? (
               <>
-                <SpinnerIcon className="ml-1 mr-1 h-5 w-5 animate-spin text-white" />
+                <SpinnerIcon className="mr-1 ml-1 h-5 w-5 animate-spin text-white" />
                 Confirming
               </>
             ) : (

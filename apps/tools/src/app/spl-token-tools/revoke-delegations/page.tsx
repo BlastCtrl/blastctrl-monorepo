@@ -111,7 +111,7 @@ export default function RevokeDelegations() {
     if (isFetching)
       return (
         <>
-          <SpinnerIcon className="-ml-1 mr-2 size-5 animate-spin" />
+          <SpinnerIcon className="mr-2 -ml-1 size-5 animate-spin" />
           Loading
         </>
       );
@@ -122,11 +122,11 @@ export default function RevokeDelegations() {
   return (
     <div
       className={cn(
-        "mx-auto w-[min(100%,theme(screens.md))] overflow-visible bg-white px-4 pb-5 sm:rounded-lg sm:p-6 sm:shadow",
-        !!data && "!pb-0",
+        "mx-auto w-[min(100%,var(--breakpoint-md))] overflow-visible bg-white px-4 pb-5 sm:rounded-lg sm:p-6 sm:shadow-sm",
+        !!data && "pb-0!",
       )}
     >
-      <h1 className="font-display mb-4 text-3xl font-semibold">
+      <h1 className="mb-4 font-display text-3xl font-semibold">
         Revoke Token Delegations
       </h1>
       {!data && (
@@ -150,7 +150,7 @@ export default function RevokeDelegations() {
             </p>
           </div>
 
-          <div className="flex flex-col items-center justify-center gap-2 pb-2 pt-8">
+          <div className="flex flex-col items-center justify-center gap-2 pt-8 pb-2">
             <Button
               color="indigo"
               type="button"
