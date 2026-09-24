@@ -1,6 +1,6 @@
 import { Badge } from "@/components/badge";
 import { compress } from "@/lib/solana/common";
-import { CopyButton, cn } from "@blastctrl/ui";
+import { Checkbox, CopyButton, cn } from "@blastctrl/ui";
 import { CheckCircleIcon } from "@heroicons/react/20/solid";
 import { useLayoutEffect, useRef } from "react";
 import { formatSol } from "./rent";
@@ -44,14 +44,12 @@ export function AccountTable({
         <thead className="sticky top-0 z-1 bg-zinc-100 text-zinc-600">
           <tr>
             <th className="w-10 py-2 pl-3 font-medium">
-              <input
+              <Checkbox
                 ref={headerCheckbox}
-                type="checkbox"
                 aria-label="Select all accounts"
                 checked={allSelected}
                 disabled={selectable.length === 0}
                 onChange={() => onToggleAll(!allSelected)}
-                className="form-checkbox rounded-sm accent-indigo-600"
               />
             </th>
             <th className="px-3 py-2 font-medium">Account</th>
@@ -102,14 +100,13 @@ function AccountRow({
       )}
     >
       <td className="py-2 pl-3">
-        <input
-          type="checkbox"
+        <Checkbox
           aria-label={`Select ${account.name}`}
           checked={selected && !disabled}
           disabled={disabled}
           onChange={onToggle}
           onClick={(e) => e.stopPropagation()}
-          className="form-checkbox rounded-sm accent-indigo-600 disabled:opacity-40"
+          className="disabled:opacity-40"
         />
       </td>
       <td className="px-3 py-2">

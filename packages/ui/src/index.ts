@@ -8,6 +8,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export { Checkbox } from "./checkbox";
 export { CopyButton } from "./copy-button";
 export { Link } from "./link";
 export { Button } from "./button";

@@ -1,9 +1,5 @@
 @import "tailwindcss";
 
-@plugin "@tailwindcss/forms" {
-  strategy: "class";
-}
-
 @source "../../../../packages/ui/src/**/*.{ts,tsx}";
 
 @theme {
