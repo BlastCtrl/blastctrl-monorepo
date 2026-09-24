@@ -193,7 +193,7 @@ export const NestedInfo = ({
                       {compress(account.mint.toBase58(), 6)}
                     </p>
                   )}
-                  <p className="tracking-tigher font-mono leading-5 font-medium text-gray-500">
+                  <p className="font-mono leading-5 font-medium tracking-tighter text-gray-500">
                     {compress(account.address.toBase58(), 6)}
                   </p>
                   <div className="mt-2 inline-flex w-full items-center justify-end">
