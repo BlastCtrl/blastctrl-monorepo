@@ -17,7 +17,7 @@ import { useDasApi } from "./das";
 import type { DasAsset, HeliusResponse } from "./types";
 import { assetDataQueryKey } from "./use-asset-data";
 
-export const reclaimableAccountsKey = (owner: string, network: string) =>
+const reclaimableAccountsKey = (owner: string, network: string) =>
   ["reclaimable-accounts", owner, network] as const;
 
 type ParsedTokenAccountInfo = {
@@ -257,7 +257,7 @@ function displayName(mint: string, asset: DasAsset | undefined): string {
 }
 
 /** Names and images for display. Failing here must not fail the scan. */
-export async function fetchAssets(url: string | null, mints: string[]) {
+async function fetchAssets(url: string | null, mints: string[]) {
   const assets = new Map<string, DasAsset>();
   if (!url || mints.length === 0) return assets;
 

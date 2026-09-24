@@ -18,8 +18,5 @@ export function useRentRate() {
     retry: 2,
   });
 
-  return {
-    lamportsPerByte: query.data ?? FALLBACK_LAMPORTS_PER_BYTE,
-    isLive: query.data !== undefined,
-  };
+  return { lamportsPerByte: query.data ?? FALLBACK_LAMPORTS_PER_BYTE };
 }

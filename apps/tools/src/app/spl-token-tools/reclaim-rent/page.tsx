@@ -8,6 +8,7 @@ import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import Link from "next/link";
 import { useState } from "react";
 import { CollapsibleTable } from "./_components/collapsible-table";
+import { SERVICE_FEE, serviceFeeLamports } from "./_components/fee";
 import { MintPanel } from "./_components/mint-panel";
 import { ReclaimDialog } from "./_components/reclaim-dialog";
 import {
@@ -89,6 +90,7 @@ export default function ReclaimRent() {
   );
   const emptyCount = openTokenAccounts.filter((a) => a.isEmpty).length;
   const transactions = Math.ceil(selected.length / ACCOUNTS_PER_TRANSACTION);
+  const serviceFee = serviceFeeLamports(selectedLamports);
 
   const scan = async () => {
     if (!connected) {
@@ -278,7 +280,7 @@ export default function ReclaimRent() {
               <div className="text-sm text-zinc-500">
                 {selected.length === 0
                   ? "Select at least one account"
-                  : `${selected.length} ${selected.length === 1 ? "account" : "accounts"}, ${transactions} ${transactions === 1 ? "transaction" : "transactions"}`}
+                  : `${selected.length} ${selected.length === 1 ? "account" : "accounts"}, ${transactions} ${transactions === 1 ? "transaction" : "transactions"}${SERVICE_FEE ? `, ${formatSol(serviceFee)} SOL fee` : ""}`}
               </div>
             </div>
             <Button

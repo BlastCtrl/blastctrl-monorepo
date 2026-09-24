@@ -1,6 +1,5 @@
 export const ACCOUNT_STORAGE_OVERHEAD = 128;
 export const TOKEN_ACCOUNT_SIZE = 165;
-export const MINT_SIZE = 82;
 
 export const ORIGINAL_LAMPORTS_PER_BYTE = 6960;
 
@@ -12,18 +11,18 @@ export const FALLBACK_LAMPORTS_PER_BYTE = 5080;
 
 export type RentStep = {
   label: string;
-  when: string;
   lamportsPerByte: number;
 };
 
-// SIMD-0437: five feature-gated reductions of lamports_per_byte.
+// SIMD-0437: five feature-gated reductions of lamports_per_byte. Steps 1 and
+// 2 went live in September 2026; the rest are expected in November.
 export const RENT_STEPS: RentStep[] = [
-  { label: "Original", when: "Before Sep 3", lamportsPerByte: 6960 },
-  { label: "Step 1", when: "Sep 3", lamportsPerByte: 6333 },
-  { label: "Step 2", when: "Sep", lamportsPerByte: 5080 },
-  { label: "Step 3", when: "November", lamportsPerByte: 2575 },
-  { label: "Step 4", when: "November", lamportsPerByte: 1322 },
-  { label: "Step 5", when: "November", lamportsPerByte: 696 },
+  { label: "Original", lamportsPerByte: 6960 },
+  { label: "Step 1", lamportsPerByte: 6333 },
+  { label: "Step 2", lamportsPerByte: 5080 },
+  { label: "Step 3", lamportsPerByte: 2575 },
+  { label: "Step 4", lamportsPerByte: 1322 },
+  { label: "Step 5", lamportsPerByte: 696 },
 ];
 
 export type RentStepStatus = "past" | "current" | "upcoming";

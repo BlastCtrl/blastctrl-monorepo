@@ -5,7 +5,10 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import type { Connection } from "@solana/web3.js";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { useMutation } from "@tanstack/react-query";
+import type { ServiceFee } from "./fee";
+import { SERVICE_FEE, createServiceFeeInstruction } from "./fee";
 import type { ReclaimableAccount } from "./types";
+import { excessLamports } from "./types";
 
 export type BatchResult =
   | { index: number; status: "confirmed"; signature: string }
@@ -97,10 +100,19 @@ type Lifetime = { blockhash: string; lastValidBlockHeight: number };
 const latestBlockhash = (connection: Connection) =>
   retryWithBackoff(() => connection.getLatestBlockhash("confirmed"));
 
-function build(batch: Batch, wallet: PublicKey, lifetime: Lifetime) {
+const build = (batch: Batch, wallet: PublicKey, lifetime: Lifetime) =>
+  buildReclaimTransaction(batch.accounts, wallet, lifetime, SERVICE_FEE);
+
+/** All withdrawals for one batch, then the service fee if there is one. */
+export function buildReclaimTransaction(
+  accounts: ReclaimableAccount[],
+  wallet: PublicKey,
+  lifetime: Lifetime,
+  fee: ServiceFee | null,
+) {
   const tx = new Transaction({ feePayer: wallet, ...lifetime });
   tx.add(
-    ...batch.accounts.map((account) =>
+    ...accounts.map((account) =>
       createWithdrawExcessLamportsInstruction(
         new PublicKey(account.address),
         wallet,
@@ -112,6 +124,11 @@ function build(batch: Batch, wallet: PublicKey, lifetime: Lifetime) {
       ),
     ),
   );
+  if (fee) {
+    const excess = accounts.reduce((sum, a) => sum + excessLamports(a), 0);
+    const transfer = createServiceFeeInstruction(wallet, excess, fee);
+    if (transfer) tx.add(transfer);
+  }
   return tx;
 }
 

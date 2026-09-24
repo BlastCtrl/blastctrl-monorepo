@@ -5,6 +5,7 @@ import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/20/solid";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useState } from "react";
+import { SERVICE_FEE, formatFeeRate, serviceFeeLamports } from "./fee";
 import {
   ACCOUNTS_PER_TRANSACTION,
   FEE_PER_TRANSACTION,
@@ -18,7 +19,10 @@ import { useRentRate } from "./use-rent-rate";
 
 type Batch = {
   accounts: ReclaimableAccount[];
+  /** Excess rent in the batch, before any fees. */
   lamports: number;
+  /** Service fee for the batch. */
+  fee: number;
   status: "queued" | "sending" | "confirmed" | "failed";
   signature?: string;
   error?: string;
@@ -37,9 +41,11 @@ function toBatches(accounts: ReclaimableAccount[]): Batch[] {
   const batches: Batch[] = [];
   for (let i = 0; i < accounts.length; i += ACCOUNTS_PER_TRANSACTION) {
     const slice = accounts.slice(i, i + ACCOUNTS_PER_TRANSACTION);
+    const lamports = slice.reduce((sum, a) => sum + excessLamports(a), 0);
     batches.push({
       accounts: slice,
-      lamports: slice.reduce((sum, a) => sum + excessLamports(a), 0),
+      lamports,
+      fee: serviceFeeLamports(lamports),
       status: "queued",
     });
   }
@@ -59,10 +65,13 @@ export function ReclaimDialog({
   const [signingCount, setSigningCount] = useState(0);
 
   const total = batches.reduce((sum, b) => sum + b.lamports, 0);
-  const fees = batches.length * FEE_PER_TRANSACTION;
+  const fees =
+    batches.length * FEE_PER_TRANSACTION +
+    batches.reduce((sum, b) => sum + b.fee, 0);
+  const net = total - fees;
   const confirmed = batches.filter((b) => b.status === "confirmed");
   const failed = batches.filter((b) => b.status === "failed");
-  const reclaimed = confirmed.reduce((sum, b) => sum + b.lamports, 0);
+  const reclaimed = confirmed.reduce((sum, b) => sum + b.lamports - b.fee, 0);
   const busy = phase === "signing" || phase === "sending";
 
   const setStatus = (index: number, patch: Partial<Batch>) =>
@@ -115,7 +124,7 @@ export function ReclaimDialog({
   };
 
   const title = () => {
-    if (phase === "review") return `Reclaim ${formatSol(total - fees)} SOL`;
+    if (phase === "review") return `Reclaim ${formatSol(net)} SOL`;
     if (phase === "signing") {
       return signingCount === 1
         ? "Approve the transaction in your wallet"
@@ -123,7 +132,7 @@ export function ReclaimDialog({
     }
     if (phase === "sending") return "Reclaiming";
     if (failed.length > 0) {
-      return `Reclaimed ${formatSol(reclaimed)} of ${formatSol(total)} SOL`;
+      return `Reclaimed ${formatSol(reclaimed)} of ${formatSol(net)} SOL`;
     }
     return `Reclaimed ${formatSol(reclaimed)} SOL`;
   };
@@ -178,9 +187,10 @@ export function ReclaimDialog({
                 </Button>
                 <Button
                   color="indigo"
+                  disabled={net <= 0}
                   onClick={() => run(batches.map((_, i) => i))}
                 >
-                  Reclaim {formatSol(total - fees)} SOL
+                  Reclaim {formatSol(net)} SOL
                 </Button>
               </>
             )}
@@ -228,7 +238,9 @@ function Review({
   wallet: string;
 }) {
   const total = batches.reduce((sum, b) => sum + b.lamports, 0);
-  const fees = batches.length * FEE_PER_TRANSACTION;
+  const networkFees = batches.length * FEE_PER_TRANSACTION;
+  const serviceFee = batches.reduce((sum, b) => sum + b.fee, 0);
+  const net = total - networkFees - serviceFee;
   const mints = accounts.filter((a) => a.kind === "mint").length;
   const tokenAccounts = accounts.length - mints;
 
@@ -256,12 +268,23 @@ function Review({
         <Row
           label={`Network fees, ${batches.length} ${batches.length === 1 ? "transaction" : "transactions"}`}
         >
-          −{formatSol(fees)} SOL
+          −{formatSol(networkFees)} SOL
         </Row>
+        {SERVICE_FEE && (
+          <Row label={`Service fee ${formatFeeRate(SERVICE_FEE)}`}>
+            −{formatSol(serviceFee)} SOL
+          </Row>
+        )}
         <Row label="You receive" strong>
-          {formatSol(total - fees)} SOL
+          {formatSol(net)} SOL
         </Row>
       </dl>
+      {net <= 0 && (
+        <p className="mt-3 text-sm text-red-700">
+          The fees would be more than the excess rent in these accounts, so
+          there is nothing to gain from reclaiming them.
+        </p>
+      )}
       {batches.length > 1 && (
         <p className="mt-3 text-xs text-zinc-500">
           One transaction fits {ACCOUNTS_PER_TRANSACTION} accounts. Your wallet
@@ -353,7 +376,7 @@ function BatchList({ batches }: { batches: Batch[] }) {
               batch.status === "failed" && "line-through",
             )}
           >
-            {formatSol(batch.lamports)} SOL
+            {formatSol(batch.lamports - batch.fee)} SOL
           </div>
         </li>
       ))}
