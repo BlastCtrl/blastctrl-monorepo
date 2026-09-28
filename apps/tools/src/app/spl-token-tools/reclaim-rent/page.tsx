@@ -156,7 +156,7 @@ export default function ReclaimRent() {
                   5,
                 )}{" "}
                 SOL per token account today, and more with each step. Your
-                tokens don‘t move and nothing gets closed.
+                tokens aren‘t moved.
               </p>
               <p>
                 Accounts with excess SOL are selected by default. You can

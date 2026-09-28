@@ -1,0 +1,72 @@
+/**
+ * What the results block has to say, in the order the page decides it:
+ * nothing found, found but all reclaimed, nothing ticked, fees eat the
+ * excess, or ready to go.
+ */
+export type RewardStatus =
+  "nothing" | "reclaimed" | "none-selected" | "fees-exceed" | "ready";
+
+/**
+ * One account, as the coin row shows it: ticked or not, waiting on its
+ * transaction to confirm, or reclaimed.
+ */
+export type CoinState = "selected" | "unselected" | "pending" | "confirmed";
+
+export type Coin = {
+  id: string;
+  kind: "token-account" | "mint";
+  state: CoinState;
+};
+
+/** A reclaim in flight: the wallet is asking, or the chain is confirming. */
+export type Sending = {
+  step: "signing" | "confirming";
+  transactions: number;
+  confirmed: number;
+  /** For wallets that ask once per transaction: which one it's asking for. */
+  prompt?: number;
+};
+
+export type RewardProps = {
+  status: RewardStatus;
+  /** Every account that has or had excess, token accounts first. */
+  coins: Coin[];
+  /** What lands in the wallet after network and service fees. */
+  net: number;
+  serviceFeeRate: string;
+  networkFee: number;
+  tokenAccounts: number;
+  mints: number;
+  /** Selected token accounts that hold no tokens, and get closed. */
+  emptyAccounts: number;
+  transactions: number;
+  /** For "reclaimed": what went back to the wallet. */
+  reclaimed: number;
+  reclaimedFrom: { tokenAccounts: number; mints: number };
+  sending: Sending | null;
+  /** The last send finished with some transactions failed. */
+  failed: { transactions: number; of: number; accounts: number } | null;
+  /** The wallet turned the request down; changes each time it happens. */
+  rejectedAt: number | null;
+  /** Play the arrival on mount. False for later renders of the same results. */
+  reveal: boolean;
+  /** Skip every animation: the OS setting, or the demo's toggle. */
+  reduced: boolean;
+  onReclaim: () => void;
+  onRescan: () => void;
+};
+
+export function fromWhere(tokenAccounts: number, mints: number) {
+  const parts = [
+    tokenAccounts > 0 &&
+      `${tokenAccounts} token ${tokenAccounts === 1 ? "account" : "accounts"}`,
+    mints > 0 && `${mints} ${mints === 1 ? "mint" : "mints"}`,
+  ].filter(Boolean);
+  return parts.join(" and ");
+}
+
+export function transactionsNote(transactions: number, feeRate: string) {
+  const n =
+    transactions === 1 ? "One transaction" : `${transactions} transactions`;
+  return `${n}, after a ${feeRate} fee`;
+}

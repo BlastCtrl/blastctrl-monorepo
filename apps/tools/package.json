@@ -57,6 +57,7 @@
     "decimal.js": "^10.6.0",
     "devalue": "^5.7.1",
     "jwt-decode": "^4.0.0",
+    "motion": "^13.4.4",
     "next": "^15.5.26",
     "node-polyfill-webpack-plugin": "^4.1.0",
     "papaparse": "^5.5.3",
