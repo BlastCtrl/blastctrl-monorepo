@@ -7,7 +7,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useReducedMotion } from "motion/react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CollapsibleTable } from "./collapsible-table";
 import { SERVICE_FEE, formatFeeRate, serviceFeeLamports } from "./fee";
 import { MintPanel } from "./mint-panel";
@@ -32,7 +32,7 @@ import type {
   Sending,
 } from "./results/types";
 import type { ReclaimableAccount } from "./types";
-import { closes, excessLamports, reclaimLamports } from "./types";
+import { closes, excessLamports, feeBase, reclaimLamports } from "./types";
 import { WalletRefusedError, useReclaimExcess } from "./use-reclaim-excess";
 import { useRentRate } from "./use-rent-rate";
 
@@ -64,7 +64,7 @@ const afterFees = (accounts: ReclaimableAccount[], closeEmpty: boolean) => {
     (sum, a) => sum + reclaimLamports(a, closeEmpty),
     0,
   );
-  return lamports - serviceFeeLamports(lamports) - FEE_PER_TRANSACTION;
+  return lamports - serviceFeeLamports(feeBase(accounts)) - FEE_PER_TRANSACTION;
 };
 
 /**
@@ -129,6 +129,11 @@ export function ReclaimRent({
   const owner = publicKey?.toBase58() ?? "";
   const scope = `${owner} ${connection.rpcEndpoint}`;
   const [stateScope, setStateScope] = useState(scope);
+  // For a scan to check, after its wait, that it still has the same scope.
+  const latestScope = useRef(scope);
+  useEffect(() => {
+    latestScope.current = scope;
+  });
   if (stateScope !== scope) {
     setStateScope(scope);
     setPhase("idle");
@@ -175,7 +180,7 @@ export function ReclaimRent({
   const reclaimed = all.filter((a) => reclaimedIds.has(a.id));
   const selectedLamports = selected.reduce((sum, a) => sum + worth(a), 0);
   const transactions = Math.ceil(selected.length / ACCOUNTS_PER_TRANSACTION);
-  const serviceFee = serviceFeeLamports(selectedLamports);
+  const serviceFee = serviceFeeLamports(feeBase(selected));
   const networkFee = transactions * FEE_PER_TRANSACTION;
   const net = selectedLamports - serviceFee - networkFee;
   // Whatever the switch says, so its description can say what it would do.
@@ -183,16 +188,18 @@ export function ReclaimRent({
     (a) => !reclaimedIds.has(a.id) && closes(a, true),
   ).length;
 
+  // Reclaimed once nothing is left selected, even if accounts someone
+  // unticked are still open: ticking one again brings the pill back.
   const status: RewardStatus =
-    open.length === 0
-      ? reclaimed.length > 0
-        ? "reclaimed"
-        : "nothing"
-      : selected.length === 0
-        ? "none-selected"
-        : net <= 0
-          ? "fees-exceed"
-          : "ready";
+    selected.length === 0 && reclaimed.length > 0
+      ? "reclaimed"
+      : open.length === 0
+        ? "nothing"
+        : selected.length === 0
+          ? "none-selected"
+          : net <= 0
+            ? "fees-exceed"
+            : "ready";
 
   // A reclaim from the results block, as the block needs to hear about it.
   const inFlight =
@@ -308,6 +315,7 @@ export function ReclaimRent({
       setVisible(true);
       return;
     }
+    const startedIn = scope;
     setPhase("scanning");
     setReclaimedIds(new Set());
     setClosedAccounts([]);
@@ -319,6 +327,9 @@ export function ReclaimRent({
       refetch(),
       wait(SCAN_MIN_MS),
     ]);
+    // The wallet or network changed while it ran: the page has already
+    // started over, and these results belong to the old scope.
+    if (latestScope.current !== startedIn) return;
     // A failed scan keeps the last results in the cache; don't show them as
     // if they were new.
     if (isError || !data) {
@@ -387,7 +398,6 @@ export function ReclaimRent({
       }),
     ...(inFlight && snapshot ? snapshot : now),
     serviceFeeRate: SERVICE_FEE ? formatFeeRate(SERVICE_FEE) : "0%",
-    networkFee,
     reclaimed: reclaimedLamports,
     reclaimedFrom: {
       tokenAccounts: reclaimed.filter((a) => a.kind === "token-account").length,

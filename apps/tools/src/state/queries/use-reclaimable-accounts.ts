@@ -1,7 +1,9 @@
 import type {
   MintLookup,
+  ParsedTokenState,
   ReclaimableAccount,
 } from "@/app/spl-token-tools/reclaim-rent/_components/types";
+import { keepOpenReason } from "@/app/spl-token-tools/reclaim-rent/_components/types";
 import { compress } from "@/lib/solana/common";
 import { chunk } from "@/lib/utils";
 import {
@@ -20,41 +22,12 @@ import { assetDataQueryKey } from "./use-asset-data";
 const reclaimableAccountsKey = (owner: string, network: string) =>
   ["reclaimable-accounts", owner, network] as const;
 
-type ParsedTokenAccountInfo = {
+type ParsedTokenAccountInfo = ParsedTokenState & {
   mint: string;
   owner: string;
   isNative: boolean;
-  state: string;
   tokenAmount: { amount: string; uiAmountString: string };
-  closeAuthority?: string;
-  /** Token-2022 only. */
-  extensions?: { extension: string; state?: Record<string, unknown> }[];
 };
-
-/**
- * Why the owner couldn't close this token account even once it's empty.
- * Closing fails for the whole transaction, so anything doubtful stays open
- * and only gives up its excess.
- */
-function keepOpenReason(info: ParsedTokenAccountInfo, owner: string) {
-  if (info.state === "frozen") return "Frozen, so it stays open";
-  if (info.closeAuthority && info.closeAuthority !== owner) {
-    return "Only its close authority can close it";
-  }
-  for (const { extension, state } of info.extensions ?? []) {
-    if (extension === "transferFeeAmount" && Number(state?.withheldAmount)) {
-      return "Withheld transfer fees keep it open";
-    }
-    // Their balances are encrypted, so there's no telling they're empty.
-    if (
-      extension === "confidentialTransferAccount" ||
-      extension === "confidentialTransferFeeAmount"
-    ) {
-      return "Confidential transfers keep it open";
-    }
-  }
-  return undefined;
-}
 
 /**
  * Token accounts (both token programs) of a wallet, plus the mints of those

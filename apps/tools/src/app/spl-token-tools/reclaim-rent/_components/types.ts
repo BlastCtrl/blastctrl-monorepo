@@ -30,6 +30,13 @@ export function excessLamports(account: ReclaimableAccount) {
 }
 
 /**
+ * What the service fee is a share of: only the excess, even for accounts
+ * that get closed and return their whole deposit.
+ */
+export const feeBase = (accounts: ReclaimableAccount[]) =>
+  accounts.reduce((sum, a) => sum + excessLamports(a), 0);
+
+/**
  * Whether reclaiming closes this account instead of withdrawing its excess:
  * an empty token account the wallet is free to close, with closing on.
  */
@@ -54,6 +61,39 @@ export function reclaimLamports(
   return closes(account, closeEmpty)
     ? account.lamports
     : excessLamports(account);
+}
+
+/** The parts of a jsonParsed token account that decide whether it can close. */
+export type ParsedTokenState = {
+  state: string;
+  closeAuthority?: string;
+  /** Token-2022 only. */
+  extensions?: { extension: string; state?: Record<string, unknown> }[];
+};
+
+/**
+ * Why the owner couldn't close this token account even once it's empty.
+ * Closing fails for the whole transaction, so anything doubtful stays open
+ * and only gives up its excess.
+ */
+export function keepOpenReason(info: ParsedTokenState, owner: string) {
+  if (info.state === "frozen") return "Frozen, so it stays open";
+  if (info.closeAuthority && info.closeAuthority !== owner) {
+    return "Only its close authority can close it";
+  }
+  for (const { extension, state } of info.extensions ?? []) {
+    if (extension === "transferFeeAmount" && Number(state?.withheldAmount)) {
+      return "Withheld transfer fees keep it open";
+    }
+    // Their balances are encrypted, so there's no telling they're empty.
+    if (
+      extension === "confidentialTransferAccount" ||
+      extension === "confidentialTransferFeeAmount"
+    ) {
+      return "Confidential transfers keep it open";
+    }
+  }
+  return undefined;
 }
 
 export type MintLookup =

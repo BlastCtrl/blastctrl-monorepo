@@ -3,8 +3,8 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
 export type ServiceFee = {
   recipient: PublicKey;
   /**
-   * Share of what a reclaim returns (the excess, plus the whole deposit of
-   * accounts it closes), in basis points (500 = 5%).
+   * Share of the reclaimed excess, in basis points (500 = 5%). Closed
+   * accounts return their whole deposit, but only their excess counts.
    */
   basisPoints: number;
 };
@@ -30,12 +30,12 @@ export const SERVICE_FEE = parseServiceFee(
   process.env.NEXT_PUBLIC_RECLAIM_RENT_FEE_BPS,
 );
 
-/** The fee on this much reclaimed SOL, rounded down to whole lamports. */
+/** The fee on this much reclaimed excess, rounded down to whole lamports. */
 export function serviceFeeLamports(
-  reclaimedLamports: number,
+  excessLamports: number,
   fee: ServiceFee | null = SERVICE_FEE,
 ) {
-  return fee ? Math.floor((reclaimedLamports * fee.basisPoints) / 10_000) : 0;
+  return fee ? Math.floor((excessLamports * fee.basisPoints) / 10_000) : 0;
 }
 
 export function formatFeeRate(fee: ServiceFee) {
@@ -49,10 +49,10 @@ export function formatFeeRate(fee: ServiceFee) {
  */
 export function createServiceFeeInstruction(
   wallet: PublicKey,
-  reclaimedLamports: number,
+  excessLamports: number,
   fee: ServiceFee,
 ) {
-  const lamports = serviceFeeLamports(reclaimedLamports, fee);
+  const lamports = serviceFeeLamports(excessLamports, fee);
   if (lamports === 0) return null;
   return SystemProgram.transfer({
     fromPubkey: wallet,

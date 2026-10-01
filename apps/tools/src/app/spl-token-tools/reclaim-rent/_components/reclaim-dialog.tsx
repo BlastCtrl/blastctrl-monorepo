@@ -5,7 +5,7 @@ import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/20/solid";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useState } from "react";
-import { SERVICE_FEE, formatFeeRate, serviceFeeLamports } from "./fee";
+import { SERVICE_FEE, serviceFeeLamports } from "./fee";
 import {
   ACCOUNTS_PER_TRANSACTION,
   FEE_PER_TRANSACTION,
@@ -13,7 +13,7 @@ import {
   remainingSteps,
 } from "./rent";
 import type { ReclaimableAccount } from "./types";
-import { closes, excessLamports, reclaimLamports } from "./types";
+import { closes, excessLamports, feeBase, reclaimLamports } from "./types";
 import { WalletRefusedError, useReclaimExcess } from "./use-reclaim-excess";
 import { useRentRate } from "./use-rent-rate";
 
@@ -42,6 +42,10 @@ type Props = {
   onClose: () => void;
 };
 
+/** What a batch puts in the wallet: after its service and network fees. */
+const afterFees = (batch: Batch) =>
+  batch.lamports - batch.fee - FEE_PER_TRANSACTION;
+
 function toBatches(
   accounts: ReclaimableAccount[],
   closeEmpty: boolean,
@@ -56,7 +60,7 @@ function toBatches(
     batches.push({
       accounts: slice,
       lamports,
-      fee: serviceFeeLamports(lamports),
+      fee: serviceFeeLamports(feeBase(slice)),
       status: "queued",
     });
   }
@@ -83,7 +87,7 @@ export function ReclaimDialog({
   const net = total - fees;
   const confirmed = batches.filter((b) => b.status === "confirmed");
   const failed = batches.filter((b) => b.status === "failed");
-  const reclaimed = confirmed.reduce((sum, b) => sum + b.lamports - b.fee, 0);
+  const reclaimed = confirmed.reduce((sum, b) => sum + afterFees(b), 0);
   const busy = phase === "signing" || phase === "sending";
   const closing = accounts.filter((a) => closes(a, closeEmpty)).length;
 
@@ -137,8 +141,14 @@ export function ReclaimDialog({
         setPhase("done");
         return;
       }
-      // Nothing was sent (usually the wallet rejected signing).
-      indexes.forEach((i) => setStatus(i, { status: "queued" }));
+      // Nothing was sent (usually the wallet rejected signing). Only what
+      // was waiting goes back to the queue; nothing confirmed is ever sent
+      // again.
+      setBatches((prev) =>
+        prev.map((b) =>
+          b.status === "sending" ? { ...b, status: "queued" } : b,
+        ),
+      );
       setPhase(
         batches.some((b) => b.status === "confirmed") ? "done" : "review",
       );
@@ -433,7 +443,7 @@ function BatchList({ batches }: { batches: Batch[] }) {
               batch.status === "failed" && "line-through",
             )}
           >
-            {formatSol(batch.lamports - batch.fee)} SOL
+            {formatSol(afterFees(batch))} SOL
           </div>
         </li>
       ))}

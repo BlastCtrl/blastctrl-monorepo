@@ -7,7 +7,7 @@ import {
   SystemProgram,
   Transaction,
 } from "@solana/web3.js";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseServiceFee } from "./fee";
 import { ACCOUNTS_PER_TRANSACTION } from "./rent";
 import type { ReclaimableAccount } from "./types";
@@ -118,7 +118,7 @@ describe("buildReclaimTransaction, closing empty accounts", () => {
     expect(close!.keys[2]!.isSigner).toBe(true);
   });
 
-  it("takes the fee from the whole deposit of a closed account", () => {
+  it("takes the fee from the excess only, even of a closed account", () => {
     const tx = buildReclaimTransaction(
       [tokenAccount(), tokenAccount({ isEmpty: false, tokenBalance: "5" })],
       wallet,
@@ -128,8 +128,23 @@ describe("buildReclaimTransaction, closing empty accounts", () => {
     );
     const transfer = tx.instructions[2]!;
     expect(transfer.programId.equals(SystemProgram.programId)).toBe(true);
-    // 5% of 2,039,280 (closed) + 550,840 (excess) lamports.
-    expect(Number(transfer.data.readBigUInt64LE(4))).toBe(129_506);
+    // 5% of 550,840 + 550,840 lamports of excess. The closed account
+    // returns all 2,039,280, but its 1,488,440 minimum carries no fee.
+    expect(Number(transfer.data.readBigUInt64LE(4))).toBe(55_084);
+  });
+
+  it("charges nothing for closing an account with no excess", () => {
+    const atMinimum = tokenAccount({ lamports: 1_488_440 });
+    const tx = buildReclaimTransaction(
+      [atMinimum],
+      wallet,
+      lifetime,
+      fee,
+      true,
+    );
+    expect(tx.instructions.map((ix) => ix.data[0])).toEqual([
+      CLOSE_ACCOUNT_INSTRUCTION,
+    ]);
   });
 });
 
@@ -191,6 +206,7 @@ describe("isWalletRefusal", () => {
   it("knows a refusal by its code or its message", () => {
     expect(isWalletRefusal(Error("User rejected the request."))).toBe(true);
     expect(isWalletRefusal(Error("Approval Denied"))).toBe(true);
+    expect(isWalletRefusal(Error("User declined the request"))).toBe(true);
     // The adapter wraps the wallet's error and keeps it as `error`.
     const wrapped = Object.assign(Error("Unexpected error"), {
       error: { code: 4001 },
@@ -260,6 +276,63 @@ describe("sendBatches with a wallet that asks per transaction", () => {
       "confirmed",
       "confirmed",
     ]);
+  });
+
+  describe("when the RPC stops giving out blockhashes", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** The `n`th blockhash (from 1) and every one after it fail. */
+    const runFailingFrom = async (n: number) => {
+      vi.useFakeTimers();
+      let handedOut = 0;
+      let prompts = 0;
+      const results: BatchResult[] = [];
+      const pending = sendBatches(
+        batches,
+        {
+          connection: {
+            ...connection,
+            getLatestBlockhash: async () => {
+              if (handedOut === n - 1) throw Error("fetch failed");
+              handedOut++;
+              return lifetime;
+            },
+          } as unknown as Connection,
+          wallet: {
+            signAllTransactions: undefined,
+            sendTransaction: async () => `signature-${++prompts}`,
+          },
+          build: () => new Transaction(),
+        },
+        { onBatchResult: (result) => results.push(result) },
+      ).catch((err: unknown) => err);
+      // Let the retries' backoff run out.
+      await vi.runAllTimersAsync();
+      return { outcome: await pending, prompts, results };
+    };
+
+    it("fails the rest once some have gone out, instead of saying nothing was sent", async () => {
+      const { outcome, prompts, results } = await runFailingFrom(3);
+      expect(outcome).toBeUndefined();
+      expect(prompts).toBe(2);
+      expect(results.map((r) => r.status)).toEqual([
+        "confirmed",
+        "confirmed",
+        "failed",
+        "failed",
+        "failed",
+      ]);
+    });
+
+    it("throws when nothing has gone out yet", async () => {
+      const { outcome, prompts, results } = await runFailingFrom(1);
+      expect(outcome).toBeInstanceOf(Error);
+      expect(outcome).not.toBeInstanceOf(WalletRefusedError);
+      expect(prompts).toBe(0);
+      expect(results).toEqual([]);
+    });
   });
 });
 

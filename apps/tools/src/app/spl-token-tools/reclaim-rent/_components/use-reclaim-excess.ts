@@ -13,7 +13,7 @@ import { useMutation } from "@tanstack/react-query";
 import type { ServiceFee } from "./fee";
 import { SERVICE_FEE, createServiceFeeInstruction } from "./fee";
 import type { ReclaimableAccount } from "./types";
-import { closes, reclaimLamports } from "./types";
+import { closes, feeBase } from "./types";
 
 export type BatchResult =
   | { index: number; status: "confirmed"; signature: string }
@@ -101,7 +101,9 @@ export function isWalletRefusal(err: unknown) {
   if ([err, inner].some((e) => (e as { code?: unknown })?.code === 4001)) {
     return true;
   }
-  return err instanceof Error && /reject|denied|cancel/i.test(err.message);
+  return (
+    err instanceof Error && /reject|denied|declined|cancel/i.test(err.message)
+  );
 }
 
 type Sender = {
@@ -166,7 +168,23 @@ export async function sendBatches(
   // confirmation, so by the time one is turned down, every batch before it
   // has reported.
   for (const [sent, batch] of batches.entries()) {
-    const lifetime = await latestBlockhash(connection);
+    let lifetime: Lifetime;
+    try {
+      lifetime = await latestBlockhash(connection);
+    } catch (err) {
+      if (sent === 0) throw err;
+      // Earlier batches went out, so this isn't "nothing was sent". The RPC
+      // is likely down: fail this batch and the rest rather than wait on
+      // each in turn.
+      for (const rest of batches.slice(sent)) {
+        onBatchResult({
+          index: rest.index,
+          status: "failed",
+          error: errorMessage(err),
+        });
+      }
+      return;
+    }
     onStage?.(batch.index, "signing");
     let signature: string;
     try {
@@ -234,11 +252,11 @@ export function buildReclaimTransaction(
     }),
   );
   if (fee) {
-    const reclaimed = accounts.reduce(
-      (sum, a) => sum + reclaimLamports(a, closeEmpty),
-      0,
+    const transfer = createServiceFeeInstruction(
+      wallet,
+      feeBase(accounts),
+      fee,
     );
-    const transfer = createServiceFeeInstruction(wallet, reclaimed, fee);
     if (transfer) tx.add(transfer);
   }
   return tx;

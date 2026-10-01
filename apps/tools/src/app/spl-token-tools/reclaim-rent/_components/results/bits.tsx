@@ -1,7 +1,6 @@
 import { CheckIcon, ChevronDownIcon } from "@heroicons/react/20/solid";
 import { SpinnerIcon, cn } from "@blastctrl/ui";
 import type { ReactNode } from "react";
-import { formatSol } from "../rent";
 import { GREEN, INK } from "./look";
 import type { RewardProps, RewardStatus } from "./types";
 import { fromWhere } from "./types";
@@ -38,7 +37,7 @@ export const HEADLINES: Partial<Record<RewardStatus, string>> = {
 export function sharedDetail(p: RewardProps): ReactNode {
   switch (p.status) {
     case "fees-exceed":
-      return `The network fee of ${formatSol(p.networkFee)} SOL is more than these accounts hold extra. Rent drops again in November, so check back then.`;
+      return "The fees are more than these accounts hold extra. Rent drops again in November, so check back then.";
     case "nothing":
       return "Every account in this wallet is already at the minimum. Rent drops again in November, so check back then.";
     case "reclaimed":

@@ -34,7 +34,6 @@ export type RewardProps = {
   /** What lands in the wallet after network and service fees. */
   net: number;
   serviceFeeRate: string;
-  networkFee: number;
   tokenAccounts: number;
   mints: number;
   /** Token accounts the reclaim closes; for "reclaimed", the ones it closed. */
