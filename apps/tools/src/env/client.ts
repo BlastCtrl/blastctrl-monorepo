@@ -4,9 +4,9 @@ import { z } from "zod";
 export const env = createEnv({
   clientPrefix: "NEXT_PUBLIC_",
   client: {
-    NEXT_PUBLIC_RPC_ENDPOINT: z.string().url(),
-    NEXT_PUBLIC_DAS_API: z.string().url(),
-    NEXT_PUBLIC_DAS_API_DEVNET: z.string().url().optional(),
+    NEXT_PUBLIC_RPC_ENDPOINT: z.url(),
+    NEXT_PUBLIC_DAS_API: z.url(),
+    NEXT_PUBLIC_DAS_API_DEVNET: z.url().optional(),
     // Reclaim-rent tool: the wallet that receives the service fee and the
     // fee as a share of the reclaimed excess, in basis points (500 = 5%).
     // Leave both unset (or the rate at 0) for no fee.

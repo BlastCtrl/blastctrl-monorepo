@@ -23,7 +23,7 @@ export async function POST(req: Request) {
 
     if (validatedBody.success === false) {
       throw Error(
-        validatedBody.error.errors[0]?.message ?? "Invalid request body",
+        validatedBody.error.issues[0]?.message ?? "Invalid request body",
       );
     }
     const connection = new Connection(process.env.NEXT_PUBLIC_RPC_ENDPOINT!);
