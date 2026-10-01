@@ -16,7 +16,7 @@
     "build": "tsc"
   },
   "devDependencies": {
-    "orval": "^7.21.0",
+    "orval": "^8.38.0",
     "typescript": "^5.8.3"
   }
 }

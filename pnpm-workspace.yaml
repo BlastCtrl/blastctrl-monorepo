@@ -22,6 +22,15 @@ minimumReleaseAgeExclude:
   - "@next/*"
 patchedDependencies:
   "@ardrive/turbo-sdk@1.41.1": "patches/@ardrive__turbo-sdk@1.41.1.patch"
+# The zod resolver imports zod without declaring it, so it would get whichever
+# zod pnpm hoists. orval brings in zod 4, which breaks our zod 3 schemas.
+packageExtensions:
+  "@hookform/resolvers@3":
+    peerDependencies:
+      zod: "^3"
+    peerDependenciesMeta:
+      zod:
+        optional: true
 peerDependencyRules:
   allowedVersions:
     "@solana/kit": "2 || 5"
@@ -31,3 +40,4 @@ overrides:
   "undici@<6.24.0": "^6.24.0"
   "ws@<7.5.10": "^7.5.10"
   "secp256k1@5.0.0": "^5.0.1"
+  "shell-quote@<1.8.4": "^1.8.4"
