@@ -2,7 +2,10 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
 
 export type ServiceFee = {
   recipient: PublicKey;
-  /** Share of the reclaimed excess, in basis points (500 = 5%). */
+  /**
+   * Share of what a reclaim returns (the excess, plus the whole deposit of
+   * accounts it closes), in basis points (500 = 5%).
+   */
   basisPoints: number;
 };
 
@@ -27,12 +30,12 @@ export const SERVICE_FEE = parseServiceFee(
   process.env.NEXT_PUBLIC_RECLAIM_RENT_FEE_BPS,
 );
 
-/** The fee on this much reclaimed excess, rounded down to whole lamports. */
+/** The fee on this much reclaimed SOL, rounded down to whole lamports. */
 export function serviceFeeLamports(
-  excessLamports: number,
+  reclaimedLamports: number,
   fee: ServiceFee | null = SERVICE_FEE,
 ) {
-  return fee ? Math.floor((excessLamports * fee.basisPoints) / 10_000) : 0;
+  return fee ? Math.floor((reclaimedLamports * fee.basisPoints) / 10_000) : 0;
 }
 
 export function formatFeeRate(fee: ServiceFee) {
@@ -41,15 +44,15 @@ export function formatFeeRate(fee: ServiceFee) {
 
 /**
  * One transfer for the whole batch, paid by the wallet. It goes after the
- * withdrawals in the transaction, so the reclaimed SOL is there to pay it.
- * Returns nothing when the fee rounds down to zero.
+ * withdrawals and closes in the transaction, so the reclaimed SOL is there to
+ * pay it. Returns nothing when the fee rounds down to zero.
  */
 export function createServiceFeeInstruction(
   wallet: PublicKey,
-  excessLamports: number,
+  reclaimedLamports: number,
   fee: ServiceFee,
 ) {
-  const lamports = serviceFeeLamports(excessLamports, fee);
+  const lamports = serviceFeeLamports(reclaimedLamports, fee);
   if (lamports === 0) return null;
   return SystemProgram.transfer({
     fromPubkey: wallet,

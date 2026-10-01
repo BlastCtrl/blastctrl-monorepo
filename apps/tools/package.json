@@ -53,6 +53,7 @@
     "bs58": "4.0.1",
     "cache-manager": "^5.5.2",
     "clsx": "^2.1.1",
+    "cuelume": "^0.2.4",
     "date-fns": "^3.6.0",
     "decimal.js": "^10.6.0",
     "devalue": "^5.7.1",

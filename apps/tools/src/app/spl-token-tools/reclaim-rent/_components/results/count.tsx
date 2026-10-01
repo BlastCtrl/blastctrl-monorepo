@@ -7,7 +7,7 @@ import {
 } from "motion/react";
 import type { HTMLAttributes } from "react";
 import { useEffect, useLayoutEffect, useRef } from "react";
-import { formatSol } from "../../_components/rent";
+import { formatSol } from "../rent";
 import { COUNT_EASE, SETTLE } from "./look";
 
 const formats = new Map<number, Intl.NumberFormat>();

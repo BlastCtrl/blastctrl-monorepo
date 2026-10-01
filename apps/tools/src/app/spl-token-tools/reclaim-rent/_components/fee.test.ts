@@ -64,6 +64,7 @@ describe("buildReclaimTransaction", () => {
       wallet,
       lifetime,
       fee,
+      false,
     );
     expect(tx.instructions).toHaveLength(4);
     const transfer = tx.instructions[3]!;
@@ -79,7 +80,7 @@ describe("buildReclaimTransaction", () => {
   it("adds nothing when there is no fee or it rounds to zero", () => {
     const fee = parseServiceFee(recipient, "500")!;
     expect(
-      buildReclaimTransaction([account("token")], wallet, lifetime, null)
+      buildReclaimTransaction([account("token")], wallet, lifetime, null, false)
         .instructions,
     ).toHaveLength(1);
     expect(
@@ -88,6 +89,7 @@ describe("buildReclaimTransaction", () => {
         wallet,
         lifetime,
         fee,
+        false,
       ).instructions,
     ).toHaveLength(1);
   });

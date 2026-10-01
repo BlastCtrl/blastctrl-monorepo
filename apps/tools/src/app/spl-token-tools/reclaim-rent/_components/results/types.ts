@@ -37,7 +37,7 @@ export type RewardProps = {
   networkFee: number;
   tokenAccounts: number;
   mints: number;
-  /** Selected token accounts that hold no tokens, and get closed. */
+  /** Token accounts the reclaim closes; for "reclaimed", the ones it closed. */
   emptyAccounts: number;
   transactions: number;
   /** For "reclaimed": what went back to the wallet. */
@@ -48,12 +48,21 @@ export type RewardProps = {
   failed: { transactions: number; of: number; accounts: number } | null;
   /** The wallet turned the request down; changes each time it happens. */
   rejectedAt: number | null;
+  /**
+   * When the refusal came partway through, from a wallet that asks per
+   * transaction: how many had gone out before it.
+   */
+  cancelledAfter: { transactions: number; of: number } | null;
   /** Play the arrival on mount. False for later renders of the same results. */
   reveal: boolean;
   /** Skip every animation: the OS setting, or the demo's toggle. */
   reduced: boolean;
   onReclaim: () => void;
   onRescan: () => void;
+  /** The detailed view below the stage, where accounts get picked. */
+  detailsId: string;
+  detailsOpen: boolean;
+  onToggleDetails: () => void;
 };
 
 export function fromWhere(tokenAccounts: number, mints: number) {
@@ -65,8 +74,8 @@ export function fromWhere(tokenAccounts: number, mints: number) {
   return parts.join(" and ");
 }
 
-export function transactionsNote(transactions: number, feeRate: string) {
-  const n =
-    transactions === 1 ? "One transaction" : `${transactions} transactions`;
-  return `${n}, after a ${feeRate} fee`;
+export function transactionCount(transactions: number) {
+  return transactions === 1
+    ? "One transaction"
+    : `${transactions} transactions`;
 }

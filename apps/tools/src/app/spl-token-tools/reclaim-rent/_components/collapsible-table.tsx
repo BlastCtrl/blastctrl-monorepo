@@ -2,7 +2,7 @@ import { ChevronRightIcon } from "@heroicons/react/20/solid";
 import type { ComponentProps } from "react";
 import { AccountTable } from "./account-table";
 import { formatSol } from "./rent";
-import { excessLamports } from "./types";
+import { reclaimLamports } from "./types";
 
 type Props = ComponentProps<typeof AccountTable> & {
   /** "accounts" or "mints", for the summary line. */
@@ -15,12 +15,15 @@ type Props = ComponentProps<typeof AccountTable> & {
  * there for anyone who wants to leave some accounts out.
  */
 export function CollapsibleTable({ noun, ...table }: Props) {
-  const { accounts, selectedIds, reclaimedIds } = table;
+  const { accounts, selectedIds, reclaimedIds, closeEmpty = false } = table;
   const selectable = accounts.filter(
     (a) => !a.blockedReason && !reclaimedIds.has(a.id),
   );
   const selected = selectable.filter((a) => selectedIds.has(a.id));
-  const lamports = selected.reduce((sum, a) => sum + excessLamports(a), 0);
+  const lamports = selected.reduce(
+    (sum, a) => sum + reclaimLamports(a, closeEmpty),
+    0,
+  );
   const reclaimed = accounts.filter((a) => reclaimedIds.has(a.id)).length;
 
   const summary = [

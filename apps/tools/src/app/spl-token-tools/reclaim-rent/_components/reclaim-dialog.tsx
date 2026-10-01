@@ -13,13 +13,16 @@ import {
   remainingSteps,
 } from "./rent";
 import type { ReclaimableAccount } from "./types";
-import { excessLamports } from "./types";
-import { useReclaimExcess } from "./use-reclaim-excess";
+import { closes, excessLamports, reclaimLamports } from "./types";
+import { WalletRefusedError, useReclaimExcess } from "./use-reclaim-excess";
 import { useRentRate } from "./use-rent-rate";
 
 type Batch = {
   accounts: ReclaimableAccount[];
-  /** Excess rent in the batch, before any fees. */
+  /**
+   * What the batch returns before any fees: the excess rent, plus the whole
+   * deposit of the accounts it closes.
+   */
   lamports: number;
   /** Service fee for the batch. */
   fee: number;
@@ -32,16 +35,24 @@ type Phase = "review" | "signing" | "sending" | "done";
 
 type Props = {
   accounts: ReclaimableAccount[];
+  /** Close the empty token accounts instead of withdrawing their excess. */
+  closeEmpty: boolean;
   onConfirmed: (ids: string[]) => void;
   onSettled?: () => void;
   onClose: () => void;
 };
 
-function toBatches(accounts: ReclaimableAccount[]): Batch[] {
+function toBatches(
+  accounts: ReclaimableAccount[],
+  closeEmpty: boolean,
+): Batch[] {
   const batches: Batch[] = [];
   for (let i = 0; i < accounts.length; i += ACCOUNTS_PER_TRANSACTION) {
     const slice = accounts.slice(i, i + ACCOUNTS_PER_TRANSACTION);
-    const lamports = slice.reduce((sum, a) => sum + excessLamports(a), 0);
+    const lamports = slice.reduce(
+      (sum, a) => sum + reclaimLamports(a, closeEmpty),
+      0,
+    );
     batches.push({
       accounts: slice,
       lamports,
@@ -54,6 +65,7 @@ function toBatches(accounts: ReclaimableAccount[]): Batch[] {
 
 export function ReclaimDialog({
   accounts,
+  closeEmpty,
   onConfirmed,
   onSettled,
   onClose,
@@ -61,7 +73,7 @@ export function ReclaimDialog({
   const { publicKey } = useWallet();
   const stepsLeft = remainingSteps(useRentRate().lamportsPerByte);
   const [phase, setPhase] = useState<Phase>("review");
-  const [batches, setBatches] = useState(() => toBatches(accounts));
+  const [batches, setBatches] = useState(() => toBatches(accounts, closeEmpty));
   const [signingCount, setSigningCount] = useState(0);
 
   const total = batches.reduce((sum, b) => sum + b.lamports, 0);
@@ -73,6 +85,7 @@ export function ReclaimDialog({
   const failed = batches.filter((b) => b.status === "failed");
   const reclaimed = confirmed.reduce((sum, b) => sum + b.lamports - b.fee, 0);
   const busy = phase === "signing" || phase === "sending";
+  const closing = accounts.filter((a) => closes(a, closeEmpty)).length;
 
   const setStatus = (index: number, patch: Partial<Batch>) =>
     setBatches((prev) =>
@@ -107,9 +120,23 @@ export function ReclaimDialog({
           index,
           accounts: batches[index]!.accounts,
         })),
+        closeEmpty,
       });
       setPhase("done");
     } catch (err) {
+      if (err instanceof WalletRefusedError && err.sent > 0) {
+        // The wallet stopped partway. What went out has reported; the rest
+        // are marked so "Send failed ones again" picks them up.
+        setBatches((prev) =>
+          prev.map((b) =>
+            b.status === "sending"
+              ? { ...b, status: "failed", error: "Cancelled in your wallet" }
+              : b,
+          ),
+        );
+        setPhase("done");
+        return;
+      }
       // Nothing was sent (usually the wallet rejected signing).
       indexes.forEach((i) => setStatus(i, { status: "queued" }));
       setPhase(
@@ -156,6 +183,7 @@ export function ReclaimDialog({
             {phase === "review" ? (
               <Review
                 accounts={accounts}
+                closeEmpty={closeEmpty}
                 batches={batches}
                 wallet={publicKey?.toBase58() ?? ""}
               />
@@ -167,7 +195,7 @@ export function ReclaimDialog({
               <p className="mt-4 text-sm text-zinc-600">
                 The SOL is in your wallet.
                 {stepsLeft > 0 &&
-                  ` Rent drops ${stepsLeft === 1 ? "once more" : `${stepsLeft} more times`}, expected in November. After each drop, the same accounts will have more to reclaim.`}
+                  ` Rent drops ${stepsLeft === 1 ? "once more" : `${stepsLeft} more times`}, expected in November. After each drop, ${closing > 0 ? "the accounts still open" : "the same accounts"} will have more to reclaim.`}
               </p>
             )}
             {phase === "done" && failed.length > 0 && (
@@ -230,10 +258,12 @@ export function ReclaimDialog({
 
 function Review({
   accounts,
+  closeEmpty,
   batches,
   wallet,
 }: {
   accounts: ReclaimableAccount[];
+  closeEmpty: boolean;
   batches: Batch[];
   wallet: string;
 }) {
@@ -243,12 +273,17 @@ function Review({
   const net = total - networkFees - serviceFee;
   const mints = accounts.filter((a) => a.kind === "mint").length;
   const tokenAccounts = accounts.length - mints;
+  const closing = accounts.filter((a) => closes(a, closeEmpty));
+  const deposits = closing.reduce((sum, a) => sum + a.lamports, 0);
+  const excess = accounts
+    .filter((a) => !closes(a, closeEmpty))
+    .reduce((sum, a) => sum + excessLamports(a), 0);
+  const staying = accounts.length - closing.length;
 
   return (
     <>
       <p className="text-sm text-zinc-600">
-        Your tokens stay where they are and no account is closed. Each account
-        keeps exactly the rent it needs today, and the rest goes to your wallet.
+        {whatHappens(closing.length, staying)}
       </p>
       <dl className="mt-4 divide-y divide-zinc-100 rounded-md border border-zinc-200 text-sm">
         <Row label="From">
@@ -264,16 +299,21 @@ function Review({
           <span className="tabular-nums">{compress(wallet, 4)}</span>, your
           wallet
         </Row>
-        <Row label="Excess rent">{formatSol(total)} SOL</Row>
+        {staying > 0 && <Row label="Excess rent">{formatSol(excess)} SOL</Row>}
+        {closing.length > 0 && (
+          <Row
+            label={`Deposits, ${closing.length} closed ${closing.length === 1 ? "account" : "accounts"}`}
+          >
+            {formatSol(deposits)} SOL
+          </Row>
+        )}
         <Row
           label={`Network fees, ${batches.length} ${batches.length === 1 ? "transaction" : "transactions"}`}
         >
           −{formatSol(networkFees)} SOL
         </Row>
         {SERVICE_FEE && (
-          <Row label={`Service fee ${formatFeeRate(SERVICE_FEE)}`}>
-            −{formatSol(serviceFee)} SOL
-          </Row>
+          <Row label="Service fee">−{formatSol(serviceFee)} SOL</Row>
         )}
         <Row label="You receive" strong>
           {formatSol(net)} SOL
@@ -293,6 +333,23 @@ function Review({
       )}
     </>
   );
+}
+
+/** What the reclaim does to the accounts, before the numbers. */
+function whatHappens(closing: number, staying: number) {
+  const closed =
+    closing === 1
+      ? "The empty token account is closed and its whole deposit goes to your wallet."
+      : `The ${closing} empty token accounts are closed and their whole deposit goes to your wallet.`;
+  if (closing === 0) {
+    return "Your tokens stay where they are and no account is closed. Each account keeps exactly the rent it needs today, and the rest goes to your wallet.";
+  }
+  if (staying === 0) return closed;
+  return `Your tokens stay where they are. ${closed} ${
+    staying === 1
+      ? "The other account stays open with exactly the rent it needs today, and the rest goes to your wallet."
+      : `The other ${staying} stay open with exactly the rent they need today, and the rest goes to your wallet.`
+  }`;
 }
 
 function Row({
