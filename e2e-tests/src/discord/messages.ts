@@ -1,5 +1,5 @@
 import { formatNumber } from "../solana-lib.js";
-import { SwapStepData, type CleanupStepData } from "./test-reporter.js";
+import type { CleanupStepData, SwapStepData } from "./test-reporter.js";
 
 export function createInitialTestMessage(data: {
   testId: string;

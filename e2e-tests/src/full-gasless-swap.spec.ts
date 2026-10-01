@@ -7,8 +7,7 @@
 import { test, expect } from "./fixtures.js";
 import CONFIG from "./config.js";
 import { cleanWallet, sendTokensToWallet, sleep } from "./solana-lib.js";
-// @ts-expect-error not installed
-import { Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { TestReporter } from "./discord/test-reporter.js";
 import { runJupiterUltraSwap } from "./jup-ultra-swap.js";
 
