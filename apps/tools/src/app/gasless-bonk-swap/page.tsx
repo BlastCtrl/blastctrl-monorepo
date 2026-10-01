@@ -41,7 +41,7 @@ const slippages = [
 
 export default function BonkSwap() {
   const { network } = useNetworkConfigurationStore();
-  const { publicKey, signTransaction, sendTransaction } = useWallet();
+  const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
   const { setVisible } = useWalletModal();
   const {
@@ -81,7 +81,10 @@ export default function BonkSwap() {
         slippage,
       );
 
-      transaction = swap.transaction;
+      // The fee payer has already signed, so only ask the wallet to sign and
+      // send it ourselves. Phantom blocks sign-and-send requests for
+      // transactions with another signer as possibly malicious.
+      transaction = await signTransaction(swap.transaction);
     } catch (err) {
       setIsSwapping(false);
       if (err instanceof WalletSignTransactionError) return;
@@ -91,7 +94,9 @@ export default function BonkSwap() {
         description: err instanceof Error ? err.message : String(err),
       });
     }
-    const signature = await sendTransaction(transaction, connection);
+    const signature = await connection.sendRawTransaction(
+      transaction.serialize(),
+    );
     const { value } = await connection.getLatestBlockhashAndContext();
 
     await notifyPromise(

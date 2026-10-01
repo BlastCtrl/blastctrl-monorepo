@@ -38,7 +38,7 @@ type SelectToken = {
 
 export default function GaslessSwap() {
   const { network } = useNetworkConfigurationStore();
-  const { publicKey, signTransaction, sendTransaction } = useWallet();
+  const { publicKey, signTransaction } = useWallet();
   const { setVisible } = useWalletModal();
   const {
     register,
@@ -90,7 +90,10 @@ export default function GaslessSwap() {
         slippage,
       );
 
-      transaction = swap.transaction;
+      // The fee payer has already signed, so only ask the wallet to sign and
+      // send it ourselves. Phantom blocks sign-and-send requests for
+      // transactions with another signer as possibly malicious.
+      transaction = await signTransaction(swap.transaction);
       quote = swap.quote;
     } catch (err) {
       setIsSwapping(false);
@@ -107,7 +110,9 @@ export default function GaslessSwap() {
       description: "Confirming transaction",
     });
     try {
-      const signature = await sendTransaction(transaction, connection);
+      const signature = await connection.sendRawTransaction(
+        transaction.serialize(),
+      );
       const { value } = await connection.getLatestBlockhashAndContext();
       const res = await connection.confirmTransaction(
         { signature, ...value },
