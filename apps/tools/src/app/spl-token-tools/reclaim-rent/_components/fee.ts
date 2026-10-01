@@ -2,7 +2,10 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
 
 export type ServiceFee = {
   recipient: PublicKey;
-  /** Share of the reclaimed excess, in basis points (500 = 5%). */
+  /**
+   * Share of the reclaimed excess, in basis points (500 = 5%). Closed
+   * accounts return their whole deposit, but only their excess counts.
+   */
   basisPoints: number;
 };
 
@@ -41,8 +44,8 @@ export function formatFeeRate(fee: ServiceFee) {
 
 /**
  * One transfer for the whole batch, paid by the wallet. It goes after the
- * withdrawals in the transaction, so the reclaimed SOL is there to pay it.
- * Returns nothing when the fee rounds down to zero.
+ * withdrawals and closes in the transaction, so the reclaimed SOL is there to
+ * pay it. Returns nothing when the fee rounds down to zero.
  */
 export function createServiceFeeInstruction(
   wallet: PublicKey,

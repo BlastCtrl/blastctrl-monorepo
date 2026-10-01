@@ -1,7 +1,9 @@
 import type {
   MintLookup,
+  ParsedTokenState,
   ReclaimableAccount,
 } from "@/app/spl-token-tools/reclaim-rent/_components/types";
+import { keepOpenReason } from "@/app/spl-token-tools/reclaim-rent/_components/types";
 import { compress } from "@/lib/solana/common";
 import { chunk } from "@/lib/utils";
 import {
@@ -20,11 +22,10 @@ import { assetDataQueryKey } from "./use-asset-data";
 const reclaimableAccountsKey = (owner: string, network: string) =>
   ["reclaimable-accounts", owner, network] as const;
 
-type ParsedTokenAccountInfo = {
+type ParsedTokenAccountInfo = ParsedTokenState & {
   mint: string;
   owner: string;
   isNative: boolean;
-  state: string;
   tokenAmount: { amount: string; uiAmountString: string };
 };
 
@@ -129,6 +130,7 @@ async function fetchTokenAccounts(connection: Connection, owner: string) {
           blockedReason: info.isNative
             ? "Wrapped SOL accounts aren't supported"
             : undefined,
+          keepOpenReason: keepOpenReason(info, owner),
         };
       });
     }),

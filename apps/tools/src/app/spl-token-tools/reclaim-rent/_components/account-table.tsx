@@ -6,12 +6,16 @@ import { useLayoutEffect, useRef } from "react";
 import { formatSol } from "./rent";
 import { TokenAvatar } from "./token-avatar";
 import type { ReclaimableAccount } from "./types";
-import { excessLamports } from "./types";
+import { closes, reclaimLamports } from "./types";
 
 type Props = {
   accounts: ReclaimableAccount[];
   selectedIds: Set<string>;
   reclaimedIds: Set<string>;
+  /** Of the reclaimed accounts, the ones a reclaim closed. */
+  closedIds?: Set<string>;
+  /** Empty token accounts get closed, so all they hold is reclaimable. */
+  closeEmpty?: boolean;
   onToggle: (id: string) => void;
   onToggleAll: (select: boolean) => void;
 };
@@ -20,6 +24,8 @@ export function AccountTable({
   accounts,
   selectedIds,
   reclaimedIds,
+  closedIds,
+  closeEmpty = false,
   onToggle,
   onToggleAll,
 }: Props) {
@@ -67,6 +73,8 @@ export function AccountTable({
               account={account}
               selected={selectedIds.has(account.id)}
               reclaimed={reclaimedIds.has(account.id)}
+              closed={!!closedIds?.has(account.id)}
+              closeEmpty={closeEmpty}
               onToggle={() => onToggle(account.id)}
             />
           ))}
@@ -80,15 +88,19 @@ function AccountRow({
   account,
   selected,
   reclaimed,
+  closed,
+  closeEmpty,
   onToggle,
 }: {
   account: ReclaimableAccount;
   selected: boolean;
   reclaimed: boolean;
+  closed: boolean;
+  closeEmpty: boolean;
   onToggle: () => void;
 }) {
   const disabled = !!account.blockedReason || reclaimed;
-  const excess = excessLamports(account);
+  const closing = closes(account, closeEmpty);
 
   return (
     <tr
@@ -142,6 +154,10 @@ function AccountRow({
                   {account.tokenBalance} {account.symbol}
                 </span>
               )}
+              {closeEmpty &&
+                account.isEmpty &&
+                account.keepOpenReason &&
+                !disabled && <span>{account.keepOpenReason}</span>}
             </div>
           </div>
         </div>
@@ -153,7 +169,12 @@ function AccountRow({
       </td>
       <td className="hidden px-3 py-2 md:table-cell">
         {!account.blockedReason && (
-          <DepositBar account={account} reclaimed={reclaimed} />
+          <DepositBar
+            account={account}
+            reclaimed={reclaimed}
+            closing={closing}
+            closed={closed}
+          />
         )}
       </td>
       <td className="px-3 py-2 text-right">
@@ -162,12 +183,12 @@ function AccountRow({
         ) : reclaimed ? (
           <span className="inline-flex items-center gap-1 font-medium text-green-700">
             <CheckCircleIcon className="size-4" aria-hidden="true" />
-            Reclaimed
+            {closed ? "Closed" : "Reclaimed"}
           </span>
         ) : (
           <div>
             <div className="font-medium whitespace-nowrap text-zinc-900 tabular-nums">
-              {formatSol(excess, 6, 6)} SOL
+              {formatSol(reclaimLamports(account, closeEmpty), 6, 6)} SOL
             </div>
           </div>
         )}
@@ -176,17 +197,23 @@ function AccountRow({
   );
 }
 
-/** What the account holds, split into what must stay and what can leave. */
+/**
+ * What the account holds, split into what must stay and what can leave. All
+ * of it leaves when the account gets closed.
+ */
 function DepositBar({
   account,
   reclaimed,
+  closing,
+  closed,
 }: {
   account: ReclaimableAccount;
   reclaimed: boolean;
+  closing: boolean;
+  closed: boolean;
 }) {
   const needed = account.minimum;
-  const excess = excessLamports(account);
-  const neededShare = (needed / account.lamports) * 100;
+  const neededShare = closing || closed ? 0 : (needed / account.lamports) * 100;
 
   return (
     <div className="w-36">
@@ -198,9 +225,13 @@ function DepositBar({
         />
       </div>
       <div className="mt-1 text-xs whitespace-nowrap text-zinc-500 tabular-nums">
-        {reclaimed
-          ? `Holds ${formatSol(needed, 5, 5)}, the minimum`
-          : `Holds ${formatSol(needed + excess, 5, 5)}, needs ${formatSol(needed, 5, 5)}`}
+        {closed
+          ? `Closed, ${formatSol(account.lamports, 5, 5)} returned`
+          : reclaimed
+            ? `Holds ${formatSol(needed, 5, 5)}, the minimum`
+            : closing
+              ? `Holds ${formatSol(account.lamports, 5, 5)}, all returned`
+              : `Holds ${formatSol(account.lamports, 5, 5)}, needs ${formatSol(needed, 5, 5)}`}
       </div>
     </div>
   );

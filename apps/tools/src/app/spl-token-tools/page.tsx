@@ -29,7 +29,7 @@ export default function Tokens() {
       name: "Reclaim excess rent",
       href: "/spl-token-tools/reclaim-rent",
       description:
-        "Solana lowered the deposit accounts must hold. Take back the excess SOL from your token accounts and mints without closing them.",
+        "Solana lowered the deposit accounts must hold. Take back the excess SOL from your token accounts and mints.",
       active: true,
     },
     {
