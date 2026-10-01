@@ -3,7 +3,7 @@ import { z } from "zod";
 
 export const env = createEnv({
   server: {
-    REDIS_URL: z.string().url(),
+    REDIS_URL: z.url(),
     REDIS_TOKEN: z.string().min(1),
     OCTANE_SECRET_KEYPAIR: z.string().min(1),
     BONK_BURN_FEE_BPS: z
@@ -17,7 +17,7 @@ export const env = createEnv({
         (amount) => !isNaN(amount),
         "Octane platform fee must be a number",
       ),
-    BLAST_BACKEND_URL: z.string().url(),
+    BLAST_BACKEND_URL: z.url(),
   },
   runtimeEnv: process.env,
 });

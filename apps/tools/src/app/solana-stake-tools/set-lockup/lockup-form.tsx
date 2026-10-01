@@ -113,7 +113,7 @@ export function LockupFormContainer() {
           </p>
           {error instanceof ZodError ? (
             <div className="space-y-1">
-              {error.errors.map((e, i) => (
+              {error.issues.map((e, i) => (
                 <p key={i} className="font-medium text-red-600">
                   {e.path.join(".")}: {e.message}
                 </p>

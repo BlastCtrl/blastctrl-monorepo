@@ -37,6 +37,16 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+// Empty, or a valid public key. Not a union with z.literal(""): when every
+// branch fails, zod 4 reports "Invalid input" instead of our message.
+const optionalPublicKey = z
+  .string()
+  .refine((v) => v === "" || isPublicKey(v), {
+    message: "Not a valid public key",
+  })
+  .transform((v) => (v === "" ? "" : new PublicKey(v)))
+  .optional();
+
 const formSchema = z.object({
   amount: z
     .string()
@@ -46,24 +56,9 @@ const formSchema = z.object({
     .refine((amount) => amount > 0, {
       message: "Amount must be greater than 0",
     }),
-  voteAddress: z
-    .string()
-    .refine((v) => isPublicKey(v), { message: "Not a valid public key" })
-    .transform((v) => new PublicKey(v))
-    .optional()
-    .or(z.literal("")),
-  withdrawAuth: z
-    .string()
-    .refine((v) => isPublicKey(v), { message: "Not a valid public key" })
-    .transform((v) => new PublicKey(v))
-    .optional()
-    .or(z.literal("")),
-  stakerAuth: z
-    .string()
-    .refine((v) => isPublicKey(v), { message: "Not a valid public key" })
-    .transform((v) => new PublicKey(v))
-    .optional()
-    .or(z.literal("")),
+  voteAddress: optionalPublicKey,
+  withdrawAuth: optionalPublicKey,
+  stakerAuth: optionalPublicKey,
   lockTime: z
     .string()
     // TODO: need to do better validation here
@@ -92,19 +87,18 @@ export function StakeAccountForm() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<FormSchemaFields>({
+  } = useForm<FormSchemaFields, unknown, FormSchemaOutput>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       voteAddress: "GREEDkpTvpKzcGvBu9qd36yk6BfjTWPShB67gLWuixMv",
     },
   });
 
-  const onSubmit = async (values: unknown) => {
+  const onSubmit = async (data: FormSchemaOutput) => {
     if (!publicKey) {
       setVisible(true);
       return;
     }
-    const data = values as FormSchemaOutput;
     setSubmitData(data);
   };
 
