@@ -8,6 +8,7 @@ import {
 import { InfoTooltip } from "@/components/info-tooltip";
 import { notify } from "@/components/notification";
 import { isPublicKey } from "@/lib/solana/common";
+import { signWithWalletFirst } from "@/lib/solana/send";
 import { retryWithBackoff } from "@/lib/utils";
 import { Button, cn, SpinnerIcon, Switch, SwitchGroup } from "@blastctrl/ui";
 import {
@@ -72,7 +73,7 @@ type FormSchemaOutput = z.output<typeof formSchema>;
 
 export function StakeAccountForm() {
   const { connection } = useConnection();
-  const { publicKey, sendTransaction } = useWallet();
+  const { publicKey, signTransaction } = useWallet();
   const { setVisible } = useWalletModal();
   const [isConfirming, setIsConfirming] = useState(false);
   const [useLockup, setUseLockup] = useState(false);
@@ -103,7 +104,7 @@ export function StakeAccountForm() {
   };
 
   const submitTransaction = async (data: FormSchemaOutput) => {
-    if (!sendTransaction || !publicKey) return;
+    if (!signTransaction || !publicKey) return;
 
     try {
       const { context, value } = await retryWithBackoff(() =>
@@ -171,14 +172,18 @@ export function StakeAccountForm() {
 
       tx.feePayer = publicKey;
       tx.recentBlockhash = value.blockhash;
-      tx.partialSign(signer);
 
-      const signature = await sendTransaction(tx, connection, {
-        minContextSlot: context.slot,
-        maxRetries: 0,
-        preflightCommitment: "confirmed",
-        skipPreflight: true,
-      });
+      const signed = await signWithWalletFirst(tx, signTransaction, [signer]);
+
+      const signature = await connection.sendRawTransaction(
+        signed.serialize(),
+        {
+          minContextSlot: context.slot,
+          maxRetries: 0,
+          preflightCommitment: "confirmed",
+          skipPreflight: true,
+        },
+      );
       if (!isConfirming) {
         setIsConfirming(true);
       }

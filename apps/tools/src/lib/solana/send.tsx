@@ -1,9 +1,11 @@
 import { sleep } from "@/lib/utils";
+import type { SignerWalletAdapterProps } from "@solana/wallet-adapter-base";
 import type {
   BlockheightBasedTransactionConfirmationStrategy,
   Commitment,
   Connection,
   RpcResponseAndContext,
+  Signer,
   SimulatedTransactionResponse,
   TransactionSignature,
   VersionedTransaction,
@@ -16,6 +18,22 @@ import {
 export const getUnixTs = () => {
   return new Date().getTime() / 1000;
 };
+
+/**
+ * Phantom blocks a request as possibly malicious when the transaction already
+ * carries another key's signature. Have the wallet sign first, then add the
+ * keypairs' signatures to whatever the wallet returns. Signing last also keeps
+ * the transaction valid if the wallet changes it, for example its fee.
+ */
+export async function signWithWalletFirst<T extends Transaction>(
+  transaction: T,
+  signTransaction: SignerWalletAdapterProps["signTransaction"],
+  signers: Signer[],
+): Promise<T> {
+  const signed = await signTransaction(transaction);
+  signed.partialSign(...signers);
+  return signed;
+}
 
 const DEFAULT_TIMEOUT = 20000;
 

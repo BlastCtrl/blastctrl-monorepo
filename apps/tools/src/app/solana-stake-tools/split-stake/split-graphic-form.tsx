@@ -6,6 +6,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import type { SyntheticEvent } from "react";
 import { useState } from "react";
 import { lamportsToSol, lamportsToSolString } from "@/lib/solana/common";
+import { signWithWalletFirst } from "@/lib/solana/send";
 import {
   ClipboardDocumentIcon,
   ClipboardDocumentCheckIcon,
@@ -90,7 +91,7 @@ function SplitFormInner({
   const { connection } = useConnection();
   const [isConfirming, setIsConfirming] = useState(false);
   const [formSuccess, setFormSuccess] = useState("");
-  const { publicKey, sendTransaction } = useWallet();
+  const { publicKey, signTransaction } = useWallet();
   const { setVisible } = useWalletModal();
   const { data: rentExemption, refetch } = useRentQuery(StakeProgram.space);
 
@@ -141,8 +142,8 @@ function SplitFormInner({
 
   const handleSubmit = async (e: SyntheticEvent) => {
     e.preventDefault();
-    if (!publicKey || !sendTransaction || !selectedAccount) {
-      throw Error("publicKey || sendTransaction unsupported");
+    if (!publicKey || !signTransaction || !selectedAccount) {
+      throw Error("publicKey || signTransaction unsupported");
     }
     if (inputError) return;
 
@@ -182,13 +183,18 @@ function SplitFormInner({
 
       tx.feePayer = publicKey;
       tx.recentBlockhash = value.blockhash;
-      tx.partialSign(stakeAccount);
-      const signature = await sendTransaction(tx, connection, {
-        minContextSlot: context.slot,
-        maxRetries: 0,
-        preflightCommitment: "confirmed",
-        skipPreflight: true,
-      });
+      const signed = await signWithWalletFirst(tx, signTransaction, [
+        stakeAccount,
+      ]);
+      const signature = await connection.sendRawTransaction(
+        signed.serialize(),
+        {
+          minContextSlot: context.slot,
+          maxRetries: 0,
+          preflightCommitment: "confirmed",
+          skipPreflight: true,
+        },
+      );
       if (!isConfirming) {
         setIsConfirming(true);
       }

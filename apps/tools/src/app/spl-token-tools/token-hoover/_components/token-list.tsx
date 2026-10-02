@@ -2,6 +2,7 @@ import { useAssetData } from "@/state/queries/use-asset-data";
 import type { ParsedTokenAccount } from "@/state/queries/use-owner-assets";
 import { ownerAssetsKey } from "@/state/queries/use-owner-assets";
 import { compress, normalizeTokenAmount } from "@/lib/solana";
+import { signWithWalletFirst } from "@/lib/solana/send";
 import { Button, CopyButton } from "@blastctrl/ui";
 import {
   Table,
@@ -35,7 +36,7 @@ export const TokenList = ({
   sourceWallet: Keypair;
 }) => {
   const { connection } = useConnection();
-  const { publicKey, signTransaction, sendTransaction } = useWallet();
+  const { publicKey, signTransaction } = useWallet();
   const queryClient = useQueryClient();
   const [tokenActions, setTokenActions] = useState<Map<string, TokenAction>>(
     new Map(),
@@ -149,17 +150,21 @@ export const TokenList = ({
         lastValidBlockHeight: value.lastValidBlockHeight,
       }).add(...instructions);
 
-      // Sign with source wallet (the one we have the private key for)
-      tx.partialSign(sourceWallet);
-      // const signed = await signTransaction(tx);
+      // The wallet signs as fee payer, then the source wallet (the one we
+      // have the private key for)
+      const signed = await signWithWalletFirst(tx, signTransaction, [
+        sourceWallet,
+      ]);
 
-      // Send transaction - wallet will sign as fee payer
-      const signature = await sendTransaction(tx, connection, {
-        minContextSlot: context.slot,
-        maxRetries: 0,
-        preflightCommitment: "confirmed",
-        skipPreflight: true,
-      });
+      const signature = await connection.sendRawTransaction(
+        signed.serialize(),
+        {
+          minContextSlot: context.slot,
+          maxRetries: 0,
+          preflightCommitment: "confirmed",
+          skipPreflight: true,
+        },
+      );
 
       const loadingToastId = notify({
         type: "loading",

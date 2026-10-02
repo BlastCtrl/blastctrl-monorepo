@@ -24,6 +24,7 @@ import {
 import { type FormEvent, useState } from "react";
 import { useRentQuery } from "./rent-query";
 import { parseJsonKeypair } from "@/lib/solana/parse-keypair";
+import { signWithWalletFirst } from "@/lib/solana/send";
 import { Box } from "./box";
 
 type Field = string;
@@ -32,7 +33,7 @@ type FormError = Record<Field, Message>;
 
 export function SplitManualForm() {
   const { connection } = useConnection();
-  const { publicKey, sendTransaction } = useWallet();
+  const { publicKey, signTransaction } = useWallet();
   const { setVisible } = useWalletModal();
 
   const [accountToSplit, setAccountToSplit] = useState("");
@@ -52,7 +53,7 @@ export function SplitManualForm() {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!publicKey || !sendTransaction) return;
+    if (!publicKey || !signTransaction) return;
     if (data === undefined) return;
     if (rentExemption === undefined) return;
 
@@ -111,13 +112,18 @@ export function SplitManualForm() {
 
       tx.feePayer = publicKey;
       tx.recentBlockhash = value.blockhash;
-      tx.partialSign(stakeAccount);
-      const signature = await sendTransaction(tx, connection, {
-        minContextSlot: context.slot,
-        maxRetries: 0,
-        preflightCommitment: "confirmed",
-        skipPreflight: true,
-      });
+      const signed = await signWithWalletFirst(tx, signTransaction, [
+        stakeAccount,
+      ]);
+      const signature = await connection.sendRawTransaction(
+        signed.serialize(),
+        {
+          minContextSlot: context.slot,
+          maxRetries: 0,
+          preflightCommitment: "confirmed",
+          skipPreflight: true,
+        },
+      );
       if (!isConfirming) {
         setIsConfirming(true);
       }
