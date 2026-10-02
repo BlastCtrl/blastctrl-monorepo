@@ -8,6 +8,7 @@ import {
 import { InfoTooltip } from "@/components/info-tooltip";
 import { notify } from "@/components/notification";
 import { isPublicKey } from "@/lib/solana/common";
+import { signWithWalletFirst } from "@/lib/solana/send";
 import { retryWithBackoff } from "@/lib/utils";
 import { Button, cn, SpinnerIcon, Switch, SwitchGroup } from "@blastctrl/ui";
 import {
@@ -172,11 +173,7 @@ export function StakeAccountForm() {
       tx.feePayer = publicKey;
       tx.recentBlockhash = value.blockhash;
 
-      // Phantom blocks sign-and-send requests for transactions another key
-      // has already signed. Let the wallet sign first, then add the new stake
-      // account's signature to whatever the wallet returns, and send it.
-      const signed = await signTransaction(tx);
-      signed.partialSign(signer);
+      const signed = await signWithWalletFirst(tx, signTransaction, [signer]);
 
       const signature = await connection.sendRawTransaction(
         signed.serialize(),

@@ -2,6 +2,7 @@
 
 import { notify } from "@/components/notification";
 import { isPublicKey, compress } from "@/lib/solana/common";
+import { signWithWalletFirst } from "@/lib/solana/send";
 import { getSetLockupInstruction } from "@/lib/solana/stake";
 import { retryWithBackoff } from "@/lib/utils";
 import {
@@ -56,7 +57,7 @@ const EXAMPLE_CSV = `stake_amount,withdraw_authority,stake_authority,validator,u
 
 export function StakeCSVForm() {
   const { connection } = useConnection();
-  const { publicKey, sendTransaction, signAllTransactions } = useWallet();
+  const { publicKey, signTransaction, signAllTransactions } = useWallet();
   const { setVisible } = useWalletModal();
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
@@ -327,7 +328,6 @@ export function StakeCSVForm() {
       );
     }
 
-    tx.partialSign(stakeAccountSigner);
     return tx;
   };
 
@@ -352,8 +352,12 @@ export function StakeCSVForm() {
       ),
     );
 
-    // Sign all transactions in the batch
+    // Sign all transactions in the batch: the wallet first, then each new
+    // stake account (see signWithWalletFirst)
     const signedTransactions = await signAllTransactions!(transactions);
+    signedTransactions.forEach((tx, i) =>
+      tx.partialSign(stakeAccountSigners[i]!),
+    );
 
     // Send and confirm all transactions in parallel
     const sendPromises = signedTransactions.map(async (signedTx, i) => {
@@ -447,11 +451,17 @@ export function StakeCSVForm() {
           value.lastValidBlockHeight!,
         );
 
-        const signature = await sendTransaction(tx, connection, {
-          maxRetries: 0,
-          preflightCommitment: "confirmed",
-          skipPreflight: true,
-        });
+        const signed = await signWithWalletFirst(tx, signTransaction!, [
+          stakeAccountSigner,
+        ]);
+        const signature = await connection.sendRawTransaction(
+          signed.serialize(),
+          {
+            maxRetries: 0,
+            preflightCommitment: "confirmed",
+            skipPreflight: true,
+          },
+        );
 
         const result = await connection.confirmTransaction(
           {
@@ -496,7 +506,7 @@ export function StakeCSVForm() {
   };
 
   const processTransactions = async () => {
-    if (!parsedData || !sendTransaction || !publicKey) return;
+    if (!parsedData || !signTransaction || !publicKey) return;
 
     // Generate transaction IDs and data
     const timestamp = Date.now();
@@ -646,7 +656,7 @@ export function StakeCSVForm() {
   };
 
   const retryTransaction = async (transactionId: string) => {
-    if (!parsedData || !sendTransaction || !publicKey) return;
+    if (!parsedData || !signTransaction || !publicKey) return;
 
     // Find the transaction in the state
     const currentTxState = useCreateStakeTransactionStore.getState().state;
@@ -689,11 +699,17 @@ export function StakeCSVForm() {
       );
 
       // Send the transaction
-      const signature = await sendTransaction(tx, connection, {
-        maxRetries: 0,
-        preflightCommitment: "confirmed",
-        skipPreflight: true,
-      });
+      const signed = await signWithWalletFirst(tx, signTransaction, [
+        stakeAccountSigner,
+      ]);
+      const signature = await connection.sendRawTransaction(
+        signed.serialize(),
+        {
+          maxRetries: 0,
+          preflightCommitment: "confirmed",
+          skipPreflight: true,
+        },
+      );
 
       // Confirm the transaction
       const result = await connection.confirmTransaction(
