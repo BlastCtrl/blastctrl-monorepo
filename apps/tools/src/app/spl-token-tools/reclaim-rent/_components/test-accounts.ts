@@ -4,18 +4,59 @@ import {
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
-import demoMints from "./demo-mints.json";
+import devnetMints from "./demo-mints.devnet.json";
+import mainnetMints from "./demo-mints.json";
+
+export type DemoMint = { name: string; mint: PublicKey; program: PublicKey };
+
+const toDemoMints = (
+  list: { id: string; name: string; tokenProgram: string }[],
+): DemoMint[] =>
+  list.map((m) => ({
+    name: m.name,
+    mint: new PublicKey(m.id),
+    program: new PublicKey(m.tokenProgram),
+  }));
 
 /**
- * For the dev-only test panel: real mainnet mints, half on Token and half on
+ * For the test panel: real mainnet mints, half on Token and half on
  * Token-2022 with a spread of extensions, so the accounts made for them come
  * in several sizes.
  */
-export const DEMO_MINTS = demoMints.map((m) => ({
-  name: m.name,
-  mint: new PublicKey(m.id),
-  program: new PublicKey(m.tokenProgram),
-}));
+export const DEMO_MINTS = toDemoMints(mainnetMints);
+
+/**
+ * The devnet counterpart: mints made for the panel, with the same split and
+ * a similar spread of extensions. Devnet gets reset now and then; if they
+ * disappear, make a new set and replace the file.
+ */
+export const DEVNET_DEMO_MINTS = toDemoMints(devnetMints);
+
+/**
+ * The demo mints a network has, or null where there are none. Like the rest
+ * of the app, a custom RPC url counts as mainnet.
+ */
+export function demoMintsFor(network: string): DemoMint[] | null {
+  switch (network) {
+    case "devnet":
+      return DEVNET_DEMO_MINTS;
+    case "testnet":
+      return null;
+    default:
+      return DEMO_MINTS;
+  }
+}
+
+/**
+ * Whether the test accounts panel shows: always in development, and for
+ * everyone on devnet, where the SOL it spends is free.
+ */
+export function showsTestAccountsPanel(
+  network: string,
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+): boolean {
+  return nodeEnv === "development" || network === "devnet";
+}
 
 /**
  * Each mint costs 91 bytes (its account and the mint as keys, the create
@@ -32,7 +73,7 @@ type Lifetime = { blockhash: string; lastValidBlockHeight: number };
  * it again only adds the excess to accounts that are still there.
  */
 export function buildTestAccountTransactions(
-  mints: typeof DEMO_MINTS,
+  mints: DemoMint[],
   wallet: PublicKey,
   lifetime: Lifetime,
   excess: number,
