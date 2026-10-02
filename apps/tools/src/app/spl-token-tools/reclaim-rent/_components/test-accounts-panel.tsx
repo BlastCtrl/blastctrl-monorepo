@@ -11,7 +11,7 @@ import {
   formatSol,
   minimumBalance,
 } from "./rent";
-import { DEMO_MINTS, buildTestAccountTransactions } from "./test-accounts";
+import { buildTestAccountTransactions, demoMintsFor } from "./test-accounts";
 import { useRentRate } from "./use-rent-rate";
 
 const SEND_OPTIONS = { preflightCommitment: "confirmed" } as const;
@@ -37,6 +37,7 @@ export function TestAccountsPanel() {
   const excess =
     minimumBalance(TOKEN_ACCOUNT_SIZE, ORIGINAL_LAMPORTS_PER_BYTE) -
     minimumBalance(TOKEN_ACCOUNT_SIZE, lamportsPerByte);
+  const mints = demoMintsFor(network);
 
   if (hidden) return null;
 
@@ -45,13 +46,12 @@ export function TestAccountsPanel() {
       notify({ type: "error", title: "Connect a wallet first" });
       return;
     }
-    // Like the rest of the app, a custom RPC url counts as mainnet.
-    if (network === "devnet" || network === "testnet") {
+    if (!mints) {
       notify({
         type: "error",
         title: "Couldn't create test accounts",
         description:
-          "The demo mints only exist on mainnet. Switch to mainnet and try again.",
+          "There are no demo mints on this network. Switch to mainnet or devnet and try again.",
       });
       return;
     }
@@ -59,7 +59,7 @@ export function TestAccountsPanel() {
     try {
       const lifetime = await connection.getLatestBlockhash("confirmed");
       const txs = buildTestAccountTransactions(
-        DEMO_MINTS,
+        mints,
         publicKey,
         lifetime,
         excess,
@@ -154,12 +154,12 @@ export function TestAccountsPanel() {
             </h2>
           </div>
           <p className="mt-1.5 max-w-prose text-sm text-pretty text-zinc-500">
-            Opens an empty token account for each of the {DEMO_MINTS.length}{" "}
-            demo mints and adds {formatSol(excess)} SOL of excess to each.
-            Accounts that already exist only get the excess. Mainnet only.
+            {mints
+              ? `Opens an empty token account for each of the ${mints.length} demo mints and adds ${formatSol(excess)} SOL of excess to each. Accounts that already exist only get the excess.`
+              : "There are no demo mints on this network. Switch to mainnet or devnet."}
           </p>
         </div>
-        <Button outline disabled={busy} onClick={() => void create()}>
+        <Button outline disabled={busy || !mints} onClick={() => void create()}>
           {busy && <SpinnerIcon className="size-4 animate-spin" />}
           {busy ? "Creating…" : "Create test accounts"}
         </Button>
