@@ -19,6 +19,8 @@ export type SwapStepData = {
   duration: number;
   transactionId?: string;
   errorReason?: string;
+  // Phantom flagged the dApp as possibly malicious and we clicked through
+  phantomFlagged?: boolean;
 };
 
 /**
