@@ -19,7 +19,7 @@ const toDemoMints = (
   }));
 
 /**
- * For the dev-only test panel: real mainnet mints, half on Token and half on
+ * For the test panel: real mainnet mints, half on Token and half on
  * Token-2022 with a spread of extensions, so the accounts made for them come
  * in several sizes.
  */
@@ -45,6 +45,17 @@ export function demoMintsFor(network: string): DemoMint[] | null {
     default:
       return DEMO_MINTS;
   }
+}
+
+/**
+ * Whether the test accounts panel shows: always in development, and for
+ * everyone on devnet, where the SOL it spends is free.
+ */
+export function showsTestAccountsPanel(
+  network: string,
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+): boolean {
+  return nodeEnv === "development" || network === "devnet";
 }
 
 /**

@@ -7,6 +7,7 @@ import {
   MINTS_PER_TRANSACTION,
   buildTestAccountTransactions,
   demoMintsFor,
+  showsTestAccountsPanel,
 } from "./test-accounts";
 
 describe.each([
@@ -51,5 +52,22 @@ describe("demoMintsFor", () => {
     expect(demoMintsFor("testnet")).toBeNull();
     // A custom RPC url counts as mainnet.
     expect(demoMintsFor("https://rpc.example.com")).toBe(DEMO_MINTS);
+  });
+});
+
+describe("showsTestAccountsPanel", () => {
+  it("shows in development, and on devnet whatever the build", () => {
+    expect(showsTestAccountsPanel("mainnet-beta", "development")).toBe(true);
+    expect(showsTestAccountsPanel("devnet", "development")).toBe(true);
+    expect(showsTestAccountsPanel("devnet", "production")).toBe(true);
+    expect(showsTestAccountsPanel("devnet", undefined)).toBe(true);
+  });
+
+  it("hides elsewhere outside development", () => {
+    expect(showsTestAccountsPanel("mainnet-beta", "production")).toBe(false);
+    expect(showsTestAccountsPanel("testnet", "production")).toBe(false);
+    expect(showsTestAccountsPanel("https://rpc.example.com", "test")).toBe(
+      false,
+    );
   });
 });

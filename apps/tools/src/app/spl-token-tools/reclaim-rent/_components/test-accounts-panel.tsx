@@ -20,10 +20,11 @@ const message = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
 
 /**
- * Development only: gives the wallet an empty token account for each demo
- * mint, holding as much excess as an account opened at the original rent,
- * so the tool has something to reclaim again. The × hides it until the
- * next page load.
+ * Gives the wallet an empty token account for each demo mint, holding as
+ * much excess as an account opened at the original rent, so the tool has
+ * something to reclaim again. Shown in development and, for everyone, on
+ * devnet; see showsTestAccountsPanel. The × hides it until the next page
+ * load.
  */
 export function TestAccountsPanel() {
   const { connection } = useConnection();
