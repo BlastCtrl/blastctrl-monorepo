@@ -1,15 +1,18 @@
 import { createWithdrawExcessLamportsInstruction } from "@/lib/solana/withdraw-excess-lamports";
 import { retryWithBackoff } from "@/lib/utils";
+import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
 import {
   TOKEN_2022_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
   createCloseAccountInstruction,
 } from "@solana/spl-token";
+import type { StandardWalletAdapter } from "@solana/wallet-adapter-base";
 import type { WalletContextState } from "@solana/wallet-adapter-react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import type { Connection } from "@solana/web3.js";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { useMutation } from "@tanstack/react-query";
+import base58 from "bs58";
 import type { ServiceFee } from "./fee";
 import { SERVICE_FEE, createServiceFeeInstruction } from "./fee";
 import type { ReclaimableAccount } from "./types";
@@ -50,15 +53,35 @@ export function useReclaimExcess({
   const { connection } = useConnection();
   const wallet = useWallet();
   const { publicKey } = wallet;
+  const network = useNetworkConfigurationStore((state) => state.network);
 
   return useMutation({
     mutationFn: async ({ batches, closeEmpty }: Variables) => {
       if (!publicKey) throw Error("Wallet is not connected");
+      const standardSendAll = standardSignAndSendAll(wallet, network);
+      const signAndSendAll = standardSendAll ?? phantomSignAndSendAll(wallet);
+      // TEMP(debug): which send path runs. Remove after testing.
+      const adapter = wallet.wallet?.adapter as
+        Partial<StandardWalletAdapter> | undefined;
+      console.info("[reclaim-rent] send path", {
+        adapter: adapter?.name,
+        standard: adapter?.standard === true,
+        features: Object.keys(adapter?.wallet?.features ?? {}),
+        network,
+        path: standardSendAll
+          ? "Wallet Standard signAndSendAllTransactions"
+          : signAndSendAll
+            ? "Phantom provider signAndSendAllTransactions"
+            : wallet.signAllTransactions
+              ? "signAllTransactions"
+              : "sendTransaction per batch",
+      });
       await sendBatches(
         batches,
         {
           connection,
           wallet,
+          signAndSendAll,
           build: (batch, lifetime) =>
             buildReclaimTransaction(
               batch.accounts,
@@ -109,8 +132,127 @@ export function isWalletRefusal(err: unknown) {
 type Sender = {
   connection: Connection;
   wallet: Pick<WalletContextState, "signAllTransactions" | "sendTransaction">;
+  /** One prompt in which the wallet signs and sends every transaction. */
+  signAndSendAll?: SignAndSendAll;
   build: (batch: Batch, lifetime: Lifetime) => Transaction;
 };
+
+type SignAndSendAll = (
+  transactions: Transaction[],
+) => Promise<PromiseSettledResult<string>[]>;
+
+/**
+ * Wallet Standard's `solana:signAndSendAllTransactions`, which the wallet
+ * adapter doesn't expose. Phantom adds its Lighthouse assertions to a single
+ * transaction, but not across `signAllTransactions`. Letting the wallet send
+ * them may let it protect each one.
+ */
+type SignAndSendAllFeature = {
+  signAndSendAllTransactions: (
+    inputs: {
+      account: StandardWalletAdapter["wallet"]["accounts"][number];
+      chain: `solana:${string}`;
+      transaction: Uint8Array;
+      options?: typeof SEND_OPTIONS;
+    }[],
+    options?: { mode?: "parallel" | "serial" },
+  ) => Promise<PromiseSettledResult<{ signature: Uint8Array }>[]>;
+};
+
+const CHAINS: Record<string, `solana:${string}`> = {
+  "mainnet-beta": "solana:mainnet",
+  devnet: "solana:devnet",
+  testnet: "solana:testnet",
+};
+
+/** Phantom's injected provider, as far as it's used here. */
+type PhantomProvider = {
+  publicKey?: { toBase58(): string } | null;
+  signAndSendAllTransactions?: (
+    transactions: Transaction[],
+    options?: typeof SEND_OPTIONS,
+  ) => Promise<{ signatures: (string | null | undefined)[] }>;
+};
+
+/**
+ * Phantom's own `signAndSendAllTransactions`, which its docs recommend over
+ * `signAllTransactions`. Phantom doesn't offer it through the Wallet
+ * Standard, so it's taken from the injected provider when Phantom is the
+ * connected wallet, on the same account.
+ */
+function phantomSignAndSendAll(
+  wallet: WalletContextState,
+): SignAndSendAll | undefined {
+  if (
+    typeof window === "undefined" ||
+    wallet.wallet?.adapter.name !== "Phantom" ||
+    !wallet.publicKey
+  ) {
+    return undefined;
+  }
+  const provider = (window as { phantom?: { solana?: PhantomProvider } })
+    .phantom?.solana;
+  const signAndSendAllTransactions = provider?.signAndSendAllTransactions;
+  if (
+    !signAndSendAllTransactions ||
+    provider.publicKey?.toBase58() !== wallet.publicKey.toBase58()
+  ) {
+    return undefined;
+  }
+
+  return async (transactions) => {
+    const { signatures } = await signAndSendAllTransactions.call(
+      provider,
+      transactions,
+      SEND_OPTIONS,
+    );
+    return transactions.map((_, i) => {
+      const signature = signatures[i];
+      return signature
+        ? { status: "fulfilled", value: signature }
+        : { status: "rejected", reason: Error("Phantom didn't send it") };
+    });
+  };
+}
+
+/** The connected wallet's `solana:signAndSendAllTransactions`, if it has one. */
+function standardSignAndSendAll(
+  wallet: WalletContextState,
+  network: string,
+): SignAndSendAll | undefined {
+  const adapter = wallet.wallet?.adapter;
+  const chain = CHAINS[network];
+  if (!adapter || !("standard" in adapter) || !wallet.publicKey || !chain) {
+    return undefined;
+  }
+  const standard = (adapter as StandardWalletAdapter).wallet;
+  const feature = (
+    standard.features as Record<string, SignAndSendAllFeature | undefined>
+  )["solana:signAndSendAllTransactions"];
+  const address = wallet.publicKey.toBase58();
+  const account = standard.accounts.find((a) => a.address === address);
+  if (!feature || !account) return undefined;
+
+  return async (transactions) => {
+    const results = await feature.signAndSendAllTransactions(
+      transactions.map((tx) => ({
+        account,
+        chain,
+        transaction: tx.serialize({
+          requireAllSignatures: false,
+          verifySignatures: false,
+        }),
+        options: SEND_OPTIONS,
+      })),
+      { mode: "parallel" },
+    );
+    return results.map((result) =>
+      result.status === "fulfilled"
+        ? { status: "fulfilled", value: base58.encode(result.value.signature) }
+        : result,
+    );
+  };
+}
 
 /**
  * Sends one transaction per batch and reports each batch's own result; one
@@ -120,7 +262,7 @@ type Sender = {
  */
 export async function sendBatches(
   batches: Batch[],
-  { connection, wallet, build }: Sender,
+  { connection, wallet, signAndSendAll, build }: Sender,
   { onBatchResult, onStage }: Pick<Options, "onBatchResult" | "onStage">,
 ) {
   const report = (index: number, promise: Promise<string>) =>
@@ -129,6 +271,46 @@ export async function sendBatches(
       (err: unknown) =>
         onBatchResult({ index, status: "failed", error: errorMessage(err) }),
     );
+
+  if (signAndSendAll) {
+    // One wallet prompt, and the wallet sends every batch itself. Like
+    // signAllTransactions, they share a blockhash and confirm side by side.
+    const lifetime = await latestBlockhash(connection);
+    batches.forEach(({ index }) => onStage?.(index, "signing"));
+    let results: PromiseSettledResult<string>[];
+    try {
+      results = await signAndSendAll(batches.map((b) => build(b, lifetime)));
+    } catch (err) {
+      if (isWalletRefusal(err)) {
+        throw new WalletRefusedError(0, batches.length, err);
+      }
+      throw err;
+    }
+    // A wallet may report a refusal per transaction instead of throwing.
+    const refused = results.find(
+      (r): r is PromiseRejectedResult => r.status === "rejected",
+    );
+    if (
+      refused &&
+      results.every((r) => r.status === "rejected" && isWalletRefusal(r.reason))
+    ) {
+      throw new WalletRefusedError(0, batches.length, refused.reason);
+    }
+    await Promise.all(
+      batches.map(({ index }, i) => {
+        const result = results[i];
+        if (result?.status !== "fulfilled") {
+          return report(
+            index,
+            Promise.reject(result?.reason ?? Error("The wallet sent nothing")),
+          );
+        }
+        onStage?.(index, "confirming");
+        return report(index, confirm(connection, result.value, lifetime));
+      }),
+    );
+    return;
+  }
 
   if (wallet.signAllTransactions) {
     // One wallet prompt for everything. The batches share a blockhash,
