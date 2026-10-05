@@ -52,7 +52,14 @@ export function remainingSteps(lamportsPerByte: number) {
   return RENT_STEPS.length - 1 - currentStepIndex(lamportsPerByte);
 }
 
-export const ACCOUNTS_PER_TRANSACTION = 20;
+/**
+ * Far below what fits in a transaction. Phantom adds a Lighthouse assertion
+ * instruction for every account a transaction changes, but only when they all
+ * fit. When they don't, it adds none and warns that the dApp could be
+ * malicious. In testing, 12 token accounts and a mint got their assertions,
+ * while 13 token accounts, or 12 that close, didn't.
+ */
+export const ACCOUNTS_PER_TRANSACTION = 10;
 export const FEE_PER_TRANSACTION = 5000;
 
 export function minimumBalance(dataLength: number, lamportsPerByte: number) {
