@@ -25,12 +25,15 @@ import {
   centerIn,
   fadeIn,
   flipIn,
+  flipOut,
   flyCoin,
   hop,
   pointIn,
+  pop,
   popIn,
   pulse,
   ringOut,
+  settle,
   shake,
 } from "./effects";
 import { GREEN, coinColor, shareTimes } from "./look";
@@ -133,6 +136,28 @@ function toss(
   return flyCoin(layer, from, via, to, { delay, duration, color: GREEN });
 }
 
+/**
+ * A coin turning over to green, at `delay` seconds. React has already given
+ * it the green face and the check, so before paint the old face goes back
+ * on and the check is hidden. At its turn the old face narrows to edge-on,
+ * the green one is put on with no colour transition, and it opens out. A
+ * coin that was breathing first comes to rest, since React has just taken
+ * its breath away.
+ */
+function turnOver(coin: HTMLElement, delay: number, wasWaiting: boolean) {
+  coin.style.backgroundColor = coin.dataset.coinColor ?? "";
+  coin.style.color = "transparent";
+  if (wasWaiting) settle(coin);
+  void flipOut(coin, delay).then(() => {
+    coin.style.transition = "none";
+    coin.style.backgroundColor = GREEN;
+    coin.style.color = "";
+    void coin.offsetWidth; // Flush, so the swap isn't transitioned.
+    coin.style.transition = "";
+    flipIn(coin, 0);
+  });
+}
+
 const ARRIVAL: Arrival = {
   hide: "[data-word],[data-pop],[data-fade],[data-coin]",
   end: T.end,
@@ -154,14 +179,21 @@ const ARRIVAL: Arrival = {
     const coins = all("[data-coin]");
     const pops = shareTimes(coins.length, T.count, T.countFor);
     const every = tickEvery(coins.length);
+    // Past a few dozen coins the flights read as a swarm whichever coins
+    // they come from; fewer of them keeps the layer count down.
+    const tossEvery = coins.length > 80 ? 3 : coins.length > 40 ? 2 : 1;
     const ticks: number[] = [];
     coins.forEach((coin, i) => {
       const start = pops[i]! - T.flight;
-      running.push(popIn(coin, at(start), { scale: 0 }));
+      running.push(popIn(coin, at(start), { scale: 0.4 }));
       if (i % every === 0) {
         ticks.push(window.setTimeout(cues.arriving, at(start) * 1000));
       }
-      if (digits && (coin as HTMLElement).dataset.state === "selected") {
+      if (
+        digits &&
+        i % tossEvery === 0 &&
+        (coin as HTMLElement).dataset.state === "selected"
+      ) {
         running.push(
           toss(layer, coin, digits, at(start + 0.03), T.flight - 0.03),
         );
@@ -212,8 +244,9 @@ export function Tally(p: RewardProps) {
 
   // A coin changing state answers for itself: ticked, it pops and tosses
   // its SOL into the number; unticked, it deflates; confirmed, it turns
-  // over to a green check, joining the sweep from the left.
-  // Before paint, so a coin never shows its new face at full size first.
+  // over to a green check, joining the sweep from the left; back from
+  // waiting after a failed transaction, it comes to rest.
+  // Before paint, so a coin never shows its green face before its turn.
   // Nothing here is cancelled when the next change comes: a transaction
   // confirming mid-flip must not leave the last group's coins edge-on.
   const previous = useRef(states);
@@ -246,8 +279,7 @@ export function Tally(p: RewardProps) {
       const now = states[i];
       if (!coin || was === now) continue;
       if (now === "c") {
-        coin.style.transform = "scaleX(0)";
-        flipIn(coin, (turnAt - clock) / 1000);
+        turnOver(coin, (turnAt - clock) / 1000, was === "p");
         // Experiment: each coin that turns green clinks, quietly.
         if (turned++ % every === 0) {
           window.setTimeout(cues.turning, turnAt - clock);
@@ -256,10 +288,12 @@ export function Tally(p: RewardProps) {
         sweepAt.current = turnAt;
       } else if (now === "s" && was === "u") {
         const delay = Math.min(ticked++, 20) * 0.02;
-        popIn(coin, delay, { scale: 0.3 });
+        pop(coin, delay, 0.3);
         if (digits) toss(layer, coin, digits, delay + 0.03, 0.22);
+      } else if (now === "s" && was === "p") {
+        settle(coin);
       } else if (now === "u") {
-        popIn(coin, 0, { scale: 1.4 });
+        pop(coin, 0, 1.4);
       }
     }
   }, [states, p.reduced, arriving]);
@@ -492,17 +526,20 @@ function CoinDot({
   // Start every coin mid-cycle so the wave is already running, its crest
   // travelling left to right.
   if (waiting) style.animationDelay = `${((index * 45) % 1100) - 1100}ms`;
+  // Inline, not a class: the animations leave an inline opacity behind
+  // that a class could never override.
+  if (dim) style.opacity = 0.4;
   return (
     <span
       data-coin
       data-state={coin.state}
+      data-coin-color={coinColor(coin.id)}
       className={cn(
         "grid place-content-center text-white",
         size,
         coin.kind === "mint" ? "rounded-[4px]" : "rounded-full",
         animated &&
           "transition-[background-color,box-shadow,opacity] duration-150",
-        dim && "opacity-40",
         waiting && "coin-wait",
       )}
       style={style}
@@ -546,11 +583,12 @@ function Detail(p: RewardProps & { busy: boolean }) {
     // Nothing else to say in the states that have their own sentence.
   } else if (p.failed && !p.busy) {
     tone = "text-red-700";
-    const { transactions, of, accounts } = p.failed;
+    const { transactions, of } = p.failed;
+    // The coins say which accounts are left; the sentence needn't count them.
     text =
       of === 1
         ? "That didn't go through. Your accounts are untouched, so you can try again."
-        : `${transactions} of ${of} transactions didn't go through. ${transactions === 1 ? "Its" : "Their"} ${accounts} accounts are untouched, so you can try again.`;
+        : `${transactions} of ${of} transactions didn't go through. The remaining accounts are untouched, so you can try again.`;
   } else if (p.rejectedAt !== null && !p.busy) {
     tone = "text-zinc-800";
     text = cancelled(p);

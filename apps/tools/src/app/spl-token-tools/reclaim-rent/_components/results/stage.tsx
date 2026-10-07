@@ -4,7 +4,7 @@ import { cn } from "@blastctrl/ui";
 import { AnimatePresence, motion } from "motion/react";
 import type { ReactNode } from "react";
 import { useEffect, useRef } from "react";
-import { DOT_GRID } from "./look";
+import { DOT_GRID, STAGE_BG } from "./look";
 
 /** One tile of the dot grid; drifting by a whole tile looks like no change. */
 const TILE = 22;
@@ -31,6 +31,11 @@ const CHECKING = {
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -10 },
 };
+const EASE_OUT = [0.23, 1, 0.32, 1] as const;
+/** In at an easy pace; out fast, so it's gone before the results pop in. */
+const CHECKING_IN = { duration: 0.2, ease: EASE_OUT };
+const CHECKING_OUT = { duration: 0.12, ease: EASE_OUT };
+const AT_ONCE = { duration: 0 };
 
 /** The band unrolls from the top as it appears. */
 const STAGE_CSS = `
@@ -65,12 +70,12 @@ export function Stage({
   reduced: boolean;
   children?: ReactNode;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const grid = useRef<HTMLDivElement>(null);
   const offset = useRef(0);
   const speed = useRef(0);
 
   useEffect(() => {
-    const el = ref.current;
+    const el = grid.current;
     if (!el || reduced) return;
     let last: number | null = null;
     let id = 0;
@@ -85,7 +90,7 @@ export function Stage({
         return;
       }
       offset.current = (offset.current + (speed.current * dt) / 1000) % TILE;
-      el.style.backgroundPosition = `${-offset.current}px ${-offset.current}px`;
+      el.style.transform = `translate(${-offset.current}px, ${-offset.current}px)`;
       id = requestAnimationFrame(tick);
     };
     id = requestAnimationFrame(tick);
@@ -94,16 +99,31 @@ export function Stage({
 
   return (
     <div
-      ref={ref}
       className={cn(
         "relative -mx-4 px-4 py-9 sm:-mx-6 sm:px-8 sm:py-11",
         last ? "sm:rounded-b-lg" : "border-b border-zinc-200",
-        DOT_GRID,
+        STAGE_BG,
         !reduced && "stage-in",
       )}
     >
       <style>{STAGE_CSS}</style>
-      <div className={cn(!children && EMPTY_HEIGHT)}>{children}</div>
+      {/* The dot grid on a layer of its own, one tile oversize, so the
+          drift is a transform and not a repaint of the whole band. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]"
+      >
+        <div
+          ref={grid}
+          className={cn(
+            "absolute top-0 left-0 h-[calc(100%+22px)] w-[calc(100%+22px)] will-change-transform",
+            DOT_GRID,
+          )}
+        />
+      </div>
+      <div className={cn("relative", !children && EMPTY_HEIGHT)}>
+        {children}
+      </div>
 
       {/* While the scan runs, a small "Checking…" sits in the middle. */}
       <div className="pointer-events-none absolute inset-0 grid place-items-center">
@@ -112,11 +132,13 @@ export function Stage({
             <motion.div
               key="checking"
               role="status"
-              {...CHECKING}
               initial={reduced ? false : CHECKING.initial}
-              transition={
-                reduced ? { duration: 0 } : { duration: 0.3, ease: "easeOut" }
-              }
+              animate={CHECKING.animate}
+              exit={{
+                ...CHECKING.exit,
+                transition: reduced ? AT_ONCE : CHECKING_OUT,
+              }}
+              transition={reduced ? AT_ONCE : CHECKING_IN}
               className="rounded-full bg-white px-4 py-2 text-sm font-medium text-zinc-600 ring-1 ring-zinc-100"
             >
               Checking…

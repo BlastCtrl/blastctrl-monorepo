@@ -54,6 +54,14 @@ export function popIn(
   );
 }
 
+/**
+ * The same pop for something already on screen: a kick from `from` back to
+ * full size, with no fade, so a coin that changes state never blinks out.
+ */
+export function pop(el: Element, delay: number, from: number): Stoppable {
+  return animate(el, { scale: [from, 1] }, { ...POP, delay });
+}
+
 /** Plain fade for the quiet parts: fine print, the tables below. */
 export function fadeIn(
   targets: Targets,
@@ -168,11 +176,38 @@ export function flyCoin(
 }
 
 /**
- * A coin turning over to its other face: in from edge-on, with the pop's
- * overshoot. Its new colour is already set, so it lands showing it.
+ * The first half of a coin turning over: its old face narrows to edge-on,
+ * speeding up as it goes. Resolves when the coin is edge-on, so the new
+ * face can be set and `flipIn` can take over.
+ */
+export function flipOut(el: Element, delay: number): Promise<void> {
+  return animate(
+    el,
+    { scaleX: [1, 0] },
+    { delay, duration: 0.08, ease: "easeIn" },
+  ).then(() => {});
+}
+
+/**
+ * The second half: the new face comes in from edge-on, with the pop's
+ * overshoot. The new colour must already be set when this starts.
  */
 export function flipIn(el: Element, delay: number): Stoppable {
   return animate(el, { scaleX: [0, 1] }, { ...POP, delay });
+}
+
+/**
+ * A coin that was breathing (waiting on the chain) comes to rest. The
+ * breath is a CSS animation React removes with the state, so its scale and
+ * opacity would otherwise snap to full; this eases them there from about
+ * where the breath leaves them.
+ */
+export function settle(el: Element): Stoppable {
+  return animate(
+    el,
+    { scale: [0.9, 1], opacity: [0.7, 1] },
+    { duration: 0.15, ease: [0.23, 1, 0.32, 1] },
+  );
 }
 
 /** A hop that ripples through a row, one element after the next. */

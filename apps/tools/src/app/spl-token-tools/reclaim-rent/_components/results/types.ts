@@ -44,7 +44,7 @@ export type RewardProps = {
   reclaimedFrom: { tokenAccounts: number; mints: number };
   sending: Sending | null;
   /** The last send finished with some transactions failed. */
-  failed: { transactions: number; of: number; accounts: number } | null;
+  failed: { transactions: number; of: number } | null;
   /** The wallet turned the request down; changes each time it happens. */
   rejectedAt: number | null;
   /**

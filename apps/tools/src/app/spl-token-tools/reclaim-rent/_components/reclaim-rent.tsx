@@ -37,10 +37,11 @@ import { WalletRefusedError, useReclaimExcess } from "./use-reclaim-excess";
 import { useRentRate } from "./use-rent-rate";
 
 /**
- * A scan always takes at least this long, so the stage's drifting dots read
- * as work and the results never arrive with a stutter.
+ * A scan always takes at least this long, so the stage has unrolled and
+ * "Checking…" has settled before the results arrive. No longer than that:
+ * a floor past what the stage needs only makes "Check again" feel slow.
  */
-const SCAN_MIN_MS = 1500;
+const SCAN_MIN_MS = 800;
 
 const DETAILS_ID = "reclaim-details";
 
@@ -409,7 +410,6 @@ export function ReclaimRent({
         ? {
             transactions: failedBatches.length,
             of: batches!.length,
-            accounts: failedBatches.reduce((n, b) => n + b.accounts.length, 0),
           }
         : null,
     rejectedAt: refusal?.count ?? null,
@@ -520,7 +520,7 @@ export function ReclaimRent({
                 "grid",
                 detailsOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
                 !reduced &&
-                  "transition-[grid-template-rows] duration-300 ease-out",
+                  "transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]",
               )}
             >
               {/* Room either side so focus rings aren't clipped. */}
@@ -530,7 +530,7 @@ export function ReclaimRent({
                     "pt-10 pb-6",
                     !detailsOpen && "-translate-y-3 opacity-0",
                     !reduced &&
-                      "transition-[opacity,translate] duration-300 ease-out",
+                      "transition-[opacity,translate] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]",
                   )}
                 >
                   <Details
