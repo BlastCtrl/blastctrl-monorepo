@@ -1,7 +1,8 @@
 import { CheckIcon, ChevronDownIcon } from "@heroicons/react/20/solid";
 import { SpinnerIcon, cn } from "@blastctrl/ui";
+import { AnimatePresence, motion } from "motion/react";
 import type { ReactNode } from "react";
-import { GREEN, INK } from "./look";
+import { GREEN, INK, SETTLE } from "./look";
 import type { RewardProps, RewardStatus } from "./types";
 import { fromWhere } from "./types";
 
@@ -69,42 +70,80 @@ function Chip({ children }: { children: ReactNode }) {
   );
 }
 
+/** A label leaves upwards and the next comes in from below, each over a
+ * few px, blurred a touch so the two read as one change rather than two
+ * things swapping. Out is quicker than in. */
+const LABEL = {
+  initial: { opacity: 0, y: 8, filter: "blur(2px)" },
+  animate: { opacity: 1, y: 0, filter: "blur(0px)" },
+  exit: { opacity: 0, y: -8, filter: "blur(2px)" },
+};
+const LABEL_EASE = [0.23, 1, 0.32, 1] as const;
+const LABEL_IN = { duration: 0.2, ease: LABEL_EASE };
+const LABEL_OUT = { duration: 0.12, ease: LABEL_EASE };
+const AT_ONCE = { duration: 0 };
+
 /**
  * The brand-red pill. While a reclaim is in flight it shows a spinner and
  * ignores clicks, but stays focusable so a screen reader keeps its place.
+ * Its label changes as the reclaim moves along: each change crossfades,
+ * and the pill's width follows the new label instead of jumping to it.
  */
 export function ReclaimPill({
   disabled,
   busy = false,
+  animated,
   onClick,
   className,
-  children,
+  label,
 }: {
   disabled: boolean;
   busy?: boolean;
+  animated: boolean;
   onClick: () => void;
   className?: string;
-  children: ReactNode;
+  label: string;
 }) {
   return (
     <span data-pill className="relative flex">
-      <button
+      <motion.button
         type="button"
         data-pop="button"
+        layout={animated}
+        transition={{ layout: SETTLE }}
         onClick={busy ? undefined : onClick}
         disabled={disabled}
         aria-disabled={busy || undefined}
         className={cn(
-          "flex w-full items-center justify-center gap-2.5 rounded-full bg-primary py-4 font-display text-xl font-bold whitespace-nowrap text-white tabular-nums shadow-[0_10px_24px_-8px_rgba(226,36,36,0.6)] transition-[filter,background-color,box-shadow] hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-focus active:translate-y-px disabled:bg-zinc-300 disabled:shadow-none disabled:hover:brightness-100",
+          "relative flex w-full items-center justify-center rounded-full bg-primary py-4 font-display text-xl font-bold whitespace-nowrap text-white tabular-nums shadow-[0_10px_24px_-8px_rgba(226,36,36,0.6)] transition-[filter,background-color,box-shadow] hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-focus active:translate-y-px disabled:bg-zinc-300 disabled:shadow-none disabled:hover:brightness-100",
           busy && "cursor-progress hover:brightness-100 active:translate-y-0",
           className,
         )}
       >
-        {busy && (
-          <SpinnerIcon aria-hidden="true" className="size-5 animate-spin" />
-        )}
-        {children}
-      </button>
+        {/* The leaving label is taken out of the flow at once, so the pill
+            can size to the new one while the old one fades. */}
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span
+            key={label}
+            // In the layout tree too, so the pill's size change doesn't
+            // stretch the text while it plays.
+            layout={animated ? "position" : false}
+            className="flex items-center gap-2.5"
+            initial={animated ? LABEL.initial : false}
+            animate={LABEL.animate}
+            exit={{
+              ...LABEL.exit,
+              transition: animated ? LABEL_OUT : AT_ONCE,
+            }}
+            transition={animated ? LABEL_IN : AT_ONCE}
+          >
+            {busy && (
+              <SpinnerIcon aria-hidden="true" className="size-5 animate-spin" />
+            )}
+            {label}
+          </motion.span>
+        </AnimatePresence>
+      </motion.button>
     </span>
   );
 }

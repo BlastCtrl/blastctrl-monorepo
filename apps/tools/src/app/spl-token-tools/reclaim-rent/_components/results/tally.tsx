@@ -472,11 +472,11 @@ export function Tally(p: RewardProps) {
               <ReclaimPill
                 disabled={!canReclaim && !busy}
                 busy={busy}
+                animated={!p.reduced}
                 onClick={p.onReclaim}
                 className="px-10 md:min-w-[18rem]"
-              >
-                {pillLabel(p)}
-              </ReclaimPill>
+                label={pillLabel(p)}
+              />
               <div className="flex flex-wrap items-baseline justify-center gap-x-3 text-sm text-zinc-500 md:justify-end">
                 {p.sending ? (
                   // Empty while it's busy, but the row keeps its height so
