@@ -3,15 +3,12 @@
 import { cn } from "@blastctrl/ui";
 import { AnimatePresence, motion } from "motion/react";
 import type { ReactNode } from "react";
-import { useEffect, useRef } from "react";
 import { DOT_GRID, STAGE_BG } from "./look";
 
 /** One tile of the dot grid; drifting by a whole tile looks like no change. */
 const TILE = 22;
 /** How fast the dots drift while the scan runs, in px per second per axis. */
 const DRIFT = 12;
-/** How quickly the drift picks up and dies away, in ms. */
-const EASE_MS = 180;
 
 /**
  * The height of Tally with one row of coins, from its Tailwind sizes. Keep
@@ -37,12 +34,20 @@ const CHECKING_IN = { duration: 0.2, ease: EASE_OUT };
 const CHECKING_OUT = { duration: 0.12, ease: EASE_OUT };
 const AT_ONCE = { duration: 0 };
 
-/** The band unrolls from the top as it appears. */
+/**
+ * The band unrolls from the top as it appears. Its dots drift up and to
+ * the left by one tile per cycle, which joins up with itself; the drift is
+ * paused rather than stopped, so it can pick up again from where it is.
+ */
 const STAGE_CSS = `
   @keyframes stage-in {
     from { opacity: 0; clip-path: inset(0 0 100% 0); }
   }
   .stage-in { animation: stage-in 450ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  @keyframes stage-drift {
+    to { transform: translate(${-TILE}px, ${-TILE}px); }
+  }
+  .stage-drift { animation: stage-drift ${TILE / DRIFT}s linear infinite; }
 `;
 
 /**
@@ -70,33 +75,6 @@ export function Stage({
   reduced: boolean;
   children?: ReactNode;
 }) {
-  const grid = useRef<HTMLDivElement>(null);
-  const offset = useRef(0);
-  const speed = useRef(0);
-
-  useEffect(() => {
-    const el = grid.current;
-    if (!el || reduced) return;
-    let last: number | null = null;
-    let id = 0;
-    const tick = (now: number) => {
-      const dt = last === null ? 0 : Math.min(64, now - last);
-      last = now;
-      // Ease towards the target speed: full drift while moving, none after.
-      const target = moving ? DRIFT : 0;
-      speed.current += (target - speed.current) * (1 - Math.exp(-dt / EASE_MS));
-      if (!moving && speed.current < 0.2) {
-        speed.current = 0;
-        return;
-      }
-      offset.current = (offset.current + (speed.current * dt) / 1000) % TILE;
-      el.style.transform = `translate(${-offset.current}px, ${-offset.current}px)`;
-      id = requestAnimationFrame(tick);
-    };
-    id = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(id);
-  }, [moving, reduced]);
-
   return (
     <div
       className={cn(
@@ -114,11 +92,12 @@ export function Stage({
         className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]"
       >
         <div
-          ref={grid}
           className={cn(
             "absolute top-0 left-0 h-[calc(100%+22px)] w-[calc(100%+22px)] will-change-transform",
             DOT_GRID,
+            !reduced && "stage-drift",
           )}
+          style={{ animationPlayState: moving ? "running" : "paused" }}
         />
       </div>
       <div className={cn("relative", !children && EMPTY_HEIGHT)}>
