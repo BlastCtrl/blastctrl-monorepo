@@ -9,6 +9,7 @@ This monorepo currently hosts the Blast Tools Nextjs application, but it could b
 │   ├── tools : Blastctrl Tools (a nextjs web app)
 ├── packages : private packages used by apps
 │   ├── octane-core : fork of the Octane project that provides functions used by the gasless-swap tool
+│   ├── solace-sdk : Orval-generated client for the Blast API; `pnpm api:update --ref <ref>` pulls a new schema (see its README)
 │   ├── ui : reusable UI components for React apps (bundling is not setup here )
 ├── tooling : tooling packages (code formatting, linting, etc) which are used by the apps and packages
 │   ├── eslint : base and nextjs-specific eslint configs

@@ -13,7 +13,8 @@
   "scripts": {
     "generate": "orval --config orval.config.cjs",
     "prebuild": "rm -rf ./dist",
-    "build": "tsc"
+    "build": "tsc",
+    "api:update": "node scripts/update-api.mjs"
   },
   "devDependencies": {
     "orval": "^8.38.0",

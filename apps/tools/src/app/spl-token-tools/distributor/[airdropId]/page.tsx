@@ -2,7 +2,7 @@
 
 import { notify } from "@/components";
 import { compress } from "@/lib/solana";
-import type { GetAirdropsId200 } from "@blastctrl/solace-sdk";
+import type { GetAirdrop200 } from "@blastctrl/solace-sdk";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import {
@@ -29,8 +29,8 @@ import {
 } from "@solana/spl-token";
 import { MintAddressLink } from "../mint-address-link";
 
-type TransactionStatus = GetAirdropsId200["transactions"][number]["status"];
-type AirdropStatus = GetAirdropsId200["status"];
+type TransactionStatus = GetAirdrop200["transactions"][number]["status"];
+type AirdropStatus = GetAirdrop200["status"];
 type AirdropIdQueryReturnData = NonNullable<
   ReturnType<typeof useGetAirdropById>["data"]
 >;
@@ -388,7 +388,7 @@ function Batch({
   airdropData,
   refetchAirdrop,
 }: {
-  batch: GetAirdropsId200["transactions"][number];
+  batch: GetAirdrop200["transactions"][number];
   airdropId: string;
   airdropData: AirdropIdQueryReturnData;
   refetchAirdrop: () => Promise<unknown>;
