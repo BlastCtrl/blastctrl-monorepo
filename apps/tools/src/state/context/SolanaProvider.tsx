@@ -117,7 +117,9 @@ export function getEndpoint(
     case "testnet":
       return clusterApiUrl("testnet");
     case "devnet":
-      return clusterApiUrl("devnet");
+      return (
+        process.env.NEXT_PUBLIC_RPC_ENDPOINT_DEVNET || clusterApiUrl("devnet")
+      );
     default:
       return endpoint;
   }
