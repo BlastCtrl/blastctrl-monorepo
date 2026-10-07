@@ -38,6 +38,8 @@ const AT_ONCE = { duration: 0 };
  * The band unrolls from the top as it appears. Its dots drift up and to
  * the left by one tile per cycle, which joins up with itself; the drift is
  * paused rather than stopped, so it can pick up again from where it is.
+ * The media query covers a server-rendered stage, painted before the page
+ * knows the setting.
  */
 const STAGE_CSS = `
   @keyframes stage-in {
@@ -48,6 +50,9 @@ const STAGE_CSS = `
     to { transform: translate(${-TILE}px, ${-TILE}px); }
   }
   .stage-drift { animation: stage-drift ${TILE / DRIFT}s linear infinite; }
+  @media (prefers-reduced-motion: reduce) {
+    .stage-in, .stage-drift { animation: none; }
+  }
 `;
 
 /**

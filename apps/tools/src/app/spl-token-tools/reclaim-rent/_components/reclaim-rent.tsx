@@ -9,7 +9,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { CollapsibleTable } from "./collapsible-table";
-import { SERVICE_FEE, formatFeeRate, serviceFeeLamports } from "./fee";
+import {
+  SERVICE_FEE,
+  afterFees,
+  formatFeeRate,
+  serviceFeeLamports,
+} from "./fee";
 import { MintPanel } from "./mint-panel";
 import { ReclaimDialog } from "./reclaim-dialog";
 import {
@@ -58,15 +63,6 @@ type Snapshot = Pick<
 >;
 
 const wait = (ms: number) => new Promise((done) => setTimeout(done, ms));
-
-/** What one transaction's accounts put in the wallet, after its fees. */
-const afterFees = (accounts: ReclaimableAccount[], closeEmpty: boolean) => {
-  const lamports = accounts.reduce(
-    (sum, a) => sum + reclaimLamports(a, closeEmpty),
-    0,
-  );
-  return lamports - serviceFeeLamports(feeBase(accounts)) - FEE_PER_TRANSACTION;
-};
 
 /**
  * The whole tool: the intro, the stage with the results block, and the
@@ -419,9 +415,11 @@ export function ReclaimRent({
         : null,
     reveal: true,
     reduced,
-    detailsId: DETAILS_ID,
-    detailsOpen,
-    onToggleDetails: () => setDetailsOpen((o) => !o),
+    details: {
+      id: DETAILS_ID,
+      open: detailsOpen,
+      onToggle: () => setDetailsOpen((o) => !o),
+    },
     onReclaim: () => void reclaimNow(),
     onRescan: () => void scan(),
   };

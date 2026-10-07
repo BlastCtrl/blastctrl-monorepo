@@ -446,11 +446,11 @@ export function Tally(p: RewardProps) {
             <Chips closesEmpty={p.emptyAccounts > 0} />
           )}
 
-          {p.status !== "nothing" && (
+          {p.status !== "nothing" && p.details && (
             <DetailsToggle
-              open={p.detailsOpen}
-              controls={p.detailsId}
-              onToggle={p.onToggleDetails}
+              open={p.details.open}
+              controls={p.details.id}
+              onToggle={p.details.onToggle}
               animated={!p.reduced}
             />
           )}

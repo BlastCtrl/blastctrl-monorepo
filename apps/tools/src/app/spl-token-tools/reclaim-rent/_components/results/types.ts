@@ -58,10 +58,12 @@ export type RewardProps = {
   reduced: boolean;
   onReclaim: () => void;
   onRescan: () => void;
-  /** The detailed view below the stage, where accounts get picked. */
-  detailsId: string;
-  detailsOpen: boolean;
-  onToggleDetails: () => void;
+  /**
+   * The detailed view below the stage, where accounts get picked. Without
+   * one (the /reclaim-sol page) there's nothing to customize, and no
+   * "Customize".
+   */
+  details?: { id: string; open: boolean; onToggle: () => void };
 };
 
 export function fromWhere(tokenAccounts: number, mints: number) {
