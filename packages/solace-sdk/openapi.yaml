@@ -1,24 +1,16 @@
 openapi: 3.0.0
 info:
-  title: Test swagger
-  description: Testing the Fastify swagger API
-  version: 0.1.0
+  title: Blast API
+  description: Create and manage Solana SOL and SPL token airdrops.
+  version: 1.0.3
 components:
   securitySchemes:
-    apiKey:
-      type: apiKey
-      name: apiKey
-      in: header
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     def-0:
-      type: object
-      properties:
-        authorization:
-          type: string
-          description: "Bearer token. Format: Bearer <token>"
-          pattern: ^Bearer [A-Za-z0-9-_=]+.[A-Za-z0-9-_=]+.[A-Za-z0-9-_.+/=]*$
-      title: authHeaderSchema
-    def-1:
       type: object
       required:
         - error
@@ -35,6 +27,10 @@ components:
 paths:
   /auth/challenge:
     get:
+      operationId: getAuthChallenge
+      summary: Get a wallet signing challenge
+      tags:
+        - Auth
       parameters:
         - schema:
             type: string
@@ -68,7 +64,12 @@ paths:
                     type: number
   /auth/verify:
     post:
+      operationId: verifyAuthChallenge
+      summary: Verify a signed challenge and issue tokens
+      tags:
+        - Auth
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -81,7 +82,6 @@ paths:
                   type: string
                 signature:
                   type: string
-        required: true
       responses:
         "200":
           description: Default Response
@@ -136,7 +136,12 @@ paths:
                     type: number
   /auth/refresh:
     post:
+      operationId: refreshAuthToken
+      summary: Refresh authentication tokens
+      tags:
+        - Auth
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -149,7 +154,6 @@ paths:
                   type: string
                 refreshToken:
                   type: string
-        required: true
       responses:
         "200":
           description: Default Response
@@ -204,7 +208,12 @@ paths:
                     type: number
   /airdrops:
     post:
+      operationId: createAirdrop
+      summary: Create a SOL airdrop
+      tags:
+        - Airdrops
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -231,13 +240,8 @@ paths:
                         atomicAmount:
                           type: integer
                           minimum: 1
-        required: true
-      parameters:
-        - schema:
-            $ref: "#/components/schemas/def-0/properties/authorization"
-          in: header
-          name: authorization
-          required: false
+      security:
+        - bearerAuth: []
       responses:
         "201":
           description: Default Response
@@ -257,26 +261,26 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
         "401":
           description: Default Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
         "500":
           description: Default Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
     get:
-      parameters:
-        - schema:
-            $ref: "#/components/schemas/def-0/properties/authorization"
-          in: header
-          name: authorization
-          required: false
+      operationId: listAirdrops
+      summary: List your airdrops
+      tags:
+        - Airdrops
+      security:
+        - bearerAuth: []
       responses:
         "200":
           description: Default Response
@@ -338,10 +342,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
   /airdrops/token:
     post:
+      operationId: createTokenAirdrop
+      summary: Create an SPL token airdrop
+      tags:
+        - Airdrops
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -376,13 +385,8 @@ paths:
                         atomicAmount:
                           type: integer
                           minimum: 1
-        required: true
-      parameters:
-        - schema:
-            $ref: "#/components/schemas/def-0/properties/authorization"
-          in: header
-          name: authorization
-          required: false
+      security:
+        - bearerAuth: []
       responses:
         "201":
           description: Default Response
@@ -402,32 +406,33 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
         "401":
           description: Default Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
         "500":
           description: Default Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
   /airdrops/{id}:
     delete:
+      operationId: deleteAirdrop
+      summary: Delete an unstarted airdrop
+      tags:
+        - Airdrops
       parameters:
         - schema:
             type: string
           in: path
           name: id
           required: true
-        - schema:
-            $ref: "#/components/schemas/def-0/properties/authorization"
-          in: header
-          name: authorization
-          required: false
+      security:
+        - bearerAuth: []
       responses:
         "204":
           description: Default Response
@@ -439,31 +444,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
         "401":
           description: Default Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
         "404":
           description: Default Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
     get:
+      operationId: getAirdrop
+      summary: Get airdrop details
+      tags:
+        - Airdrops
       parameters:
         - schema:
             type: string
           in: path
           name: id
           required: true
-        - schema:
-            $ref: "#/components/schemas/def-0/properties/authorization"
-          in: header
-          name: authorization
-          required: false
+      security:
+        - bearerAuth: []
       responses:
         "200":
           description: Default Response
@@ -563,16 +569,21 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
         "404":
           description: Default Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
   /airdrops/{id}/start:
     post:
+      operationId: startAirdrop
+      summary: Submit signed transactions for an airdrop
+      tags:
+        - Airdrops
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -605,11 +616,8 @@ paths:
           in: path
           name: id
           required: true
-        - schema:
-            $ref: "#/components/schemas/def-0/properties/authorization"
-          in: header
-          name: authorization
-          required: false
+      security:
+        - bearerAuth: []
       responses:
         "200":
           description: Default Response
@@ -640,28 +648,33 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
         "401":
           description: Default Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
         "404":
           description: Default Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
         "500":
           description: Default Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
   /airdrops/{airdropId}/retry-batch/{batchId}:
     post:
+      operationId: retryAirdropTransaction
+      summary: Retry an expired airdrop transaction
+      tags:
+        - Airdrops
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -682,7 +695,6 @@ paths:
                   minimum: 0
                 txBase64:
                   type: string
-        required: true
       parameters:
         - schema:
             type: string
@@ -694,11 +706,8 @@ paths:
           in: path
           name: batchId
           required: true
-        - schema:
-            $ref: "#/components/schemas/def-0/properties/authorization"
-          in: header
-          name: authorization
-          required: false
+      security:
+        - bearerAuth: []
       responses:
         "200":
           description: Default Response
@@ -716,22 +725,27 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
         "401":
           description: Default Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
         "404":
           description: Default Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
   /airdrops/{airdropId}/set-label:
     post:
+      operationId: setAirdropLabel
+      summary: Set an airdrop label
+      tags:
+        - Airdrops
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -742,18 +756,14 @@ paths:
                 label:
                   type: string
                   maxLength: 30
-        required: true
       parameters:
         - schema:
             type: string
           in: path
           name: airdropId
           required: true
-        - schema:
-            $ref: "#/components/schemas/def-0/properties/authorization"
-          in: header
-          name: authorization
-          required: false
+      security:
+        - bearerAuth: []
       responses:
         "200":
           description: Default Response
@@ -771,21 +781,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
         "401":
           description: Default Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
         "404":
           description: Default Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/def-1"
+                $ref: "#/components/schemas/def-0"
   /health:
     get:
+      operationId: getHealth
+      summary: Check service health
+      tags:
+        - Health
       responses:
         "200":
           description: Default Response
@@ -797,3 +811,12 @@ paths:
 servers:
   - url: http://localhost:3000
     description: Development server
+  - url: https://blastsolace.prasko.io
+    description: Production server
+tags:
+  - name: Auth
+    description: Wallet authentication and token refresh.
+  - name: Airdrops
+    description: Create, manage, and process airdrops.
+  - name: Health
+    description: Service health.

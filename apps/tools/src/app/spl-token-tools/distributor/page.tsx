@@ -7,8 +7,8 @@ import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Button } from "@blastctrl/ui";
 import base58 from "bs58";
 import type {
-  GetAirdrops200Item,
-  GetAirdropsId200,
+  ListAirdrops200Item,
+  GetAirdrop200,
 } from "@blastctrl/solace-sdk";
 import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
@@ -37,7 +37,7 @@ export default function Overview() {
 
   const refreshAccessToken = useCallback(async () => {
     if (!authToken?.refreshToken || !publicKey) return;
-    const response = await solace.api.postAuthRefresh({
+    const response = await solace.api.refreshAuthToken({
       address: publicKey?.toString(),
       refreshToken: authToken.refreshToken,
     });
@@ -98,7 +98,7 @@ export default function Overview() {
       const msgUint8 = new TextEncoder().encode(challenge.data.message);
       const signature = await signMessage(msgUint8);
 
-      const authResp = await solace.api.postAuthVerify({
+      const authResp = await solace.api.verifyAuthChallenge({
         address: publicKey?.toString(),
         signature: base58.encode(signature),
       });
@@ -160,7 +160,7 @@ export default function Overview() {
   return <SolaceAirdropDashboard clearAuthToken={clearAuthToken} />;
 }
 
-type AirdropStatus = GetAirdropsId200["status"];
+type AirdropStatus = GetAirdrop200["status"];
 
 const SolaceAirdropDashboard = ({
   clearAuthToken,
@@ -449,7 +449,7 @@ const SolaceAirdropDashboard = ({
   );
 };
 
-function AirdropName({ airdrop }: { airdrop: GetAirdrops200Item }) {
+function AirdropName({ airdrop }: { airdrop: ListAirdrops200Item }) {
   const [state, setState] = useState<"edit" | "view">("view");
   const inputRef = useRef<HTMLInputElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);

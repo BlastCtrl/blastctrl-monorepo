@@ -3,15 +3,15 @@ import { useSolace } from "./solace-provider";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { SolaceError } from "./common";
 import type {
-  PostAirdrops201,
-  PostAirdropsAirdropIdRetryBatchBatchIdBody,
-  PostAirdropsBody,
-  PostAirdropsIdStart200,
-  PostAirdropsIdStartBodyItem,
-  GetAirdropsId200,
-  GetAirdrops200Item,
-  PostAirdropsToken201,
-  PostAirdropsTokenBody,
+  CreateAirdrop201,
+  RetryAirdropTransactionBody,
+  CreateAirdropBody,
+  StartAirdrop200,
+  StartAirdropBodyItem,
+  GetAirdrop200,
+  ListAirdrops200Item,
+  CreateTokenAirdrop201,
+  CreateTokenAirdropBody,
 } from "@blastctrl/solace-sdk";
 import { notify } from "@/components/notification";
 import { withMinimumTime } from "@/lib/utils";
@@ -20,12 +20,12 @@ export function useGetAirdrops() {
   const sdk = useSolace();
   const { publicKey } = useWallet();
 
-  return useQuery<GetAirdrops200Item[], SolaceError>({
+  return useQuery<ListAirdrops200Item[], SolaceError>({
     retry: 1,
     enabled: !!publicKey,
     queryKey: ["airdrops", "all", publicKey?.toString()],
     queryFn: async () => {
-      const response = await sdk.api.getAirdrops();
+      const response = await sdk.api.listAirdrops();
       if (response.status !== 200) {
         throw new SolaceError(response.data);
       }
@@ -34,7 +34,7 @@ export function useGetAirdrops() {
   });
 }
 
-function getAirdropByIdTransformer(data: GetAirdropsId200) {
+function getAirdropByIdTransformer(data: GetAirdrop200) {
   let type: "same" | "different";
   const recipients = data.transactions.flatMap((t) => t.recipients);
 
@@ -83,7 +83,7 @@ export function useGetAirdropById(airdropId: string, hasStarted?: boolean) {
     },
     queryKey: ["airdrops", "single", airdropId],
     queryFn: async () => {
-      const response = await sdk.api.getAirdropsId(airdropId);
+      const response = await sdk.api.getAirdrop(airdropId);
 
       if (response.status !== 200) {
         throw new SolaceError(response.data);
@@ -98,10 +98,10 @@ export function useGetAirdropById(airdropId: string, hasStarted?: boolean) {
 export function useCreateAirdrop() {
   const sdk = useSolace();
 
-  return useMutation<PostAirdrops201, SolaceError, PostAirdropsBody>({
+  return useMutation<CreateAirdrop201, SolaceError, CreateAirdropBody>({
     mutationKey: ["createAirdrop"],
     mutationFn: async (data) => {
-      const response = await withMinimumTime(sdk.api.postAirdrops(data), 500);
+      const response = await withMinimumTime(sdk.api.createAirdrop(data), 500);
       if (response.status !== 201) {
         throw new SolaceError(response.data);
       }
@@ -113,11 +113,15 @@ export function useCreateAirdrop() {
 export function useCreateTokenAirdrop() {
   const sdk = useSolace();
 
-  return useMutation<PostAirdropsToken201, SolaceError, PostAirdropsTokenBody>({
+  return useMutation<
+    CreateTokenAirdrop201,
+    SolaceError,
+    CreateTokenAirdropBody
+  >({
     mutationKey: ["createTokenAirdrop"],
     mutationFn: async (data) => {
       const response = await withMinimumTime(
-        sdk.api.postAirdropsToken(data),
+        sdk.api.createTokenAirdrop(data),
         500,
       );
       if (response.status !== 201) {
@@ -131,14 +135,10 @@ export function useCreateTokenAirdrop() {
 export function useStartAirdrop(airdropId: string) {
   const sdk = useSolace();
 
-  return useMutation<
-    PostAirdropsIdStart200,
-    SolaceError,
-    PostAirdropsIdStartBodyItem[]
-  >({
+  return useMutation<StartAirdrop200, SolaceError, StartAirdropBodyItem[]>({
     mutationKey: ["startAirdrop"],
     mutationFn: async (data) => {
-      const response = await sdk.api.postAirdropsIdStart(airdropId, data);
+      const response = await sdk.api.startAirdrop(airdropId, data);
 
       if (response.status !== 200) {
         throw new SolaceError(response.data);
@@ -153,8 +153,8 @@ export function useRetryTransaction(airdropId: string, batchId: string) {
 
   return useMutation({
     mutationKey: ["retry", airdropId, batchId],
-    mutationFn: async (data: PostAirdropsAirdropIdRetryBatchBatchIdBody) => {
-      const response = await sdk.api.postAirdropsAirdropIdRetryBatchBatchId(
+    mutationFn: async (data: RetryAirdropTransactionBody) => {
+      const response = await sdk.api.retryAirdropTransaction(
         airdropId,
         batchId,
         data,
@@ -176,12 +176,12 @@ export function useRetryMany(airdropId: string) {
     mutationFn: async (
       data: Array<{
         batchId: number;
-        data: PostAirdropsAirdropIdRetryBatchBatchIdBody;
+        data: RetryAirdropTransactionBody;
       }>,
     ) => {
       const responses = await Promise.allSettled(
         data.map((batchData) =>
-          sdk.api.postAirdropsAirdropIdRetryBatchBatchId(
+          sdk.api.retryAirdropTransaction(
             airdropId,
             batchData.batchId.toString(),
             batchData.data,
@@ -219,7 +219,7 @@ export function useDeleteAirdrop() {
   return useMutation({
     mutationKey: ["delete"],
     mutationFn: async ({ id }: { id: string }) => {
-      const response = await sdk.api.deleteAirdropsId(id);
+      const response = await sdk.api.deleteAirdrop(id);
 
       if (response.status !== 204) {
         throw new SolaceError(response.data);
@@ -253,7 +253,7 @@ export function useSetLabel(airdropId: string) {
   return useMutation({
     mutationKey: ["set-label"],
     mutationFn: async (label: string) => {
-      const response = await sdk.api.postAirdropsAirdropIdSetLabel(airdropId, {
+      const response = await sdk.api.setAirdropLabel(airdropId, {
         label,
       });
 
@@ -266,7 +266,7 @@ export function useSetLabel(airdropId: string) {
     onMutate: async (data) => {
       await queryClient.cancelQueries({ queryKey: ["airdrops"] });
       const previousAirdrops =
-        queryClient.getQueryData<GetAirdrops200Item[]>(queryKey);
+        queryClient.getQueryData<ListAirdrops200Item[]>(queryKey);
       if (!previousAirdrops) return;
       const updatedAirdrops = previousAirdrops.map((a) =>
         a.id === airdropId ? { ...a, label: data } : a,
