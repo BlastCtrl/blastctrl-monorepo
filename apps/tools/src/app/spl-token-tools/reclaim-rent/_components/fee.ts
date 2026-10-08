@@ -1,3 +1,7 @@
+import {
+  serviceFeeLamports as calculateServiceFee,
+  serviceFeeForBatches as calculateBatchFees,
+} from "@blastctrl/rent-reclaimer";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { FEE_PER_TRANSACTION } from "./rent";
 import type { ReclaimableAccount } from "./types";
@@ -38,7 +42,7 @@ export function serviceFeeLamports(
   excessLamports: number,
   fee: ServiceFee | null = SERVICE_FEE,
 ) {
-  return fee ? Math.floor((excessLamports * fee.basisPoints) / 10_000) : 0;
+  return fee ? calculateServiceFee(excessLamports, fee.basisPoints) : 0;
 }
 
 /** What one transaction's accounts put in the wallet, after its fees. */
@@ -71,4 +75,12 @@ export function createServiceFeeInstruction(
     toPubkey: fee.recipient,
     lamports,
   });
+}
+
+/** Match the per-transaction rounding used by the actual fee transfers. */
+export function serviceFeeForBatches(
+  accounts: ReclaimableAccount[],
+  fee: ServiceFee | null = SERVICE_FEE,
+) {
+  return Number(calculateBatchFees(accounts, fee?.basisPoints ?? 0));
 }

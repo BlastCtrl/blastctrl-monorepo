@@ -9,9 +9,9 @@
   },
   "packageManager": "pnpm@10.34.3+sha512.f2c531b08829d7be7f03c90addc266615f9c5477463e4bf1d275cb263ce9ea57cf0d5599110d94649a9bb3fed9f0b5efcea74a7016b61532a24cb9ad87860c1d",
   "scripts": {
-    "build": "next build",
+    "build": "pnpm --filter @blastctrl/rent-reclaimer build && next build",
     "clean": "git clean -xdf .next node_modules",
-    "dev": "next dev",
+    "dev": "pnpm --filter @blastctrl/rent-reclaimer build && next dev",
     "format": "prettier --check . --ignore-path ./.gitignore",
     "lint": "eslint .",
     "start": "next start",
@@ -21,6 +21,7 @@
   "dependencies": {
     "@ardrive/turbo-sdk": "^1.41.1",
     "@blastctrl/octane-core": "workspace:^",
+    "@blastctrl/rent-reclaimer": "workspace:*",
     "@blastctrl/solace-sdk": "workspace:^",
     "@blastctrl/ui": "workspace:^",
     "@dha-team/arbundles": "^1.0.4",

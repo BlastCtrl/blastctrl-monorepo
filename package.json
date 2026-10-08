@@ -9,7 +9,10 @@
     "format": "pnpm run --recursive format",
     "lint": "pnpm run --recursive lint",
     "build": "pnpm -F solace-sdk build && pnpm -F tools build",
-    "api:update": "node packages/solace-sdk/scripts/update-api.mjs"
+    "api:update": "node packages/solace-sdk/scripts/update-api.mjs",
+    "build:mcp": "pnpm --filter @blastctrl/mcp... build",
+    "dev:mcp": "pnpm -F @blastctrl/rent-reclaimer build && pnpm -F @blastctrl/mcp dev",
+    "test:mcp": "pnpm -F @blastctrl/rent-reclaimer build && pnpm -F @blastctrl/rent-reclaimer test && pnpm -F @blastctrl/mcp test"
   },
   "license": "MIT",
   "devDependencies": {

@@ -1,0 +1,32 @@
+{
+  "name": "@blastctrl/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+    "start": "node --env-file-if-exists=.env dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "format": "prettier --check . --ignore-path ../../.gitignore"
+  },
+  "dependencies": {
+    "@blastctrl/rent-reclaimer": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@solana/web3.js": "^1.99.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@blastctrl/tsconfig": "workspace:*",
+    "@blastctrl/prettier-config": "workspace:*",
+    "@types/node": "22.18.8",
+    "tsx": "^4.19.3",
+    "typescript": "5.8.3",
+    "vitest": "^3.2.7"
+  },
+  "prettier": "@blastctrl/prettier-config"
+}

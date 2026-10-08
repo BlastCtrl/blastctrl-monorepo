@@ -13,7 +13,7 @@ import {
   SERVICE_FEE,
   afterFees,
   formatFeeRate,
-  serviceFeeLamports,
+  serviceFeeForBatches,
 } from "./fee";
 import { MintPanel } from "./mint-panel";
 import { ReclaimDialog } from "./reclaim-dialog";
@@ -37,7 +37,7 @@ import type {
   Sending,
 } from "./results/types";
 import type { ReclaimableAccount } from "./types";
-import { closes, excessLamports, feeBase, reclaimLamports } from "./types";
+import { closes, excessLamports, reclaimLamports } from "./types";
 import { WalletRefusedError, useReclaimExcess } from "./use-reclaim-excess";
 import { useRentRate } from "./use-rent-rate";
 
@@ -177,7 +177,7 @@ export function ReclaimRent({
   const reclaimed = all.filter((a) => reclaimedIds.has(a.id));
   const selectedLamports = selected.reduce((sum, a) => sum + worth(a), 0);
   const transactions = Math.ceil(selected.length / ACCOUNTS_PER_TRANSACTION);
-  const serviceFee = serviceFeeLamports(feeBase(selected));
+  const serviceFee = serviceFeeForBatches(selected);
   const networkFee = transactions * FEE_PER_TRANSACTION;
   const net = selectedLamports - serviceFee - networkFee;
   // Whatever the switch says, so its description can say what it would do.

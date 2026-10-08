@@ -20,6 +20,16 @@ This monorepo currently hosts the Blast Tools Nextjs application, but it could b
 
 ### Installation and setup
 
+The read-only Rent Reclaimer MCP server is in `apps/mcp`. It reuses the web
+tool's account analysis through `packages/rent-reclaimer`. See
+[the MCP setup guide](apps/mcp/README.md) for local tests and ChatGPT connection steps.
+
+```bash
+pnpm dev:mcp
+pnpm build:mcp
+pnpm test:mcp
+```
+
 The project uses the `pnpm` package manager for managing dependencies. To install all dependencies, run `pnpm install` from the root directory.
 
 To run the development server for the tools app:

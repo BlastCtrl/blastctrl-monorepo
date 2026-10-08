@@ -59,8 +59,10 @@ export function remainingSteps(lamportsPerByte: number) {
  * malicious. In testing, 12 token accounts and a mint got their assertions,
  * while 13 token accounts, or 12 that close, didn't.
  */
-export const ACCOUNTS_PER_TRANSACTION = 10;
-export const FEE_PER_TRANSACTION = 5000;
+export {
+  ACCOUNTS_PER_TRANSACTION,
+  FEE_PER_TRANSACTION,
+} from "@blastctrl/rent-reclaimer";
 
 export function minimumBalance(dataLength: number, lamportsPerByte: number) {
   return (ACCOUNT_STORAGE_OVERHEAD + dataLength) * lamportsPerByte;
