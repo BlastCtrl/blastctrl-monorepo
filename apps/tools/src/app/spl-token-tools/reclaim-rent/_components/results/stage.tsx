@@ -1,8 +1,10 @@
 "use client";
 
 import { cn } from "@blastctrl/ui";
-import { AnimatePresence, motion } from "motion/react";
+import type { AnimationPlaybackControls } from "motion/react";
+import { AnimatePresence, animate, motion } from "motion/react";
 import type { ReactNode } from "react";
+import { useEffect, useRef } from "react";
 import { DOT_GRID, STAGE_BG } from "./look";
 
 /** One tile of the dot grid; drifting by a whole tile looks like no change. */
@@ -14,13 +16,14 @@ const DRIFT = 12;
  * The height of Tally with one row of coins, from its Tailwind sizes. Keep
  * in step with Tally's layout.
  *   Amount column: amount (48px, 60px from sm) + coins (16 + 12px, 14px
- *   from sm) + sentence (12 + 20px) + chips (20 + 32px) + "Choose
- *   accounts" pill (16 + 34px) = 210px, 224px.
- *   Pill column: pill (56px) + gap (10px) + count row (20px) = 86px.
+ *   from sm) + sentence (12 + 20px) + chips (20 + 32px) + "Customize"
+ *   pill (16 + 34px) = 210px, 224px.
+ *   Pill column: pill (32px padding + 28px line) + gap (10px) + count row
+ *   (20px) = 90px.
  *   Below md the columns stack with a 32px gap; from md they sit side by
  *   side and the amount column is the taller.
  */
-const EMPTY_HEIGHT = "min-h-[328px] sm:min-h-[342px] md:min-h-[224px]";
+const EMPTY_HEIGHT = "min-h-[332px] sm:min-h-[346px] md:min-h-[224px]";
 
 /** "Checking…" rises in from below and leaves upwards, a few px each way. */
 const CHECKING = {
@@ -33,6 +36,71 @@ const EASE_OUT = [0.23, 1, 0.32, 1] as const;
 const CHECKING_IN = { duration: 0.2, ease: EASE_OUT };
 const CHECKING_OUT = { duration: 0.12, ease: EASE_OUT };
 const AT_ONCE = { duration: 0 };
+/** The band's height follows its content at the details drawer's pace. */
+const RESIZE = { duration: 0.3, ease: EASE_OUT };
+
+/**
+ * Eases the band from its old height to its new one whenever what's inside
+ * changes size, say results with nothing to reclaim replacing a taller
+ * invitation. `frame` takes the height; `content` keeps its own, anchored
+ * to the top, so nothing inside moves: only the band's bottom edge does,
+ * and what follows it on the page with it. The resize observer reports
+ * after layout and before paint, so the frame is held at the old height
+ * before the new one ever shows. A change of width is the page resizing,
+ * not new content, and just follows along.
+ */
+function useFollowHeight(reduced: boolean) {
+  const frame = useRef<HTMLDivElement>(null);
+  const content = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const outer = frame.current;
+    const inner = content.current;
+    if (!outer || !inner) return;
+    let last: { width: number; height: number } | null = null;
+    let running: AnimationPlaybackControls | null = null;
+    const release = () => {
+      running?.stop();
+      running = null;
+      outer.style.height = "";
+      outer.style.overflow = "";
+    };
+
+    const observer = new ResizeObserver(([entry]) => {
+      const box = entry?.borderBoxSize[0];
+      if (!box) return;
+      const now = { width: box.inlineSize, height: box.blockSize };
+      const before = last;
+      last = now;
+      if (!before || before.height === now.height) return;
+      if (reduced || before.width !== now.width) {
+        release();
+        return;
+      }
+      // Mid-resize, start from wherever the band is now.
+      const from = running
+        ? outer.getBoundingClientRect().height
+        : before.height;
+      running?.stop();
+      outer.style.height = `${from}px`;
+      // Clipped only while it moves, so a taller result is revealed rather
+      // than spilling out, and the payoff's burst is never cut off.
+      outer.style.overflow = "clip";
+      const mine = animate(outer, { height: [from, now.height] }, RESIZE);
+      running = mine;
+      void mine.then(() => {
+        if (running === mine) release();
+      });
+    });
+    observer.observe(inner);
+    return () => {
+      observer.disconnect();
+      release();
+    };
+  }, [reduced]);
+
+  return { frame, content };
+}
 
 /**
  * The band unrolls from the top as it appears. Its dots drift up and to
@@ -62,8 +130,8 @@ const STAGE_CSS = `
  * a stop when the scan is done, as "Checking…" leaves.
  * Until something is inside, it holds exactly the height of a typical
  * result (one row of coins, so up to ~30 accounts), so the results land
- * without the stage changing size. Bigger wallets grow it by their extra
- * coin rows.
+ * without the stage changing size. When they do need a different height
+ * (bigger wallets, nothing to reclaim), the band eases to it.
  */
 export function Stage({
   moving,
@@ -80,6 +148,7 @@ export function Stage({
   reduced: boolean;
   children?: ReactNode;
 }) {
+  const { frame, content } = useFollowHeight(reduced);
   return (
     <div
       className={cn(
@@ -105,8 +174,13 @@ export function Stage({
           style={{ animationPlayState: moving ? "running" : "paused" }}
         />
       </div>
-      <div className={cn("relative", !children && EMPTY_HEIGHT)}>
-        {children}
+      <div ref={frame}>
+        <div
+          ref={content}
+          className={cn("relative", !children && EMPTY_HEIGHT)}
+        >
+          {children}
+        </div>
       </div>
 
       {/* While the scan runs, a small "Checking…" sits in the middle. */}
