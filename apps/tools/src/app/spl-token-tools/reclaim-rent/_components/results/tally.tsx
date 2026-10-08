@@ -1,5 +1,6 @@
 "use client";
 
+import { compress } from "@/lib/solana";
 import { cn } from "@blastctrl/ui";
 import type { AnimationSequence, MotionValue } from "motion/react";
 import { motion, stagger, useAnimate } from "motion/react";
@@ -458,7 +459,18 @@ export function Tally(p: RewardProps) {
 
         <div className="flex shrink-0 flex-col items-stretch gap-2.5 md:items-end">
           {p.status === "nothing" ? (
-            <CheckAgainPill onClick={p.onRescan} />
+            <>
+              <CheckAgainPill
+                onClick={p.watching?.onCheckAnother ?? p.onRescan}
+                label={p.watching ? "Check another address" : undefined}
+              />
+              {p.watching && (
+                <Whose
+                  address={p.watching.address}
+                  className="self-center text-sm text-zinc-500 md:self-end"
+                />
+              )}
+            </>
           ) : p.status === "reclaimed" ? (
             <>
               <ReclaimedBadge className="px-10 md:min-w-[18rem]" />
@@ -484,17 +496,24 @@ export function Tally(p: RewardProps) {
                   <p aria-hidden="true">{"\u00a0"}</p>
                 ) : (
                   <>
-                    {canReclaim && (
-                      <>
+                    {p.watching ? (
+                      <Whose address={p.watching.address} />
+                    ) : (
+                      canReclaim && (
                         <p data-fade>{transactionCount(p.transactions)}</p>
-                        <span
-                          aria-hidden="true"
-                          data-fade
-                          className="h-3.5 w-px self-center bg-zinc-300"
-                        />
-                      </>
+                      )
                     )}
-                    <CheckAgainLink onClick={p.onRescan} />
+                    {(p.watching || canReclaim) && (
+                      <span
+                        aria-hidden="true"
+                        data-fade
+                        className="h-3.5 w-px self-center bg-zinc-300"
+                      />
+                    )}
+                    <CheckAgainLink
+                      onClick={p.watching?.onCheckAnother ?? p.onRescan}
+                      label={p.watching ? "Check another address" : undefined}
+                    />
                   </>
                 )}
               </div>
@@ -575,6 +594,21 @@ function CoinDot({
   );
 }
 
+/** Whose results these are, for a pasted address. */
+function Whose({
+  address,
+  className,
+}: {
+  address: string;
+  className?: string;
+}) {
+  return (
+    <p data-fade title={address} className={className}>
+      For {compress(address, 4)}
+    </p>
+  );
+}
+
 function pillLabel(p: RewardProps) {
   const s = p.sending;
   if (s?.step === "signing") {
@@ -587,6 +621,7 @@ function pillLabel(p: RewardProps) {
       ? `Reclaiming, ${s.confirmed} of ${s.transactions}`
       : "Reclaiming…";
   }
+  if (p.watching) return "Connect to reclaim";
   return p.failed ? "Try again" : "Reclaim it";
 }
 

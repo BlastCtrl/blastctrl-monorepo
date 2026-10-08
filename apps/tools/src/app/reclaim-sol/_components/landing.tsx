@@ -1,9 +1,5 @@
 "use client";
 
-import {
-  SERVICE_FEE,
-  formatFeeRate,
-} from "@/app/spl-token-tools/reclaim-rent/_components/fee";
 import { remainingSteps } from "@/app/spl-token-tools/reclaim-rent/_components/rent";
 import { RentScheduleChart } from "@/app/spl-token-tools/reclaim-rent/_components/rent-schedule-chart";
 import { useRentRate } from "@/app/spl-token-tools/reclaim-rent/_components/use-rent-rate";
@@ -84,10 +80,15 @@ function GoodToKnow({
           Good to know before you reclaim
         </h2>
         <dl className="contents">
+          <Fact term="You approve everything.">
+            Your wallet shows each transaction first, and nothing is sent until
+            you approve it.
+          </Fact>
           <Fact term="Your tokens stay put.">
             Accounts that hold tokens stay open. Only the SOL they no longer
             need leaves them.
           </Fact>
+          <div className="hidden lg:block">{/* Placeholder */}</div>
           <Fact term="Empty accounts get closed.">
             They hold no tokens, so closing them returns their whole deposit. To
             keep some open, or pick accounts yourself, use the{" "}
@@ -96,11 +97,7 @@ function GoodToKnow({
             </Link>
             .
           </Fact>
-          <Fact term="You approve everything.">
-            Your wallet shows each transaction first, and nothing is sent until
-            you approve it.
-          </Fact>
-          {SERVICE_FEE ? (
+          {/*{SERVICE_FEE ? (
             <Fact
               term={`A ${formatFeeRate(SERVICE_FEE)} fee, already counted.`}
             >
@@ -113,7 +110,7 @@ function GoodToKnow({
               The amount you see is what lands in your wallet, after network
               fees.
             </Fact>
-          )}
+          )}*/}
           {stepsLeft > 0 && (
             <Fact term="There's more coming.">
               Rent drops again in November, and every step frees up more. Come

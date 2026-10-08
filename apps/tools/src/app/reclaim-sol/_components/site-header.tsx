@@ -19,8 +19,8 @@ export function SiteHeader() {
         href="/"
         className="-m-1 flex items-center gap-2.5 rounded-md p-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
-        <Image src={BlastCtrlIcon} alt="" className="size-8" priority />
-        <span className="font-display text-xl font-bold tracking-tight text-slate-800">
+        <Image src={BlastCtrlIcon} alt="" className="size-10" priority />
+        <span className="font-display text-2xl font-bold tracking-tight text-slate-800">
           BlastCtrl
         </span>
       </Link>

@@ -35,6 +35,7 @@ import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import type { Entry } from "./band";
 import { Band, Invitation } from "./band";
 import { useHydrated } from "./use-hydrated";
 
@@ -78,13 +79,27 @@ function reclaimable(data: ReclaimableAccount[]) {
  * The reclaim-rent tool with every choice made: everything found gets
  * reclaimed, empty accounts close, and the pill sends it all at once, with
  * no review step. It plays out on the same results block as the full tool.
+ * Without a wallet, a pasted address can be checked; reclaiming from it
+ * takes connecting it.
  */
 export function OneClickReclaim() {
   const { connection } = useConnection();
   const { connected, publicKey } = useWallet();
   const { setVisible } = useWalletModal();
   const queryClient = useQueryClient();
-  const owner = publicKey?.toBase58() ?? "";
+  const wallet = publicKey?.toBase58() ?? "";
+  /** An address someone pasted to check without connecting. */
+  const [pasted, setPasted] = useState<string | null>(null);
+  const [entry, setEntry] = useState<Entry>("wallet");
+  // A connected wallet takes over from a pasted address. When it's the
+  // same address, nothing changes but that the pill can now reclaim.
+  if (wallet && pasted) {
+    setPasted(null);
+    setEntry("wallet");
+  }
+  /** Whose accounts the block is about. */
+  const owner = wallet || pasted || "";
+  const watching = wallet ? null : pasted;
   const { error, refetch } = useReclaimableAccounts(owner);
   // Unlike the full tool's, this stage is server-rendered, and the server
   // can't know the setting: assume motion until hydrated, then follow it.
@@ -110,7 +125,7 @@ export function OneClickReclaim() {
   } | null>(null);
   const sent = useRef<ReclaimableAccount[][]>([]);
 
-  // Results belong to one wallet on one network: start over when either
+  // Results belong to one address on one network: start over when either
   // changes.
   const scope = `${owner} ${connection.rpcEndpoint}`;
   const [stateScope, setStateScope] = useState(scope);
@@ -235,15 +250,14 @@ export function OneClickReclaim() {
     }
   };
 
-  /** Set when the pill asked for a wallet: once one connects, check it. */
-  const scanOnConnect = useRef(false);
+  /**
+   * A check waiting for its address to be the block's: a pasted one, or a
+   * wallet the page asked for. `notice` is for a wallet that turns out not
+   * to be the address that was pasted, so it gets checked in its place.
+   */
+  const scanNext = useRef<{ notice: boolean } | null>(null);
 
   const scan = async () => {
-    if (!connected) {
-      scanOnConnect.current = true;
-      setVisible(true);
-      return;
-    }
     const startedIn = scope;
     setPhase("scanning");
     setReclaimedIds(new Set());
@@ -268,17 +282,59 @@ export function OneClickReclaim() {
     setPhase("shown");
   };
 
-  // Once a wallet connects because the pill asked for one, check it. The
-  // scan has to be this render's, the first with the wallet in it.
+  // The waiting check runs once its address is in place. The scan has to
+  // be this render's, the first with that address in it.
   const latestScan = useRef(scan);
   useEffect(() => {
     latestScan.current = scan;
   });
   useEffect(() => {
-    if (!connected || !scanOnConnect.current) return;
-    scanOnConnect.current = false;
+    const next = scanNext.current;
+    if (!next || !owner) return;
+    scanNext.current = null;
+    if (next.notice) {
+      notify({
+        type: "info",
+        title: "Checking your connected wallet",
+        description: "It's a different address from the one you pasted.",
+      });
+    }
     void latestScan.current();
+  }, [owner]);
+  // A wallet that connects as the pasted address leaves nothing to check.
+  useEffect(() => {
+    if (connected) scanNext.current = null;
   }, [connected]);
+
+  /** The pill without a wallet: connect one, then check it. */
+  const connectWallet = () => {
+    setPasted(null);
+    setEntry("wallet");
+    scanNext.current = { notice: false };
+    setVisible(true);
+  };
+
+  /** A pasted address: check it once it's the block's. */
+  const checkAddress = (address: string) => {
+    if (address === owner) {
+      void scan();
+      return;
+    }
+    scanNext.current = { notice: false };
+    setPasted(address);
+  };
+
+  /** From a pasted address's results, back to the field for another. */
+  const checkAnother = () => {
+    setPasted(null);
+    setEntry("address");
+  };
+
+  /** The pill on a pasted address's results: reclaiming takes its wallet. */
+  const connectToReclaim = () => {
+    scanNext.current = { notice: true };
+    setVisible(true);
+  };
 
   const props: RewardProps = {
     status,
@@ -309,7 +365,10 @@ export function OneClickReclaim() {
         : null,
     reveal: true,
     reduced,
-    onReclaim: () => void reclaimNow(),
+    watching: watching
+      ? { address: watching, onCheckAnother: checkAnother }
+      : null,
+    onReclaim: watching ? connectToReclaim : () => void reclaimNow(),
     onRescan: () => void scan(),
   };
 
@@ -320,10 +379,14 @@ export function OneClickReclaim() {
       ) : (
         <Invitation
           connected={connected}
+          entry={entry}
           checking={phase === "scanning"}
           failed={!!error && phase === "idle"}
           reduced={reduced}
           onCheck={() => void scan()}
+          onConnect={connectWallet}
+          onEntry={setEntry}
+          onCheckAddress={checkAddress}
         />
       )}
     </Band>

@@ -64,6 +64,12 @@ export type RewardProps = {
    * "Customize".
    */
   details?: { id: string; open: boolean; onToggle: () => void };
+  /**
+   * Results for an address someone pasted instead of connecting a wallet
+   * (the /reclaim-sol page): whose they are, and a way to check another.
+   * The pill connects a wallet before anything can be reclaimed.
+   */
+  watching?: { address: string; onCheckAnother: () => void } | null;
 };
 
 export function fromWhere(tokenAccounts: number, mints: number) {

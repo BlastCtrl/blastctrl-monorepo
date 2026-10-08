@@ -4,14 +4,14 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 const LINK =
-  "inline-flex items-center gap-2 rounded-sm text-slate-300 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
+  "inline-flex items-center gap-2 rounded-sm text-neutral-300 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
 
 /** Where to go from here: the full tool, the rest of the toolbox, BlastCtrl. */
 export function SiteFooter() {
   return (
-    <footer className="bg-slate-800 text-sm">
+    <footer className="bg-[#333] text-sm">
       <div className="mx-auto grid max-w-5xl gap-x-16 gap-y-10 px-4 pt-12 pb-10 sm:grid-cols-2 sm:px-8 md:grid-cols-[minmax(0,1fr)_auto_auto]">
-        <div>
+        <div className="flex flex-col">
           <Link
             href="/"
             className="-m-1 inline-flex items-center gap-2.5 rounded-md p-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
@@ -21,8 +21,11 @@ export function SiteFooter() {
               BlastCtrl
             </span>
           </Link>
-          <p className="mt-3 max-w-xs text-slate-400">
+          <p className="mt-3 max-w-xs text-neutral-400">
             A small toolbox for the adventuring Solana degen.
+          </p>
+          <p className="mt-auto text-xs text-neutral-400">
+            &copy; 2026 BlastCtrl
           </p>
         </div>
 
@@ -69,7 +72,7 @@ export function SiteFooter() {
               >
                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
               </svg>
-              @BlastCtrl on X
+              @BlastCtrl
             </a>
           </li>
           <li>
@@ -89,12 +92,28 @@ export function SiteFooter() {
               Discord
             </a>
           </li>
+          <li>
+            <a
+              href="https://t.me/BlastCtrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={LINK}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                className="size-4 fill-current"
+              >
+                <path
+                  clipRule="evenodd"
+                  d="m24 12c0 6.6274-5.3726 12-12 12-6.62742 0-12-5.3726-12-12 0-6.62742 5.37258-12 12-12 6.6274 0 12 5.37258 12 12zm-11.57-3.14107c-1.1671.48547-3.49985 1.49027-6.99809 3.01437-.56806.2259-.86563.4469-.89272.663-.04579.3652.41154.509 1.0343.7048.08471.0267.17249.0543.26247.0835.6127.1992 1.43688.4322 1.86535.4414.38865.0084.82244-.1518 1.30135-.4807 3.26854-2.2063 4.95574-3.32149 5.06164-3.34553.0748-.01696.1783-.03829.2485.02408.0701.06235.0633.18045.0558.21215-.0453.1931-1.8405 1.8621-2.7695 2.7258-.2896.2692-.495.4602-.537.5038-.0941.0978-.19.1902-.2821.279-.5692.5487-.99607.9602.0236 1.6322.4901.3229.8822.5899 1.2734.8563.4272.291.8533.5812 1.4046.9426.1405.0921.2746.1877.4053.2808.4972.3545.9439.6729 1.4957.6221.3207-.0295.6519-.331.8201-1.2302.3975-2.1252 1.1789-6.7299 1.3595-8.62742.0159-.16625-.004-.37901-.02-.4724-.016-.0934-.0494-.22647-.1708-.32498-.1438-.11666-.3657-.14126-.465-.13952-.4514.00796-1.1438.24874-4.4764 1.63485z"
+                  fillRule="evenodd"
+                />
+              </svg>
+              Telegram
+            </a>
+          </li>
         </LinkGroup>
-      </div>
-      <div className="mx-auto max-w-5xl px-4 sm:px-8">
-        <p className="border-t border-white/10 py-6 text-xs text-slate-400">
-          &copy; 2026 BlastCtrl
-        </p>
       </div>
     </footer>
   );

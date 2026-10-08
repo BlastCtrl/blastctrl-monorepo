@@ -178,7 +178,13 @@ export function ReclaimedBadge({ className }: { className?: string }) {
 }
 
 /** "Check again" as a quiet outline pill, for when there's nothing to take. */
-export function CheckAgainPill({ onClick }: { onClick: () => void }) {
+export function CheckAgainPill({
+  onClick,
+  label = "Check again",
+}: {
+  onClick: () => void;
+  label?: string;
+}) {
   return (
     <button
       type="button"
@@ -187,7 +193,7 @@ export function CheckAgainPill({ onClick }: { onClick: () => void }) {
       className="rounded-full border-2 px-8 py-3 font-display text-lg font-bold transition-[background-color] hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2"
       style={{ borderColor: INK, color: INK }}
     >
-      Check again
+      {label}
     </button>
   );
 }
@@ -195,9 +201,11 @@ export function CheckAgainPill({ onClick }: { onClick: () => void }) {
 export function CheckAgainLink({
   onClick,
   className,
+  label = "Check again",
 }: {
   onClick: () => void;
   className?: string;
+  label?: string;
 }) {
   return (
     <button
@@ -209,7 +217,7 @@ export function CheckAgainLink({
         className,
       )}
     >
-      Check again
+      {label}
     </button>
   );
 }
