@@ -16,7 +16,9 @@ const nextConfig = {
   //   path: "https://res.cloudinary.com/doz0obwb0/image/fetch/",
   // },
   transpilePackages: ["@blastctrl/ui", "@blastctrl/octane-core"],
-  eslint: { ignoreDuringBuilds: true },
+  experimental: {
+    agentUpgrade: "latest",
+  },
   images: {
     remotePatterns: [
       {
