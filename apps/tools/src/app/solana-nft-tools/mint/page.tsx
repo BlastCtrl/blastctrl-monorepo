@@ -21,7 +21,7 @@ import { useSearchParams } from "next/navigation";
 import { Attributes } from "./_components/attributes";
 import { MediaFiles } from "./_components/media-files";
 import useUmi from "@/lib/hooks/use-umi";
-import { createProgrammableNft } from "@metaplex-foundation/mpl-token-metadata";
+import { createNft } from "@metaplex-foundation/mpl-token-metadata";
 import {
   generateSigner,
   percentAmount,
@@ -227,7 +227,7 @@ export default function Mint() {
 
       const { name, symbol, isMutable, isCollection, maxSupply } = data;
 
-      const { signature } = await createProgrammableNft(umi, {
+      const { signature } = await createNft(umi, {
         mint: generateSigner(umi),
         uri: jsonUrl,
         name,
