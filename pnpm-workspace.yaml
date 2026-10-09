@@ -3,15 +3,6 @@ packages:
   - apps/*
   - tooling/*
   - e2e-tests
-ignoredBuiltDependencies:
-  - esbuild
-  - keccak
-  - secp256k1
-  - utf-8-validate
-onlyBuiltDependencies:
-  - bigint-buffer
-  - bufferutil
-  - sharp
 blockExoticSubdeps: true
 minimumReleaseAge: 2880
 minimumReleaseAgeExclude:
@@ -30,3 +21,17 @@ overrides:
   "ws@<7.5.10": "^7.5.10"
   "secp256k1@5.0.0": "^5.0.1"
   "shell-quote@<1.8.4": "^1.8.4"
+allowBuilds:
+  bigint-buffer: true
+  bufferutil: true
+  sharp: true
+  esbuild: true
+  keccak: false
+  secp256k1: false
+  utf-8-validate: false
+  "@stellar/stellar-sdk": false
+  blake-hash: false
+  protobufjs: false
+  tiny-secp256k1: false
+  unrs-resolver: false
+  usb: false
