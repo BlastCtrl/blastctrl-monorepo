@@ -9,7 +9,8 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import Image from "next/image";
 import Link from "next/link";
-import { useHydrated } from "./use-hydrated";
+import { Suspense, use } from "react";
+import { browser } from "react-dom";
 
 /** BlastCtrl's mark and name, and the wallet. */
 export function SiteHeader() {
@@ -29,6 +30,17 @@ export function SiteHeader() {
   );
 }
 
+function NetworkBadge() {
+  use(browser("The network is persisted in localStorage"));
+  const network = useNetworkConfigurationStore((state) => state.network);
+  if (network === "mainnet-beta") return null;
+  return (
+    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 capitalize">
+      {network.startsWith("http") ? "Custom RPC" : network}
+    </span>
+  );
+}
+
 const ITEM =
   "block w-full px-3.5 py-2 text-left text-sm text-zinc-700 data-focus:bg-zinc-100 data-focus:text-zinc-950";
 
@@ -41,18 +53,13 @@ const ITEM =
 function Wallet() {
   const { publicKey, wallet, disconnect } = useWallet();
   const { setVisible } = useWalletModal();
-  const network = useNetworkConfigurationStore((state) => state.network);
-  // The network is persisted in localStorage, which the server can't see.
-  const hydrated = useHydrated();
   const address = publicKey?.toBase58();
 
   return (
     <div className="flex items-center gap-2">
-      {hydrated && network !== "mainnet-beta" && (
-        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 capitalize">
-          {network.startsWith("http") ? "Custom RPC" : network}
-        </span>
-      )}
+      <Suspense fallback={null}>
+        <NetworkBadge />
+      </Suspense>
       {address && wallet && (
         <Menu>
           <MenuButton className="flex items-center gap-2 rounded-full border border-zinc-300 bg-white py-1 pr-2.5 pl-1 text-sm font-medium text-slate-800 transition-colors hover:border-zinc-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-800 data-open:border-zinc-400">

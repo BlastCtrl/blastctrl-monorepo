@@ -106,8 +106,9 @@ function useFollowHeight(reduced: boolean) {
  * The band unrolls from the top as it appears. Its dots drift up and to
  * the left by one tile per cycle, which joins up with itself; the drift is
  * paused rather than stopped, so it can pick up again from where it is.
- * The media query covers a server-rendered stage, painted before the page
- * knows the setting.
+ * Reduced motion turns both off here, in CSS, rather than by leaving the
+ * classes off: a server-rendered stage can't know the setting, and its
+ * classes have to match the browser's first render.
  */
 const STAGE_CSS = `
   @keyframes stage-in {
@@ -155,7 +156,7 @@ export function Stage({
         "relative -mx-4 px-4 py-9 sm:-mx-6 sm:px-8 sm:py-11",
         last ? "sm:rounded-b-lg" : "border-b border-zinc-200",
         STAGE_BG,
-        !reduced && "stage-in",
+        "stage-in",
       )}
     >
       <style>{STAGE_CSS}</style>
@@ -169,7 +170,7 @@ export function Stage({
           className={cn(
             "absolute top-0 left-0 h-[calc(100%+22px)] w-[calc(100%+22px)] will-change-transform",
             DOT_GRID,
-            !reduced && "stage-drift",
+            "stage-drift",
           )}
           style={{ animationPlayState: moving ? "running" : "paused" }}
         />

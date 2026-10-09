@@ -37,7 +37,6 @@ import { useReducedMotion } from "motion/react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { Entry } from "./band";
 import { Band, Invitation } from "./band";
-import { useHydrated } from "./use-hydrated";
 
 /** Nothing to choose here: empty token accounts always close. */
 const CLOSE_EMPTY = true;
@@ -101,10 +100,7 @@ export function OneClickReclaim() {
   const owner = wallet || pasted || "";
   const watching = wallet ? null : pasted;
   const { error, refetch } = useReclaimableAccounts(owner);
-  // Unlike the full tool's, this stage is server-rendered, and the server
-  // can't know the setting: assume motion until hydrated, then follow it.
-  const prefersReduced = !!useReducedMotion();
-  const reduced = useHydrated() && prefersReduced;
+  const reduced = !!useReducedMotion();
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [run, setRun] = useState(0);
