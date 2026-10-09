@@ -34,7 +34,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useReducedMotion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { Entry } from "./band";
 import { Band, Invitation } from "./band";
 import { useHydrated } from "./use-hydrated";
@@ -282,13 +282,10 @@ export function OneClickReclaim() {
     setPhase("shown");
   };
 
-  // The waiting check runs once its address is in place. The scan has to
-  // be this render's, the first with that address in it.
-  const latestScan = useRef(scan);
-  useEffect(() => {
-    latestScan.current = scan;
-  });
-  useEffect(() => {
+  // The waiting check runs once its address is in place. As an effect
+  // event it sees this render's scan, the first with that address in it,
+  // without the effect re-running every time `scan` is recreated.
+  const runWaitingScan = useEffectEvent(() => {
     const next = scanNext.current;
     if (!next || !owner) return;
     scanNext.current = null;
@@ -299,7 +296,10 @@ export function OneClickReclaim() {
         description: "It's a different address from the one you pasted.",
       });
     }
-    void latestScan.current();
+    void scan();
+  });
+  useEffect(() => {
+    runWaitingScan();
   }, [owner]);
   // A wallet that connects as the pasted address leaves nothing to check.
   useEffect(() => {
