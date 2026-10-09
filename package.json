@@ -8,7 +8,7 @@
     "dev": "pnpm run --parallel dev",
     "format": "pnpm run --recursive format",
     "lint": "pnpm run --recursive lint",
-    "build": "pnpm -F solace-sdk build && pnpm -F tools build",
+    "build": "pnpm -F @blastctrl/tools... build",
     "api:update": "node packages/solace-sdk/scripts/update-api.mjs"
   },
   "license": "MIT",
