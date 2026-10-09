@@ -1,7 +1,6 @@
 import { notify } from "@/components";
 import type { TurboStorage } from "@/lib/turbo";
 import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
-import type { Amount, Currency } from "@/types";
 import { formatAmount } from "@/types";
 import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
 import { Transition } from "@headlessui/react";
@@ -9,9 +8,10 @@ import { QuestionMarkCircleIcon } from "@heroicons/react/20/solid";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { useLocalStorage, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useQuery } from "@tanstack/react-query";
 import { formatRelative } from "date-fns";
 import type { ChangeEvent, DragEvent, MouseEvent } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Uploads } from "./uploads";
 
 export type UploadedFile = {
@@ -27,24 +27,34 @@ function pascalify(text: string) {
 }
 
 export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
-  const { connected } = useWallet();
+  const { connected, publicKey } = useWallet();
   const { setVisible } = useWalletModal();
   const { network } = useNetworkConfigurationStore();
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [filePrice, setFilePrice] = useState<Amount<Currency> | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploads, setUploads] = useLocalStorage<UploadedFile[]>(
     `previousUploads${pascalify(network)}`,
     [],
   );
-  const [balance, setBalance] = useState<Amount<Currency> | null>(null);
-
-  const refreshBalance = useCallback(async () => {
-    if (!connected) return;
-    const balance = await turbo.getBalance();
-    setBalance(balance);
-  }, [turbo, connected]);
+  const {
+    data: balance,
+    error: balanceError,
+    refetch: refreshBalance,
+  } = useQuery({
+    queryKey: ["turbo-balance", publicKey?.toBase58()],
+    queryFn: () => turbo.getBalance(),
+    enabled: connected,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const { data: filePrice, error: priceError } = useQuery({
+    queryKey: ["turbo-upload-price", file?.size],
+    queryFn: () => turbo.getUploadPrice(file!.size),
+    enabled: !!file,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
   useEffect(() => {
     if (network !== WalletAdapterNetwork.Mainnet) {
@@ -59,16 +69,6 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
       });
     }
   }, [network]);
-
-  useEffect(() => {
-    let subscribed = true;
-    if (subscribed) {
-      void refreshBalance();
-    }
-    return () => {
-      subscribed = false;
-    };
-  }, [network, refreshBalance]);
 
   const handleDrag = (event: DragEvent<HTMLFormElement | HTMLDivElement>) => {
     event.preventDefault();
@@ -87,9 +87,6 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
     if (event.dataTransfer.files?.[0]) {
       const droppedFile = event.dataTransfer.files[0];
       setFile(droppedFile);
-      void turbo
-        .getUploadPrice(droppedFile.size)
-        .then((price) => setFilePrice(price));
     }
   };
 
@@ -98,16 +95,12 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
     if (event.target?.files?.length === 1) {
       const selectedFile = event.target.files.item(0)!;
       setFile(selectedFile);
-      void turbo
-        .getUploadPrice(selectedFile.size)
-        .then((price) => setFilePrice(price));
     }
   };
 
   const handleCancel = (e: MouseEvent) => {
     e.preventDefault();
     setFile(null);
-    setFilePrice(null);
     setIsUploading(false);
   };
 
@@ -306,6 +299,9 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
                     </dt>
                     <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
                       {filePrice && formatAmount(filePrice)}
+                      {priceError && (
+                        <span role="alert">Unable to load upload price.</span>
+                      )}
                     </dd>
                   </div>
                 </dl>
@@ -343,6 +339,12 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
           )}
         </Transition>
       </div>
+
+      {balanceError && (
+        <p role="alert" className="my-3 text-sm text-red-600">
+          Unable to load Turbo credits. {balanceError.message}
+        </p>
+      )}
 
       {balance?.basisPoints.gtn(0) && (
         <div className="mx-auto my-3 max-w-sm rounded-md border border-gray-300 px-3 py-2 shadow-xs">

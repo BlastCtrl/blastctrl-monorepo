@@ -2,26 +2,25 @@
 
 import { TurboStorage } from "@/lib/turbo";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { UploaderView } from "./_components/view";
 
 export default function FileUpload() {
-  const wallet = useWallet();
-  const [storage, setStorage] = useState<TurboStorage | null>(null);
-
-  useEffect(() => {
-    async function make() {
-      const turbo = await TurboStorage.make(wallet);
-      setStorage(turbo);
+  const { connected, publicKey, signMessage, signTransaction } = useWallet();
+  const { storage, error } = useMemo(() => {
+    if (!connected) return { storage: null, error: null };
+    try {
+      return {
+        storage: TurboStorage.make({ publicKey, signMessage, signTransaction }),
+        error: null,
+      };
+    } catch (error) {
+      return {
+        storage: null,
+        error: error instanceof Error ? error.message : String(error),
+      };
     }
-    if (!storage && wallet?.connected) {
-      void make();
-    }
-
-    return () => {
-      setStorage(null);
-    };
-  }, [storage, wallet, wallet.connected]);
+  }, [connected, publicKey, signMessage, signTransaction]);
 
   return (
     <div>
@@ -35,8 +34,10 @@ export default function FileUpload() {
           </p>
         </div>
       </div>
-      {wallet && storage ? (
-        <UploaderView turbo={storage} />
+      {error ? (
+        <div role="alert">{error}</div>
+      ) : storage ? (
+        <UploaderView key={publicKey?.toBase58()} turbo={storage} />
       ) : (
         <div>Connect your wallet to use this tool</div>
       )}

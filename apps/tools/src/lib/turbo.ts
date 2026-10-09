@@ -5,6 +5,7 @@ import {
   type TurboAuthenticatedClient,
 } from "@ardrive/turbo-sdk/web";
 import type { WalletContextState } from "@solana/wallet-adapter-react";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import BigNumber from "bignumber.js";
 import type { Amount } from "@/types";
 import { amount, lamports, toBigNumber } from "@/types";
@@ -23,7 +24,12 @@ export class TurboStorage {
     this.turbo = turbo;
   }
 
-  static async make(wallet: WalletContextState) {
+  static make(
+    wallet: Pick<
+      WalletContextState,
+      "publicKey" | "signMessage" | "signTransaction"
+    >,
+  ) {
     if (!wallet.publicKey) {
       throw new Error("Wallet is not connected");
     }
@@ -80,9 +86,11 @@ export class TurboStorage {
     const { tokenPrice } = await this.turbo.getTokenPriceForBytes({
       byteCount: bytes,
     });
+    // Turbo quotes whole SOL; Amount stores integer lamports.
     const buffered = new BigNumber(tokenPrice)
+      .multipliedBy(LAMPORTS_PER_SOL)
       .multipliedBy(1.5)
-      .decimalPlaces(0);
+      .integerValue(BigNumber.ROUND_CEIL);
     return lamports(toBigNumber(buffered.toString()));
   }
 }
