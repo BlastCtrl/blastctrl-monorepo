@@ -1,4 +1,7 @@
 import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { FEE_PER_TRANSACTION } from "./rent";
+import type { ReclaimableAccount } from "./types";
+import { feeBase, reclaimLamports } from "./types";
 
 export type ServiceFee = {
   recipient: PublicKey;
@@ -36,6 +39,15 @@ export function serviceFeeLamports(
   fee: ServiceFee | null = SERVICE_FEE,
 ) {
   return fee ? Math.floor((excessLamports * fee.basisPoints) / 10_000) : 0;
+}
+
+/** What one transaction's accounts put in the wallet, after its fees. */
+export function afterFees(accounts: ReclaimableAccount[], closeEmpty: boolean) {
+  const lamports = accounts.reduce(
+    (sum, a) => sum + reclaimLamports(a, closeEmpty),
+    0,
+  );
+  return lamports - serviceFeeLamports(feeBase(accounts)) - FEE_PER_TRANSACTION;
 }
 
 export function formatFeeRate(fee: ServiceFee) {

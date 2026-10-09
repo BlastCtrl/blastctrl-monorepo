@@ -5,5 +5,6 @@ export const Networks: { [key in Cluster]: string } = {
   "mainnet-beta":
     process.env.NEXT_PUBLIC_RPC_ENDPOINT ?? clusterApiUrl("mainnet-beta"),
   testnet: clusterApiUrl("testnet"),
-  devnet: clusterApiUrl("devnet"),
+  devnet:
+    process.env.NEXT_PUBLIC_RPC_ENDPOINT_DEVNET || clusterApiUrl("devnet"),
 };

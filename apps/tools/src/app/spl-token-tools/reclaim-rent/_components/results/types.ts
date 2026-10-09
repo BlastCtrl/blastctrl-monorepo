@@ -44,7 +44,7 @@ export type RewardProps = {
   reclaimedFrom: { tokenAccounts: number; mints: number };
   sending: Sending | null;
   /** The last send finished with some transactions failed. */
-  failed: { transactions: number; of: number; accounts: number } | null;
+  failed: { transactions: number; of: number } | null;
   /** The wallet turned the request down; changes each time it happens. */
   rejectedAt: number | null;
   /**
@@ -58,10 +58,18 @@ export type RewardProps = {
   reduced: boolean;
   onReclaim: () => void;
   onRescan: () => void;
-  /** The detailed view below the stage, where accounts get picked. */
-  detailsId: string;
-  detailsOpen: boolean;
-  onToggleDetails: () => void;
+  /**
+   * The detailed view below the stage, where accounts get picked. Without
+   * one (the /reclaim-sol page) there's nothing to customize, and no
+   * "Customize".
+   */
+  details?: { id: string; open: boolean; onToggle: () => void };
+  /**
+   * Results for an address someone pasted instead of connecting a wallet
+   * (the /reclaim-sol page): whose they are, and a way to check another.
+   * The pill connects a wallet before anything can be reclaimed.
+   */
+  watching?: { address: string; onCheckAnother: () => void } | null;
 };
 
 export function fromWhere(tokenAccounts: number, mints: number) {

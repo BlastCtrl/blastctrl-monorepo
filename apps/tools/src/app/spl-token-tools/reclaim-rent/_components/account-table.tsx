@@ -219,9 +219,14 @@ function DepositBar({
     <div className="w-36">
       <div className="flex h-2 overflow-hidden rounded-full bg-zinc-100">
         <div className="bg-zinc-400" style={{ width: `${neededShare}%` }} />
+        {/* Reclaimed, the excess leaves by scaling to nothing: a transform,
+            so the row never relayouts while it goes. */}
         <div
-          className="bg-indigo-500 transition-[width] duration-700 ease-out motion-reduce:transition-none"
-          style={{ width: reclaimed ? "0%" : `${100 - neededShare}%` }}
+          className="origin-left bg-indigo-500 transition-transform duration-250 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none"
+          style={{
+            width: `${100 - neededShare}%`,
+            transform: reclaimed ? "scaleX(0)" : undefined,
+          }}
         />
       </div>
       <div className="mt-1 text-xs whitespace-nowrap text-zinc-500 tabular-nums">

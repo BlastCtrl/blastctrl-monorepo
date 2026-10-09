@@ -5,6 +5,9 @@ export const env = createEnv({
   clientPrefix: "NEXT_PUBLIC_",
   client: {
     NEXT_PUBLIC_RPC_ENDPOINT: z.url(),
+    // Optional. RPC used when the wallet is on devnet; falls back to the
+    // public https://api.devnet.solana.com when unset.
+    NEXT_PUBLIC_RPC_ENDPOINT_DEVNET: z.url().optional(),
     NEXT_PUBLIC_DAS_API: z.url(),
     NEXT_PUBLIC_DAS_API_DEVNET: z.url().optional(),
     // Reclaim-rent tool: the wallet that receives the service fee and the
@@ -23,6 +26,8 @@ export const env = createEnv({
   },
   runtimeEnv: {
     NEXT_PUBLIC_RPC_ENDPOINT: process.env.NEXT_PUBLIC_RPC_ENDPOINT,
+    NEXT_PUBLIC_RPC_ENDPOINT_DEVNET:
+      process.env.NEXT_PUBLIC_RPC_ENDPOINT_DEVNET,
     NEXT_PUBLIC_DAS_API: process.env.NEXT_PUBLIC_DAS_API,
     NEXT_PUBLIC_DAS_API_DEVNET: process.env.NEXT_PUBLIC_DAS_API_DEVNET,
     NEXT_PUBLIC_RECLAIM_RENT_FEE_RECIPIENT:

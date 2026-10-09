@@ -21,8 +21,10 @@ export const COIN_COLORS = [
   "#fb923c",
 ];
 
+/** The stage's off-white, and the dot grid that drifts over it. */
+export const STAGE_BG = "bg-[#fafafa]";
 export const DOT_GRID =
-  "bg-[#fafafa] bg-[radial-gradient(#d4d4d8_1px,transparent_1px)] [background-size:22px_22px]";
+  "bg-[radial-gradient(#d4d4d8_1px,transparent_1px)] [background-size:22px_22px]";
 
 /**
  * The promo's pop, measured at 30 fps: a pill starts near 0.6 scale, passes

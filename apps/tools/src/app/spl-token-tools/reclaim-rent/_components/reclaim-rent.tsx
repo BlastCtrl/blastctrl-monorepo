@@ -9,7 +9,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { CollapsibleTable } from "./collapsible-table";
-import { SERVICE_FEE, formatFeeRate, serviceFeeLamports } from "./fee";
+import {
+  SERVICE_FEE,
+  afterFees,
+  formatFeeRate,
+  serviceFeeLamports,
+} from "./fee";
 import { MintPanel } from "./mint-panel";
 import { ReclaimDialog } from "./reclaim-dialog";
 import {
@@ -37,10 +42,11 @@ import { WalletRefusedError, useReclaimExcess } from "./use-reclaim-excess";
 import { useRentRate } from "./use-rent-rate";
 
 /**
- * A scan always takes at least this long, so the stage's drifting dots read
- * as work and the results never arrive with a stutter.
+ * A scan always takes at least this long, so the stage has unrolled and
+ * "Checking…" has settled before the results arrive. No longer than that:
+ * a floor past what the stage needs only makes "Check again" feel slow.
  */
-const SCAN_MIN_MS = 1500;
+const SCAN_MIN_MS = 800;
 
 const DETAILS_ID = "reclaim-details";
 
@@ -57,15 +63,6 @@ type Snapshot = Pick<
 >;
 
 const wait = (ms: number) => new Promise((done) => setTimeout(done, ms));
-
-/** What one transaction's accounts put in the wallet, after its fees. */
-const afterFees = (accounts: ReclaimableAccount[], closeEmpty: boolean) => {
-  const lamports = accounts.reduce(
-    (sum, a) => sum + reclaimLamports(a, closeEmpty),
-    0,
-  );
-  return lamports - serviceFeeLamports(feeBase(accounts)) - FEE_PER_TRANSACTION;
-};
 
 /**
  * The whole tool: the intro, the stage with the results block, and the
@@ -409,7 +406,6 @@ export function ReclaimRent({
         ? {
             transactions: failedBatches.length,
             of: batches!.length,
-            accounts: failedBatches.reduce((n, b) => n + b.accounts.length, 0),
           }
         : null,
     rejectedAt: refusal?.count ?? null,
@@ -419,9 +415,11 @@ export function ReclaimRent({
         : null,
     reveal: true,
     reduced,
-    detailsId: DETAILS_ID,
-    detailsOpen,
-    onToggleDetails: () => setDetailsOpen((o) => !o),
+    details: {
+      id: DETAILS_ID,
+      open: detailsOpen,
+      onToggle: () => setDetailsOpen((o) => !o),
+    },
     onReclaim: () => void reclaimNow(),
     onRescan: () => void scan(),
   };
@@ -520,7 +518,7 @@ export function ReclaimRent({
                 "grid",
                 detailsOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
                 !reduced &&
-                  "transition-[grid-template-rows] duration-300 ease-out",
+                  "transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]",
               )}
             >
               {/* Room either side so focus rings aren't clipped. */}
@@ -530,7 +528,7 @@ export function ReclaimRent({
                     "pt-10 pb-6",
                     !detailsOpen && "-translate-y-3 opacity-0",
                     !reduced &&
-                      "transition-[opacity,translate] duration-300 ease-out",
+                      "transition-[opacity,translate] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]",
                   )}
                 >
                   <Details

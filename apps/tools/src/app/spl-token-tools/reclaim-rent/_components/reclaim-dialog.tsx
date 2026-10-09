@@ -1,7 +1,12 @@
 import { notify } from "@/components/notification";
 import { compress } from "@/lib/solana/common";
 import { Button, CopyButton, SpinnerIcon, cn } from "@blastctrl/ui";
-import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
+import {
+  Dialog,
+  DialogBackdrop,
+  DialogPanel,
+  DialogTitle,
+} from "@headlessui/react";
 import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/20/solid";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useState } from "react";
@@ -32,6 +37,9 @@ type Batch = {
 };
 
 type Phase = "review" | "signing" | "sending" | "done";
+
+/** How long the panel takes to leave; the parent unmounts it after that. */
+const LEAVE_MS = 150;
 
 type Props = {
   accounts: ReclaimableAccount[];
@@ -79,6 +87,12 @@ export function ReclaimDialog({
   const [phase, setPhase] = useState<Phase>("review");
   const [batches, setBatches] = useState(() => toBatches(accounts, closeEmpty));
   const [signingCount, setSigningCount] = useState(0);
+  // Closing plays the leave first: the parent only unmounts on `onClose`.
+  const [open, setOpen] = useState(true);
+  const close = () => {
+    setOpen(false);
+    window.setTimeout(onClose, LEAVE_MS);
+  };
 
   const total = batches.reduce((sum, b) => sum + b.lamports, 0);
   const fees =
@@ -175,10 +189,17 @@ export function ReclaimDialog({
   };
 
   return (
-    <Dialog open onClose={busy ? () => {} : onClose}>
-      <div className="fixed inset-0 z-50 bg-black/30" aria-hidden="true" />
+    <Dialog open={open} onClose={busy ? () => {} : close}>
+      <DialogBackdrop
+        transition
+        className="fixed inset-0 z-50 bg-black/30 transition duration-150 ease-out data-closed:opacity-0"
+      />
       <div className="fixed inset-0 z-50 flex w-screen items-center justify-center p-4">
-        <DialogPanel className="flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-lg">
+        {/* A modal: it scales in place, from the centre. */}
+        <DialogPanel
+          transition
+          className="flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-lg transition ease-[cubic-bezier(0.23,1,0.32,1)] data-closed:scale-[0.97] data-closed:opacity-0 data-enter:duration-200 data-leave:duration-150"
+        >
           <DialogTitle
             aria-live="polite"
             className="flex items-center gap-3 px-6 pt-6 font-display text-xl font-semibold"
@@ -220,7 +241,7 @@ export function ReclaimDialog({
           <div className="flex flex-wrap justify-end gap-3 px-6 pt-4 pb-6">
             {phase === "review" && (
               <>
-                <Button plain onClick={onClose}>
+                <Button plain onClick={close}>
                   Cancel
                 </Button>
                 <Button
@@ -254,7 +275,7 @@ export function ReclaimDialog({
                     again
                   </Button>
                 )}
-                <Button color="indigo" onClick={onClose}>
+                <Button color="indigo" onClick={close}>
                   Done
                 </Button>
               </>

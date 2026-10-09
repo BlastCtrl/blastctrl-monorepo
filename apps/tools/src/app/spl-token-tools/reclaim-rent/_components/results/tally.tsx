@@ -1,12 +1,12 @@
 "use client";
 
+import { compress } from "@/lib/solana";
 import { cn } from "@blastctrl/ui";
-import { stagger } from "motion/react";
+import type { AnimationSequence, MotionValue } from "motion/react";
+import { motion, stagger, useAnimate } from "motion/react";
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { formatSol } from "../rent";
-import type { Arrival } from "./arrival";
-import { useArrival } from "./arrival";
 import {
   CheckAgainLink,
   CheckAgainPill,
@@ -18,22 +18,26 @@ import {
   HEADLINES,
   sharedDetail,
 } from "./bits";
-import { CountText, useCountUp } from "./count";
+import { useCountUp } from "./count";
 import type { Stoppable } from "./effects";
 import {
+  FADE_IN,
+  HOP,
+  RING_OUT,
   burst,
   centerIn,
-  fadeIn,
   flipIn,
+  flipOut,
   flyCoin,
-  hop,
   pointIn,
+  pop,
   popIn,
   pulse,
-  ringOut,
+  settle,
   shake,
+  step,
 } from "./effects";
-import { GREEN, coinColor, shareTimes } from "./look";
+import { COUNT_EASE, GREEN, coinColor, shareTimes } from "./look";
 import { cues } from "./sound";
 import type { Coin, RewardProps } from "./types";
 import { fromWhere, transactionCount } from "./types";
@@ -133,51 +137,88 @@ function toss(
   return flyCoin(layer, from, via, to, { delay, duration, color: GREEN });
 }
 
-const ARRIVAL: Arrival = {
-  hide: "[data-word],[data-pop],[data-fade],[data-coin]",
-  end: T.end,
-  run: ({ layer, at, all, one }) => {
-    const running: Stoppable[] = [
-      popIn(all("[data-word]"), stagger(0.04, { startDelay: at(T.words) }), {
-        scale: 0.9,
-        y: 14,
-      }),
-      popIn(all("[data-pop=button]"), at(T.button)),
-      popIn(all("[data-pop=amount]"), at(T.amount), { scale: 0.85, y: 10 }),
-      popIn(all("[data-pop=chip]"), stagger(0.06, { startDelay: at(T.chips) })),
-      fadeIn(all("[data-fade]"), at(T.notes)),
-    ];
+/**
+ * A coin turning over to green, at `delay` seconds. React has already given
+ * it the green face and the check, so before paint the old face goes back
+ * on and the check is hidden. At its turn the old face narrows to edge-on,
+ * the green one is put on with no colour transition, and it opens out. A
+ * coin that was breathing first comes to rest, since React has just taken
+ * its breath away.
+ */
+function turnOver(coin: HTMLElement, delay: number, wasWaiting: boolean) {
+  coin.style.backgroundColor = coin.dataset.coinColor ?? "";
+  coin.style.color = "transparent";
+  if (wasWaiting) settle(coin);
+  void flipOut(coin, delay).then(() => {
+    coin.style.transition = "none";
+    coin.style.backgroundColor = GREEN;
+    coin.style.color = "";
+    void coin.offsetWidth; // Flush, so the swap isn't transitioned.
+    coin.style.transition = "";
+    flipIn(coin, 0);
+  });
+}
 
-    // Each coin pops just in time for its SOL to land as the number passes
-    // its share of the total.
-    const digits = one("[data-digits]");
-    const coins = all("[data-coin]");
-    const pops = shareTimes(coins.length, T.count, T.countFor);
-    const every = tickEvery(coins.length);
-    const ticks: number[] = [];
-    coins.forEach((coin, i) => {
-      const start = pops[i]! - T.flight;
-      running.push(popIn(coin, at(start), { scale: 0 }));
-      if (i % every === 0) {
-        ticks.push(window.setTimeout(cues.arriving, at(start) * 1000));
-      }
-      if (digits && (coin as HTMLElement).dataset.state === "selected") {
-        running.push(
-          toss(layer, coin, digits, at(start + 0.03), T.flight - 0.03),
-        );
-      }
-    });
+/** Motion's `animate`, scoped to the block by `useAnimate`. */
+type Animate = ReturnType<typeof useAnimate>[1];
 
+/**
+ * The arrival: one timeline from the moment the scan finishes, with every
+ * step at its time in `T`. Each element holds at its first keyframe until
+ * its step, so nothing shows before its moment. The coins pop just in time
+ * for their SOL to land as the number passes their share of the total; the
+ * flights and the ticks run alongside on the same clock. `past` is how far
+ * along the timeline already is, so a second run (React's double effect in
+ * development) resumes it instead of starting over.
+ */
+function arrive(
+  animate: Animate,
+  root: HTMLElement,
+  layer: HTMLElement,
+  value: MotionValue<number>,
+  amount: number,
+  past: number,
+): Stoppable[] {
+  const coins = [...root.querySelectorAll<HTMLElement>("[data-coin]")];
+  const digits = root.querySelector("[data-digits]");
+  const button = root.querySelector<HTMLButtonElement>("[data-pop=button]");
+  const pops = shareTimes(coins.length, T.count, T.countFor);
+
+  const timeline = animate([
+    step("[data-word]", popIn(0.9, 14), T.words, { delay: stagger(0.04) }),
+    step("[data-pop=button]", popIn(), T.button),
+    step("[data-pop=amount]", popIn(0.85, 10), T.amount),
+    step("[data-fade]", FADE_IN, T.notes),
+    step("[data-pop=chip]", popIn(), T.chips, { delay: stagger(0.06) }),
+    ...coins.map((coin, i) => step(coin, popIn(0.4), pops[i]! - T.flight)),
+    [
+      value,
+      [0, amount],
+      { at: T.count, duration: T.countFor, ease: COUNT_EASE },
+    ],
     // The last coin lands: the number thumps and the pill pulses once.
-    const amount = one("[data-pop=amount]");
-    const button = one("[data-pop=button]") as HTMLButtonElement | null;
-    if (amount && coins.length > 0) running.push(pulse(amount, at(LAND)));
-    if (button && !button.disabled) running.push(pulse(button, at(LAND)));
+    ...(coins.length > 0 ? [step("[data-pop=amount]", pulse(), LAND)] : []),
+    ...(button && !button.disabled ? [step(button, pulse(), LAND)] : []),
+  ] satisfies AnimationSequence);
+  timeline.time = past;
 
-    running.push({ stop: () => ticks.forEach((t) => window.clearTimeout(t)) });
-    return running;
-  },
-};
+  const running: Stoppable[] = [timeline];
+  const every = tickEvery(coins.length);
+  // Past a few dozen coins the flights read as a swarm whichever coins
+  // they come from; fewer of them keeps the layer count down.
+  const tossEvery = coins.length > 80 ? 3 : coins.length > 40 ? 2 : 1;
+  coins.forEach((coin, i) => {
+    const start = pops[i]! - T.flight - past;
+    if (i % every === 0) {
+      const tick = window.setTimeout(cues.arriving, Math.max(0, start) * 1000);
+      running.push({ stop: () => window.clearTimeout(tick) });
+    }
+    if (digits && i % tossEvery === 0 && coin.dataset.state === "selected") {
+      running.push(toss(layer, coin, digits, start + 0.03, T.flight - 0.03));
+    }
+  });
+  return running;
+}
 
 /**
  * The results block: the Stage, with the promo's "Reclaim the excess" scene
@@ -192,18 +233,28 @@ const ARRIVAL: Arrival = {
  * number thumps and a hop runs through the coins. If anything fails there's no payoff, just a way to try again.
  */
 export function Tally(p: RewardProps) {
-  const rootRef = useRef<HTMLDivElement>(null);
+  const [scope, animate] = useAnimate<HTMLDivElement>();
   const layerRef = useRef<HTMLDivElement>(null);
   const [play] = useState(p.reveal && !p.reduced);
-  const arriving = useArrival(rootRef, layerRef, play, ARRIVAL);
 
   const muted = p.status === "none-selected";
   const amount = p.status === "reclaimed" ? p.reclaimed : Math.max(0, p.net);
-  const text = useCountUp(
-    amount,
-    p.reveal ? { delay: T.count, duration: T.countFor } : null,
-    p.reduced,
-  );
+  const { text, value } = useCountUp(amount, play, p.reduced);
+
+  // The arrival plays once, on mount, and counts up to the amount it found
+  // there; if the amount changes mid-count, the count springs after it.
+  // Nothing but unmounting stops it: a background tab only pauses it.
+  const [arrivalAmount] = useState(amount);
+  const startedAt = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const root = scope.current;
+    const layer = layerRef.current;
+    if (!play || !root || !layer) return;
+    startedAt.current ??= clockNow();
+    const past = (clockNow() - startedAt.current) / 1000;
+    const running = arrive(animate, root, layer, value, arrivalAmount, past);
+    return () => running.forEach((r) => r.stop());
+  }, [play, scope, animate, value, arrivalAmount]);
 
   const coins = inOrder(p.coins.slice(0, MAX_COINS));
   const overflow = p.coins.length - coins.length;
@@ -212,8 +263,9 @@ export function Tally(p: RewardProps) {
 
   // A coin changing state answers for itself: ticked, it pops and tosses
   // its SOL into the number; unticked, it deflates; confirmed, it turns
-  // over to a green check, joining the sweep from the left.
-  // Before paint, so a coin never shows its new face at full size first.
+  // over to a green check, joining the sweep from the left; back from
+  // waiting after a failed transaction, it comes to rest.
+  // Before paint, so a coin never shows its green face before its turn.
   // Nothing here is cancelled when the next change comes: a transaction
   // confirming mid-flip must not leave the last group's coins edge-on.
   const previous = useRef(states);
@@ -222,9 +274,13 @@ export function Tally(p: RewardProps) {
   useLayoutEffect(() => {
     const before = previous.current;
     previous.current = states;
-    const root = rootRef.current;
+    const root = scope.current;
     const layer = layerRef.current;
-    if (p.reduced || arriving() || !root || !layer) return;
+    // While the arrival plays, it has the coins; keep out of its way.
+    const arriving =
+      startedAt.current !== null &&
+      clockNow() - startedAt.current < T.end * 1000;
+    if (p.reduced || arriving || !root || !layer) return;
     if (before === states || before.length !== states.length) return;
     const digits = root.querySelector("[data-digits]");
     const coinEls = root.querySelectorAll<HTMLElement>("[data-coin]");
@@ -246,8 +302,7 @@ export function Tally(p: RewardProps) {
       const now = states[i];
       if (!coin || was === now) continue;
       if (now === "c") {
-        coin.style.transform = "scaleX(0)";
-        flipIn(coin, (turnAt - clock) / 1000);
+        turnOver(coin, (turnAt - clock) / 1000, was === "p");
         // Experiment: each coin that turns green clinks, quietly.
         if (turned++ % every === 0) {
           window.setTimeout(cues.turning, turnAt - clock);
@@ -256,13 +311,15 @@ export function Tally(p: RewardProps) {
         sweepAt.current = turnAt;
       } else if (now === "s" && was === "u") {
         const delay = Math.min(ticked++, 20) * 0.02;
-        popIn(coin, delay, { scale: 0.3 });
+        pop(coin, delay, 0.3);
         if (digits) toss(layer, coin, digits, delay + 0.03, 0.22);
+      } else if (now === "s" && was === "p") {
+        settle(coin);
       } else if (now === "u") {
-        popIn(coin, 0, { scale: 1.4 });
+        pop(coin, 0, 1.4);
       }
     }
-  }, [states, p.reduced, arriving]);
+  }, [states, p.reduced, scope]);
 
   // The payoff, once, when a reclaim in flight ends with everything done.
   // Before paint too: the badge must not flash before it pops. The sound
@@ -287,47 +344,41 @@ export function Tally(p: RewardProps) {
     } else if (wasBusy.current && failedHow === "partly") cues.partlyFailed();
     else if (wasBusy.current && failedHow === "all") cues.failed();
     wasBusy.current = false;
-    const root = rootRef.current;
+    const root = scope.current;
     const layer = layerRef.current;
     if (!finished || p.reduced || !root || !layer) return;
-    const badge = root.querySelector<HTMLElement>("[data-badge]");
-    const ring = root.querySelector("[data-ring-done]");
-    const number = root.querySelector("[data-pop=amount]");
-    const running: Stoppable[] = [];
-    if (badge) {
-      badge.style.opacity = "0";
-      running.push(
-        popIn(badge, PAYOFF.badge, { scale: 0.8 }),
-        burst(layer, badge, PAYOFF.badge + 0.08),
-      );
-    }
-    if (ring) running.push(ringOut(ring, PAYOFF.badge + 0.04));
-    if (number) running.push(pulse(number, PAYOFF.number, 0.09));
+    const badge = root.querySelector("[data-badge]");
+    const coins = root.querySelectorAll("[data-coin]").length;
     // The hop waits for the sweep to reach the last coin and settle, so it
     // never runs through coins that are still turning.
     const sweepLeft = (sweepAt.current - clockNow()) / 1000;
-    running.push(
-      hop(
-        [...root.querySelectorAll("[data-coin]")],
-        Math.max(PAYOFF.hop, sweepLeft + 0.3),
-      ),
-    );
+    const running: Stoppable[] = [
+      animate([
+        step("[data-badge]", popIn(0.8), PAYOFF.badge),
+        step("[data-ring-done]", RING_OUT, PAYOFF.badge + 0.04),
+        step("[data-pop=amount]", pulse(0.09), PAYOFF.number),
+        step("[data-coin]", HOP, Math.max(PAYOFF.hop, sweepLeft + 0.3), {
+          delay: stagger(Math.min(0.02, 0.4 / coins)),
+        }),
+      ]),
+    ];
+    if (badge) running.push(burst(layer, badge, PAYOFF.badge + 0.08));
     return () => running.forEach((r) => r.stop());
-  }, [busy, p.status, p.reduced, failedHow]);
+  }, [busy, p.status, p.reduced, failedHow, scope, animate]);
 
   // The wallet said no: the pill shakes its head.
   useEffect(() => {
-    const pill = rootRef.current?.querySelector("[data-pill]");
+    const pill = scope.current?.querySelector("[data-pill]");
     if (p.rejectedAt === null || p.reduced || !pill) return;
     const running = shake(pill);
     return () => running.stop();
-  }, [p.rejectedAt, p.reduced]);
+  }, [p.rejectedAt, p.reduced, scope]);
 
   const headline = HEADLINES[p.status];
   const canReclaim = p.status === "ready" && !busy;
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={scope} className="relative">
       <style>{WAITING_CSS}</style>
       <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between md:gap-12">
         <div className="min-w-0 md:max-w-xl">
@@ -351,7 +402,7 @@ export function Tally(p: RewardProps) {
             >
               <span aria-hidden="true">
                 {muted ? "" : "+"}
-                <CountText data-digits text={text} /> SOL
+                <motion.span data-digits>{text}</motion.span> SOL
               </span>
               <span className="sr-only">
                 {formatSol(amount, 5)} SOL
@@ -396,11 +447,11 @@ export function Tally(p: RewardProps) {
             <Chips closesEmpty={p.emptyAccounts > 0} />
           )}
 
-          {p.status !== "nothing" && (
+          {p.status !== "nothing" && p.details && (
             <DetailsToggle
-              open={p.detailsOpen}
-              controls={p.detailsId}
-              onToggle={p.onToggleDetails}
+              open={p.details.open}
+              controls={p.details.id}
+              onToggle={p.details.onToggle}
               animated={!p.reduced}
             />
           )}
@@ -408,7 +459,18 @@ export function Tally(p: RewardProps) {
 
         <div className="flex shrink-0 flex-col items-stretch gap-2.5 md:items-end">
           {p.status === "nothing" ? (
-            <CheckAgainPill onClick={p.onRescan} />
+            <>
+              <CheckAgainPill
+                onClick={p.watching?.onCheckAnother ?? p.onRescan}
+                label={p.watching ? "Check another address" : undefined}
+              />
+              {p.watching && (
+                <Whose
+                  address={p.watching.address}
+                  className="self-center text-sm text-zinc-500 md:self-end"
+                />
+              )}
+            </>
           ) : p.status === "reclaimed" ? (
             <>
               <ReclaimedBadge className="px-10 md:min-w-[18rem]" />
@@ -422,11 +484,11 @@ export function Tally(p: RewardProps) {
               <ReclaimPill
                 disabled={!canReclaim && !busy}
                 busy={busy}
+                animated={!p.reduced}
                 onClick={p.onReclaim}
                 className="px-10 md:min-w-[18rem]"
-              >
-                {pillLabel(p)}
-              </ReclaimPill>
+                label={pillLabel(p)}
+              />
               <div className="flex flex-wrap items-baseline justify-center gap-x-3 text-sm text-zinc-500 md:justify-end">
                 {p.sending ? (
                   // Empty while it's busy, but the row keeps its height so
@@ -434,17 +496,24 @@ export function Tally(p: RewardProps) {
                   <p aria-hidden="true">{"\u00a0"}</p>
                 ) : (
                   <>
-                    {canReclaim && (
-                      <>
+                    {p.watching ? (
+                      <Whose address={p.watching.address} />
+                    ) : (
+                      canReclaim && (
                         <p data-fade>{transactionCount(p.transactions)}</p>
-                        <span
-                          aria-hidden="true"
-                          data-fade
-                          className="h-3.5 w-px self-center bg-zinc-300"
-                        />
-                      </>
+                      )
                     )}
-                    <CheckAgainLink onClick={p.onRescan} />
+                    {(p.watching || canReclaim) && (
+                      <span
+                        aria-hidden="true"
+                        data-fade
+                        className="h-3.5 w-px self-center bg-zinc-300"
+                      />
+                    )}
+                    <CheckAgainLink
+                      onClick={p.watching?.onCheckAnother ?? p.onRescan}
+                      label={p.watching ? "Check another address" : undefined}
+                    />
                   </>
                 )}
               </div>
@@ -486,7 +555,9 @@ function CoinDot({
       : coin.state === "unselected"
         ? {
             backgroundColor: "transparent",
-            boxShadow: "inset 0 0 0 1.5px #d4d4d8",
+            // Dimmed as a lighter ring, not as opacity: Motion owns the
+            // coin's opacity once it has animated it.
+            boxShadow: `inset 0 0 0 1.5px ${dim ? "#e4e4e7" : "#d4d4d8"}`,
           }
         : { backgroundColor: coinColor(coin.id) };
   // Start every coin mid-cycle so the wave is already running, its crest
@@ -496,13 +567,13 @@ function CoinDot({
     <span
       data-coin
       data-state={coin.state}
+      data-coin-color={coinColor(coin.id)}
       className={cn(
         "grid place-content-center text-white",
         size,
         coin.kind === "mint" ? "rounded-[4px]" : "rounded-full",
         animated &&
           "transition-[background-color,box-shadow,opacity] duration-150",
-        dim && "opacity-40",
         waiting && "coin-wait",
       )}
       style={style}
@@ -523,6 +594,21 @@ function CoinDot({
   );
 }
 
+/** Whose results these are, for a pasted address. */
+function Whose({
+  address,
+  className,
+}: {
+  address: string;
+  className?: string;
+}) {
+  return (
+    <p data-fade title={address} className={className}>
+      For {compress(address, 4)}
+    </p>
+  );
+}
+
 function pillLabel(p: RewardProps) {
   const s = p.sending;
   if (s?.step === "signing") {
@@ -535,6 +621,7 @@ function pillLabel(p: RewardProps) {
       ? `Reclaiming, ${s.confirmed} of ${s.transactions}`
       : "Reclaiming…";
   }
+  if (p.watching) return "Connect to reclaim";
   return p.failed ? "Try again" : "Reclaim it";
 }
 
@@ -546,11 +633,12 @@ function Detail(p: RewardProps & { busy: boolean }) {
     // Nothing else to say in the states that have their own sentence.
   } else if (p.failed && !p.busy) {
     tone = "text-red-700";
-    const { transactions, of, accounts } = p.failed;
+    const { transactions, of } = p.failed;
+    // The coins say which accounts are left; the sentence needn't count them.
     text =
       of === 1
         ? "That didn't go through. Your accounts are untouched, so you can try again."
-        : `${transactions} of ${of} transactions didn't go through. ${transactions === 1 ? "Its" : "Their"} ${accounts} accounts are untouched, so you can try again.`;
+        : `${transactions} of ${of} transactions didn't go through. The remaining accounts are untouched, so you can try again.`;
   } else if (p.rejectedAt !== null && !p.busy) {
     tone = "text-zinc-800";
     text = cancelled(p);

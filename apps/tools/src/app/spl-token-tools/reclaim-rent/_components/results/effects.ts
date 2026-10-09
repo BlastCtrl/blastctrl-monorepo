@@ -1,18 +1,16 @@
-import type { DynamicOption } from "motion/react";
-import { animate, stagger } from "motion/react";
+import type {
+  DOMKeyframesDefinition,
+  ElementOrSelector,
+  Segment,
+  SegmentTransitionOptions,
+} from "motion/react";
+import { animate } from "motion/react";
 import { COIN_COLORS, POP } from "./look";
 
 type Point = { x: number; y: number };
-type Targets = Element | Element[] | NodeListOf<Element>;
 
-/** Anything that can be stopped: Motion's controls, or a coin. */
+/** Anything that can be stopped: Motion's controls, a flight, a timer. */
 export type Stoppable = { stop: () => void };
-
-const NOTHING: Stoppable = { stop: () => {} };
-
-/** Motion throws on an empty list; a state without chips has none to pop. */
-const empty = (targets: Targets) =>
-  !(targets instanceof Element) && targets.length === 0;
 
 /** Centre of `el`, in the coordinate space of `layer`. */
 export function centerIn(layer: Element, el: Element): Point {
@@ -37,76 +35,150 @@ export function pointIn(
   };
 }
 
-/**
- * The promo's pop: in from a smaller scale with a springy overshoot. The
- * elements start hidden (see `useArrival`).
+/*
+ * The choreographed moments (the arrival, the payoff) are Motion sequences:
+ * one timeline each, with every step at an absolute time. The effects
+ * below are steps for those timelines.
  */
-export function popIn(
-  targets: Targets,
-  delay: number | DynamicOption<number>,
-  { scale = 0.6, y = 0 }: { scale?: number; y?: number } = {},
-): Stoppable {
-  if (empty(targets)) return NOTHING;
-  return animate(
-    targets,
-    { opacity: [0, 1], scale: [scale, 1], y: [y, 0] },
-    { ...POP, delay },
-  );
+
+export type Effect = {
+  keyframes: DOMKeyframesDefinition;
+  transition: SegmentTransitionOptions;
+};
+
+/** `effect` on `subject`, `at` seconds into the sequence. */
+export function step(
+  subject: ElementOrSelector,
+  { keyframes, transition }: Effect,
+  at: number,
+  more: SegmentTransitionOptions = {},
+): Segment {
+  return [subject, keyframes, { ...transition, ...more, at }];
 }
 
+/**
+ * The promo's pop: in from a smaller scale with a springy overshoot. In a
+ * sequence the first keyframe holds from the start, so the element is
+ * hidden until its moment.
+ */
+export const popIn = (scale = 0.6, y = 0): Effect => ({
+  keyframes: { opacity: [0, 1], scale: [scale, 1], y: [y, 0] },
+  transition: POP,
+});
+
 /** Plain fade for the quiet parts: fine print, the tables below. */
-export function fadeIn(
-  targets: Targets,
-  delay: number,
-  duration = 0.25,
-): Stoppable {
-  if (empty(targets)) return NOTHING;
-  return animate(targets, { opacity: [0, 1] }, { delay, duration });
-}
+export const FADE_IN: Effect = {
+  keyframes: { opacity: [0, 1] },
+  transition: { duration: 0.25 },
+};
 
 /**
  * A bump that says "this just changed": up a few percent, then back with a
  * small dip below full size, like something heavy landing.
  */
-export function pulse(el: Element, delay: number, amount = 0.07) {
-  return animate(
-    el,
-    { scale: [1, 1 + amount, 1] },
-    {
-      delay,
-      duration: 0.32,
-      times: [0, 0.35, 1],
-      ease: ["easeOut", [0.35, 1.35, 0.6, 1]],
-    },
-  );
-}
+export const pulse = (amount = 0.07): Effect => ({
+  keyframes: { scale: [1, 1 + amount, 1] },
+  transition: {
+    duration: 0.32,
+    times: [0, 0.35, 1],
+    ease: ["easeOut", [0.35, 1.35, 0.6, 1]],
+  },
+});
 
 /**
  * The ring the promo's closing logo sends out, drawn as an outline so it
  * keeps an even gap around a pill. It thins and fades as it grows. The
- * first keyframe is invisible because Motion shows it during the delay.
+ * first keyframe is invisible, since it holds until the ring's moment.
  */
-export function ringOut(el: Element, delay: number) {
-  return animate(
-    el,
-    {
-      outlineOffset: ["0px", "0px", "18px"],
-      outlineWidth: ["3px", "3px", "1px"],
-      opacity: [0, 0.7, 0],
-    },
-    {
-      delay,
-      duration: 0.45,
-      times: [0, 0.04, 1],
-      ease: ["linear", [0.15, 0.7, 0.3, 1]],
-    },
-  );
+export const RING_OUT: Effect = {
+  keyframes: {
+    outlineOffset: ["0px", "0px", "18px"],
+    outlineWidth: ["3px", "3px", "1px"],
+    opacity: [0, 0.7, 0],
+  },
+  transition: {
+    duration: 0.45,
+    times: [0, 0.04, 1],
+    ease: ["linear", [0.15, 0.7, 0.3, 1]],
+  },
+};
+
+/** A hop that ripples through a row; stagger it per element. */
+export const HOP: Effect = {
+  keyframes: { y: [0, -4, 0] },
+  transition: {
+    duration: 0.34,
+    times: [0, 0.4, 1],
+    ease: ["easeOut", "easeIn"],
+  },
+};
+
+/*
+ * Single effects, for when one thing changes state.
+ */
+
+/**
+ * The pop for something already on screen: a kick from `from` back to full
+ * size, with no fade, so a coin that changes state never blinks out.
+ */
+export function pop(el: Element, delay: number, from: number): Stoppable {
+  return animate(el, { scale: [from, 1] }, { ...POP, delay });
 }
 
 /**
+ * The first half of a coin turning over: its old face narrows to edge-on,
+ * speeding up as it goes. Resolves when the coin is edge-on, so the new
+ * face can be set and `flipIn` can take over.
+ */
+export function flipOut(el: Element, delay: number): Promise<void> {
+  return animate(
+    el,
+    { scaleX: [1, 0] },
+    { delay, duration: 0.08, ease: "easeIn" },
+  ).then(() => {});
+}
+
+/**
+ * The second half: the new face comes in from edge-on, with the pop's
+ * overshoot. The new colour must already be set when this starts.
+ */
+export function flipIn(el: Element, delay: number): Stoppable {
+  return animate(el, { scaleX: [0, 1] }, { ...POP, delay });
+}
+
+/**
+ * A coin that was breathing (waiting on the chain) comes to rest. The
+ * breath is a CSS animation React removes with the state, so its scale and
+ * opacity would otherwise snap to full; this eases them there from about
+ * where the breath leaves them.
+ */
+export function settle(el: Element): Stoppable {
+  return animate(
+    el,
+    { scale: [0.9, 1], opacity: [0.7, 1] },
+    { duration: 0.15, ease: [0.23, 1, 0.32, 1] },
+  );
+}
+
+/** "No": a short shake, left and right, settling back in place. */
+export function shake(el: Element): Stoppable {
+  return animate(
+    el,
+    { x: [0, -9, 8, -6, 4, -2, 0] },
+    { duration: 0.45, ease: "easeOut" },
+  );
+}
+
+/*
+ * Flights: small coins that cross the block. They're off the main thread,
+ * on a CSS motion path.
+ */
+
+/**
  * A small coin that flies from `from` to `to` along a quadratic curve bent
- * through `via`, then vanishes into its target. Lives in `layer`, an
- * absolutely positioned overlay, and removes itself when done.
+ * through `via`, fading in as it leaves and shrinking into its target.
+ * Lives in `layer`, an absolutely positioned overlay, and removes itself
+ * when done. A negative `delay` starts it partway through.
  */
 export function flyCoin(
   layer: HTMLElement,
@@ -129,72 +201,41 @@ export function flyCoin(
   el.setAttribute("aria-hidden", "true");
   Object.assign(el.style, {
     position: "absolute",
-    left: `${-size / 2}px`,
-    top: `${-size / 2}px`,
+    left: "0",
+    top: "0",
     width: `${size}px`,
     height: `${size}px`,
     borderRadius: "9999px",
     background: color,
     opacity: "0",
     pointerEvents: "none",
-    willChange: "transform, opacity",
+    offsetPath: `path("M ${from.x} ${from.y} Q ${via.x} ${via.y} ${to.x} ${to.y}")`,
+    offsetRotate: "0deg",
   });
   layer.appendChild(el);
-
-  const controls = animate(0, 1, {
-    delay,
-    duration,
-    ease: "easeOut",
-    onUpdate: (p) => {
-      const q = 1 - p;
-      const x = q * q * from.x + 2 * q * p * via.x + p * p * to.x;
-      const y = q * q * from.y + 2 * q * p * via.y + p * p * to.y;
-      // Shrinks and fades over the last stretch, as if sinking in.
-      const scale = p < 0.6 ? 1 : 1 - ((p - 0.6) / 0.4) * 0.7;
-      el.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
-      el.style.opacity = String(
-        p < 0.08 ? p / 0.08 : p > 0.7 ? (1 - p) / 0.3 : 1,
-      );
+  const flight = el.animate(
+    [
+      { offsetDistance: "0%", opacity: 0, transform: "scale(1)" },
+      { opacity: 1, offset: 0.08 },
+      { transform: "scale(1)", offset: 0.6 },
+      { opacity: 1, offset: 0.7 },
+      { offsetDistance: "100%", opacity: 0, transform: "scale(0.3)" },
+    ],
+    {
+      delay: delay * 1000,
+      duration: duration * 1000,
+      easing: "ease-out",
+      fill: "both",
     },
-    onComplete: () => el.remove(),
-  });
+  );
+  flight.onfinish = () => el.remove();
   // Stopping early (unmount, replay) must not leave coins behind.
   return {
     stop: () => {
-      controls.stop();
+      flight.cancel();
       el.remove();
     },
   };
-}
-
-/**
- * A coin turning over to its other face: in from edge-on, with the pop's
- * overshoot. Its new colour is already set, so it lands showing it.
- */
-export function flipIn(el: Element, delay: number): Stoppable {
-  return animate(el, { scaleX: [0, 1] }, { ...POP, delay });
-}
-
-/** A hop that ripples through a row, one element after the next. */
-export function hop(
-  targets: Element[],
-  delay: number,
-  height = 4,
-  total = 0.4,
-): Stoppable {
-  if (targets.length === 0) return NOTHING;
-  return animate(
-    targets,
-    { y: [0, -height, 0] },
-    {
-      duration: 0.34,
-      times: [0, 0.4, 1],
-      ease: ["easeOut", "easeIn"],
-      delay: stagger(Math.min(0.02, total / targets.length), {
-        startDelay: delay,
-      }),
-    },
-  );
 }
 
 /**
@@ -238,13 +279,4 @@ export function burst(
     );
   }
   return { stop: () => running.forEach((r) => r.stop()) };
-}
-
-/** "No": a short shake, left and right, settling back in place. */
-export function shake(el: Element): Stoppable {
-  return animate(
-    el,
-    { x: [0, -9, 8, -6, 4, -2, 0] },
-    { duration: 0.45, ease: "easeOut" },
-  );
 }

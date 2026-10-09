@@ -1,6 +1,4 @@
-import { Breadcrumbs } from "@/components/layout/breadcrumbs";
-import { Footer } from "@/components/layout/footer";
-import { Topbar } from "@/components/layout/topbar";
+import { SiteChrome } from "@/components/layout/site-chrome";
 import "@solana/wallet-adapter-react-ui/styles.css";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
@@ -58,10 +56,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     >
       <body className="flex h-full flex-col">
         <Providers>
-          <Topbar />
-          <Breadcrumbs />
-          <main className="mx-auto w-full max-w-7xl grow p-4">{children}</main>
-          <Footer />
+          <SiteChrome>{children}</SiteChrome>
         </Providers>
       </body>
     </html>
