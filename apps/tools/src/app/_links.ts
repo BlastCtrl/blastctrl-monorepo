@@ -31,6 +31,11 @@ export const navigation = [
   },
   { name: "Mint NFT", href: "/solana-nft-tools/mint", in: "NFT Tools" },
   {
+    name: "Transfer NFT update authority",
+    href: "/solana-nft-tools/transfer-authority",
+    in: "NFT Tools",
+  },
+  {
     name: "Create collection",
     href: "/solana-nft-tools/mint",
     in: "NFT Tools",

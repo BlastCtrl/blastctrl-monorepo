@@ -37,6 +37,13 @@ export default function Nfts() {
       active: true,
     },
     {
+      name: "Transfer update authority",
+      href: "/solana-nft-tools/transfer-authority",
+      description:
+        "Move many NFTs to a new update authority and creator, then verify the new creator.",
+      active: true,
+    },
+    {
       name: "Add or Remove from a collection",
       href: "/solana-nft-tools/collections",
       description: "Add or remove Solana NFTs from an on-chain collection.",
