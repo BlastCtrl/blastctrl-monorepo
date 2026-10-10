@@ -13,6 +13,7 @@ export const currentEpochQuery = (connection: Connection) =>
       } catch (error) {
         throw new Error(
           `Failed to fetch current epoch: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error },
         );
       }
     },

@@ -35,7 +35,6 @@ const reportMessage = createComprehensiveTestReport({
     success: true,
     duration: 5,
     swapAmount: 3,
-    receivedAmount: 0.1234,
     transactionId: "dgdgsdg",
   },
   overallSuccess: true,

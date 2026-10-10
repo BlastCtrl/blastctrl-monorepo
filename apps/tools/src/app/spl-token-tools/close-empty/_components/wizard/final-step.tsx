@@ -42,7 +42,7 @@ export const FinalStep = () => {
             cause of the error.
           </span>
           <code className="block w-full max-w-full overflow-x-auto p-1 text-xs shadow-xs">
-            {String(error) ?? "There was no error message"}
+            {String(error)}
           </code>
         </Dialog.Description>
         <div className="mt-auto flex items-center justify-end gap-2">

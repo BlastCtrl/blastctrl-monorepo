@@ -5,14 +5,14 @@ import path from "path";
 import unzipper from "unzipper";
 
 const chromeURLPattern =
-  /^https?:\/\/chrome\.google\.com\/webstore\/.+?\/([a-z]{32})(?=[\/#?]|$)/;
+  /^https?:\/\/chrome\.google\.com\/webstore\/.+?\/([a-z]{32})(?=[/#?]|$)/;
 const microsoftURLPattern =
-  /^https?:\/\/microsoftedge\.microsoft\.com\/addons\/detail\/.+?\/([a-z]{32})(?=[\/#?]|$)/;
+  /^https?:\/\/microsoftedge\.microsoft\.com\/addons\/detail\/.+?\/([a-z]{32})(?=[/#?]|$)/;
 const chromeNewURLPattern =
-  /^https?:\/\/chromewebstore\.google\.com\/detail\/.+?\/([a-z]{32})(?=[\/#?]|$)/;
+  /^https?:\/\/chromewebstore\.google\.com\/detail\/.+?\/([a-z]{32})(?=[/#?]|$)/;
 
 function extractExtensionId(input: string) {
-  let match =
+  const match =
     chromeURLPattern.exec(input) ||
     chromeNewURLPattern.exec(input) ||
     microsoftURLPattern.exec(input);
@@ -45,15 +45,15 @@ function extractZipBufferFromCrx(arrayBuffer: ArrayBuffer) {
   if (buf[4] === 2) {
     header = 16;
     publicKeyLength =
-      // @ts-ignore
+      // @ts-expect-error CRX headers contain these fixed byte offsets.
       buf[8] + (buf[9] << 8) + (buf[10] << 16) + (buf[11] << 24);
     signatureLength =
-      // @ts-ignore
+      // @ts-expect-error CRX headers contain these fixed byte offsets.
       buf[12] + (buf[13] << 8) + (buf[14] << 16) + (buf[15] << 24);
     zipStartOffset = header + publicKeyLength + signatureLength;
   } else {
     publicKeyLength =
-      // @ts-ignore
+      // @ts-expect-error CRX headers contain these fixed byte offsets.
       buf[8] + (buf[9] << 8) + (buf[10] << 16) + (buf[11] << 24);
     zipStartOffset = 12 + publicKeyLength;
   }

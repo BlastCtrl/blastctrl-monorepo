@@ -5,17 +5,20 @@
     "node": "24.x"
   },
   "scripts": {
-    "dev": "pnpm run --parallel dev",
+    "dev": "pnpm -r --parallel dev",
     "format": "pnpm run --recursive format",
     "lint": "pnpm run --recursive lint",
     "build": "pnpm -F @blastctrl/tools... build",
-    "api:update": "node packages/solace-sdk/scripts/update-api.mjs"
+    "api:update": "node packages/solace-sdk/scripts/update-api.mjs",
+    "typecheck": "pnpm -r typecheck"
   },
   "license": "MIT",
   "devDependencies": {
     "prettier": "^3.9.8",
     "prettier-plugin-tailwindcss": "^0.8.1",
-    "typescript": "^6.0.3"
+    "typescript": "6.0.3",
+    "@blastctrl/eslint-config": "workspace:*",
+    "eslint": "10.11.0"
   },
   "dependencies": {
     "@blastctrl/prettier-config": "workspace:^"

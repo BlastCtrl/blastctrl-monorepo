@@ -1,0 +1,22 @@
+{
+  "name": "@blastctrl/tailwind-config",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./shared-styles.css",
+    "./postcss": "./postcss.config.js"
+  },
+  "scripts": {
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@blastctrl/eslint-config": "workspace:*",
+    "eslint": "10.11.0"
+  }
+}

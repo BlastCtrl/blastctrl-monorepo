@@ -27,7 +27,6 @@ export function loadWallet(key: number[]) {
 }
 
 export async function cleanWallet(from: Keypair, to: Keypair) {
-  const mint = CONFIG.usdcMint;
   const connection = new Connection(CONFIG.rpcUrl, "confirmed");
   const fromTokenAccount = getAssociatedTokenAddressSync(CONFIG.usdcMint, from.publicKey);
   const toTokenAccount = getAssociatedTokenAddressSync(CONFIG.usdcMint, to.publicKey);

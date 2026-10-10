@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import "../styles/globals.css";
 import "../styles/scroller.css";
 import { Providers } from "./providers";
-import { Roboto, Roboto_Slab } from "next/font/google";
+import localFont from "next/font/local";
 
 export const metadata: Metadata = {
   title: "Solana Tools | BlastTools",
@@ -32,27 +32,33 @@ export const viewport: Viewport = {
   themeColor: "#e52525",
 };
 
-const roboto = Roboto({
+const roboto = localFont({
+  src: [
+    { path: "../fonts/roboto/roboto-v51-latin-300.woff2", weight: "300" },
+    { path: "../fonts/roboto/roboto-v51-latin-regular.woff2", weight: "400" },
+    { path: "../fonts/roboto/roboto-v51-latin-500.woff2", weight: "500" },
+    { path: "../fonts/roboto/roboto-v51-latin-700.woff2", weight: "700" },
+    { path: "../fonts/roboto/roboto-v51-latin-900.woff2", weight: "900" },
+  ],
   display: "swap",
   style: "normal",
   variable: "--font-roboto",
-  weight: ["300", "400", "500", "700", "900"],
-  subsets: ["latin"],
 });
 
-const roboto_slab = Roboto_Slab({
+const robotoSlab = localFont({
+  src: "../fonts/roboto-slab/roboto-slab-latin-variable.woff2",
   display: "swap",
   style: "normal",
   variable: "--font-roboto-slab",
-  weight: ["300", "400", "500", "700", "900"],
-  subsets: ["latin"],
+  weight: "300 900",
+  adjustFontFallback: "Times New Roman",
 });
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
-      className={`${roboto.variable} ${roboto_slab.variable} h-full scrollbar-gutter-stable antialiased scheme-only-light dark:bg-white`}
+      className={`${roboto.variable} ${robotoSlab.variable} h-full scrollbar-gutter-stable antialiased scheme-only-light dark:bg-white`}
     >
       <body className="flex h-full flex-col">
         <Providers>

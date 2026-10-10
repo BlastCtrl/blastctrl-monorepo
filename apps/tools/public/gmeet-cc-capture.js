@@ -467,4 +467,4 @@ Stopped: ${new Date().toLocaleString()} — Duration: ${meta.duration || elapsed
     scrape: showPanel,
   };
 })(typeof window === "undefined" ? globalThis : window);
-gmeetcaptions.showPanel();
+globalThis.gmeetcaptions.showPanel();

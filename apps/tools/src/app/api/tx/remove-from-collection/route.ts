@@ -44,7 +44,6 @@ export async function POST(req: NextRequest) {
 
   const nftMetadata = await fetchMetadata(umi, getMetadata(nfts[0]));
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const collection = (nftMetadata as unknown as any).collection?.value?.key;
 
   if (!collection) {

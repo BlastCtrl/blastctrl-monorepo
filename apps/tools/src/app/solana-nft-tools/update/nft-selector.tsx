@@ -21,7 +21,7 @@ export const NftSelector = ({ control }: UseControllerProps<FormInputs>) => {
   const { data } = useOwnerNfts(publicKey?.toString() ?? "");
 
   const {
-    field,
+    field: { ref, value, onChange },
     fieldState: { error },
   } = useController({
     name: "mint",
@@ -40,12 +40,12 @@ export const NftSelector = ({ control }: UseControllerProps<FormInputs>) => {
     <>
       <Combobox
         as="div"
-        ref={field.ref}
+        ref={ref}
         name={"mint"}
-        onChange={(value) => field.onChange(value)}
+        onChange={onChange}
       >
         <NftComboboxInput
-          selectedMint={field.value}
+          selectedMint={value}
           onChange={setQuery}
           error={error}
         />

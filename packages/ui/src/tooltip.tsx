@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
 "use client";
 
 import { cloneElement, useRef, useState } from "react";
@@ -58,6 +57,8 @@ export function Tooltip({
       offset(4 + ARROW_HEIGHT),
       flip(),
       shift({ padding: 8 }),
+      // Floating UI accepts the ref object and reads it during positioning.
+      // eslint-disable-next-line react-hooks/refs
       arrow({ element: arrowRef }),
     ],
     whileElementsMounted: autoUpdate,

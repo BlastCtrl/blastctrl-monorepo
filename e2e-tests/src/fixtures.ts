@@ -5,7 +5,6 @@ import fs from "fs";
 import { downloadAndExtractExtension } from "./extension-downloader.js";
 
 const PHANTOM_EXTENSION_ID = "bfnaelmomeimhlpmgjnjophhpkkoljpa";
-const SOLFLARE_EXTENSION_ID = "bhhhlbepdkbapadjdnnojkbgioiodbic";
 
 const pathToExtension = path.join(import.meta.dirname, "..", PHANTOM_EXTENSION_ID);
 
@@ -19,6 +18,8 @@ export const test = base.extend<{
   context: BrowserContext;
   extensionId: string;
 }>({
+  // Playwright requires destructuring to infer fixture dependencies.
+  // eslint-disable-next-line no-empty-pattern
   context: async ({}, use) => {
     const context = await chromium.launchPersistentContext("", {
       headless: false,

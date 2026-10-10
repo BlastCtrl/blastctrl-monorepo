@@ -1,4 +1,4 @@
-import { fileURLToPath } from "url";
+import { fileURLToPath } from "node:url";
 
 /** @typedef {import("prettier").Config} PrettierConfig */
 /** @typedef {import("prettier-plugin-tailwindcss").PluginOptions} TailwindConfig */
@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 const config = {
   plugins: ["prettier-plugin-tailwindcss"],
   tailwindStylesheet: fileURLToPath(
-    new URL("../../apps/tools/src/styles/globals.css", import.meta.url),
+    import.meta.resolve("@blastctrl/tailwind-config"),
   ),
   tailwindFunctions: ["cn", "cva", "clsx"],
 };
