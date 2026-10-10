@@ -99,7 +99,6 @@ export function Switch({
         // Disabled
         "data-disabled:bg-zinc-200 data-disabled:opacity-50 data-disabled:data-checked:bg-zinc-200 data-disabled:data-checked:ring-black/5",
 
-        // eslint-disable-next-line @typescript-eslint/dot-notation
         colors["indigo"],
       )}
       {...props}

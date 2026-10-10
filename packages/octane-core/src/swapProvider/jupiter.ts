@@ -53,14 +53,15 @@ export async function getJupiterSwapInstructions(params: {
     // @ts-expect-error: If the response has an error
     if (quoteResponse.error) {
       // @ts-expect-error error
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       throw Error(quoteResponse.error);
     }
   } catch (err) {
     if (err instanceof Error) {
-      throw Error(`Failed to get quote for trade: ${err.message}`);
+      throw Error(`Failed to get quote for trade: ${err.message}`, {
+        cause: err,
+      });
     }
-    throw Error("Failed to get quote for trade");
+    throw Error("Failed to get quote for trade", { cause: err });
   }
 
   // Now that we have the quote, we can get the swap instructions
@@ -84,15 +85,16 @@ export async function getJupiterSwapInstructions(params: {
       })
     ).json();
     if ((response as any)?.error) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       throw Error((response as any).error);
     }
     instructions = response as JupiterSwapInstructionsApiResponse;
   } catch (err) {
     if (err instanceof Error) {
-      throw Error(`Failed to get swap instructions: ${err.message}`);
+      throw Error(`Failed to get swap instructions: ${err.message}`, {
+        cause: err,
+      });
     }
-    throw Error("Failed to get swap response");
+    throw Error("Failed to get swap response", { cause: err });
   }
 
   // Now we map these instructions to the web3.js objects

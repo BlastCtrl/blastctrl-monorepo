@@ -102,7 +102,7 @@ export async function sendSignedTransaction({
     console.error(err);
     if (err instanceof TransactionExpiredBlockheightExceededError) {
       console.log("Timed out awaiting confirmation on transaction");
-      throw new Error("Timed out awaiting confirmation on transaction");
+      throw new Error("Timed out awaiting confirmation on transaction", { cause: err });
     }
 
     let simulateResult: SimulatedTransactionResponse | null = null;
@@ -131,12 +131,13 @@ export async function sendSignedTransaction({
           if (line?.startsWith("Program log: ")) {
             throw new Error(
               "Transaction failed: " + line.slice("Program log: ".length),
+              { cause: err },
             );
           }
         }
       }
       console.log("Transaction simulation error");
-      throw new Error(JSON.stringify(simulateResult.err));
+      throw new Error(JSON.stringify(simulateResult.err), { cause: err });
     }
 
     console.log("Transaction failed");

@@ -145,7 +145,7 @@ export default function Update() {
     }
 
     const shareTotal = data.creators.reduce(
-      (sum, { share }) => (sum += share),
+      (sum, { share }) => sum + share,
       0,
     );
     if (data.creators.length > 0 && shareTotal !== 100) {

@@ -1,6 +1,6 @@
 import { createInitialTestMessage, createComprehensiveTestReport } from "./messages.js";
 import { DiscordWebhookClient } from "./webhook-client.js";
-import { getSolBalance, getTokenBalance, formatNumber, sleep } from "../solana-lib.js";
+import { getSolBalance, getTokenBalance, sleep } from "../solana-lib.js";
 import CONFIG from "../config.js";
 
 export type CleanupStepData = {

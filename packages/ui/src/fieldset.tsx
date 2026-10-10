@@ -37,7 +37,6 @@ export function Legend({ ...props }: HeadlessLegendProps) {
       data-slot="legend"
       className={cn(
         "text-base/6 font-semibold text-zinc-950 data-disabled:opacity-50 sm:text-sm/6",
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         props.className,
       )}
     />

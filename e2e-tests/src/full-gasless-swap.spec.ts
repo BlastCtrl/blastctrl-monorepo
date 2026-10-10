@@ -7,8 +7,7 @@
 import { test, expect } from "./fixtures.js";
 import CONFIG from "./config.js";
 import { cleanWallet, sendTokensToWallet, sleep } from "./solana-lib.js";
-// @ts-expect-error not installed
-import { Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { TestReporter } from "./discord/test-reporter.js";
 import { runJupiterUltraSwap } from "./jup-ultra-swap.js";
 
@@ -19,7 +18,6 @@ const testReporter: TestReporter = new TestReporter(DISCORD_WEBHOOK_URL);
 test.beforeAll(async () => {
   await testReporter.init();
 
-  let fundingSuccess = false;
   let fundStartTime = Date.now();
   let fundTxid: string;
   let fundDuration: number;
@@ -31,10 +29,8 @@ test.beforeAll(async () => {
     fundTxid = await sendTokensToWallet(CONFIG.funder, CONFIG.swapper, amountToSend);
     fundDuration = (Date.now() - fundStartTime) / 1000;
     console.log(`Funding successful ${fundTxid}`);
-    fundingSuccess = true;
   } catch (error) {
     console.error("Funding failed:", error);
-    fundTxid = "";
     fundDuration = (Date.now() - (fundStartTime || Date.now())) / 1000;
 
     // Report failure and exit early - we can't continue without funds
@@ -50,7 +46,7 @@ test.beforeAll(async () => {
   }
 
   // Record successful funding
-  testReporter.recordFundingStatus(fundingSuccess, {
+  testReporter.recordFundingStatus(true, {
     transactionId: fundTxid,
     amount: 3, // USDC
     duration: fundDuration,
@@ -109,9 +105,7 @@ test.afterAll(async () => {
   await testReporter.reportTestCompletion(overallSuccess);
 });
 
-// @ts-expect-error not installed
 test("test swap", async ({ page, extensionId }) => {
-  let swapSuccess = false;
   let swapStartTime = Date.now();
   let swapDuration: number;
 
@@ -131,7 +125,6 @@ test("test swap", async ({ page, extensionId }) => {
     const sidePanelPage: Page = page
       .context()
       .pages()
-      // @ts-expect-error not installed
       .find((value) => value.url().match(extensionId))!;
     await sidePanelPage?.close({});
 
@@ -178,7 +171,6 @@ test("test swap", async ({ page, extensionId }) => {
     const transactionId = txLink?.split("/").pop() || "";
 
     swapDuration = (Date.now() - swapStartTime) / 1000;
-    swapSuccess = true;
 
     await page.close();
 

@@ -13,7 +13,7 @@
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
-    "typecheck": "tsc --noEmit --emitDeclarationOnly false"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@floating-ui/react": "^0.26.13",
@@ -24,23 +24,17 @@
   "devDependencies": {
     "@blastctrl/eslint-config": "workspace:*",
     "@blastctrl/prettier-config": "workspace:*",
-    "@blastctrl/tsconfig": "workspace:*",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "eslint": "^8.57.0",
+    "eslint": "10.11.0",
     "prettier": "^3.9.8",
     "tailwindcss": "^4.3.3",
-    "typescript": "^6.0.3"
+    "typescript": "6.0.3",
+    "@blastctrl/typescript-config": "workspace:*"
   },
   "peerDependencies": {
     "next": "^15.5.26 || ^16.4.0",
     "react": "^19.3.0"
-  },
-  "eslintConfig": {
-    "extends": [
-      "@blastctrl/eslint-config/base",
-      "@blastctrl/eslint-config/react"
-    ]
   },
   "prettier": "@blastctrl/prettier-config"
 }

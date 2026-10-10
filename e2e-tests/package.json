@@ -9,7 +9,9 @@
     "playwright:install": "playwright install",
     "script:clear-wallet": "tsc && node dist/src/scripts/clear-wallet.js",
     "script:webhook": "tsc && node dist/src/scripts/discord-webhook.js",
-    "script:swap": "tsc && node dist/src/scripts/ultra-swap.js"
+    "script:swap": "tsc && node dist/src/scripts/ultra-swap.js",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [],
   "author": "",
@@ -27,6 +29,10 @@
   "devDependencies": {
     "@types/bs58": "^4.0.1",
     "@types/node": "^22.13.10",
-    "@types/unzipper": "^0.10.11"
+    "@types/unzipper": "^0.10.11",
+    "eslint": "10.11.0",
+    "@blastctrl/eslint-config": "workspace:*",
+    "typescript": "6.0.3",
+    "@blastctrl/typescript-config": "workspace:*"
   }
 }

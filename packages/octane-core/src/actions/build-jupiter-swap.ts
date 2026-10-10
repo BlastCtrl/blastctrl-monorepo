@@ -199,9 +199,11 @@ export async function buildJupiterSwapToSOL(
     transactionFee = await connection.getFeeForMessage(messageV0, "confirmed");
   } catch (err) {
     if (err instanceof Error) {
-      throw Error(`Failed to calculate transaction fee: ${err.message}`);
+      throw Error(`Failed to calculate transaction fee: ${err.message}`, {
+        cause: err,
+      });
     }
-    throw Error("Failed to get transaction fee");
+    throw Error("Failed to get transaction fee", { cause: err });
   }
 
   // Modify our cleanup instruction to add this transaction fee as well

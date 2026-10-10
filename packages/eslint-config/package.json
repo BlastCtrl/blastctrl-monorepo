@@ -1,0 +1,36 @@
+{
+  "name": "@blastctrl/eslint-config",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "exports": {
+    "./base": "./base.js",
+    "./next-js": "./next.js",
+    "./react-internal": "./react-internal.js"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@eslint/js": "10.0.1",
+    "@next/eslint-plugin-next": "16.4.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.12.0",
+    "typescript-eslint": "8.70.1"
+  },
+  "peerDependencies": {
+    "eslint": "^10.11.0",
+    "typescript": "^6.0.3"
+  },
+  "devDependencies": {
+    "@blastctrl/typescript-config": "workspace:*",
+    "eslint": "10.11.0",
+    "typescript": "6.0.3",
+    "prettier": "^3.9.8"
+  },
+  "prettier": "@blastctrl/prettier-config"
+}

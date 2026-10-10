@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint and typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install pnpm and dependencies
+        uses: pnpm/setup@v3
+        with:
+          node-version-file: .node-version
+          cache: true
+          require-lockfile: true
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Generate Next.js types
+        run: pnpm --filter @blastctrl/tools exec next typegen
+        # Loading next.config.js validates env. Type generation does not use
+        # these services, so placeholders keep this check independent of secrets.
+        env:
+          REDIS_URL: https://redis.example.invalid
+          REDIS_TOKEN: ci-placeholder
+          OCTANE_SECRET_KEYPAIR: ci-placeholder
+          BONK_BURN_FEE_BPS: "0"
+          OCTANE_PLATFORM_FEE_BPS: "0"
+          BLAST_BACKEND_URL: https://backend.example.invalid
+          NEXT_PUBLIC_RPC_ENDPOINT: https://rpc.example.invalid
+          NEXT_PUBLIC_DAS_API: https://das.example.invalid
+
+      - name: Typecheck
+        run: pnpm typecheck

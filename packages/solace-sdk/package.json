@@ -2,7 +2,6 @@
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@blastctrl/solace-sdk",
   "main": "dist/index.js",
-  "packageManager": "pnpm@10.34.3+sha512.f2c531b08829d7be7f03c90addc266615f9c5477463e4bf1d275cb263ce9ea57cf0d5599110d94649a9bb3fed9f0b5efcea74a7016b61532a24cb9ad87860c1d",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -14,10 +13,15 @@
     "generate": "orval --config orval.config.cjs",
     "prebuild": "rm -rf ./dist",
     "build": "tsc",
-    "api:update": "node scripts/update-api.mjs"
+    "api:update": "node scripts/update-api.mjs",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "orval": "^8.38.0",
-    "typescript": "^6.0.3"
+    "typescript": "6.0.3",
+    "eslint": "10.11.0",
+    "@blastctrl/eslint-config": "workspace:*",
+    "@blastctrl/typescript-config": "workspace:*"
   }
 }
