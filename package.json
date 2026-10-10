@@ -10,7 +10,7 @@
     "lint": "pnpm run --recursive lint",
     "build": "pnpm -F @blastctrl/tools... build",
     "api:update": "node packages/solace-sdk/scripts/update-api.mjs",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm --filter @blastctrl/solace-sdk build && pnpm -r typecheck"
   },
   "license": "MIT",
   "devDependencies": {
