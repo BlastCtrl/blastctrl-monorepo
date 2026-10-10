@@ -30,7 +30,7 @@
     "eslint": "^8.57.0",
     "prettier": "^3.9.8",
     "tailwindcss": "^4.3.3",
-    "typescript": "^5.4.3"
+    "typescript": "^6.0.3"
   },
   "peerDependencies": {
     "next": "^15.5.26 || ^16.4.0",
