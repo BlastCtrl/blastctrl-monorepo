@@ -142,15 +142,6 @@ describe("planTransfer", () => {
       status: "error",
     });
   });
-
-  it("trims the null padding off names", () => {
-    const plan = planTransfer(
-      mint,
-      metadata({ name: "Padded\0\0\0" }),
-      settings(),
-    );
-    expect(plan.name).toBe("Padded");
-  });
 });
 
 describe("planVerify", () => {

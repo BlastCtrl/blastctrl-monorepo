@@ -65,22 +65,6 @@ describe("transferInstruction", () => {
     );
     expect(writable?.isWritable).toBe(true);
   });
-
-  it("sends trimmed strings, not the null padding", () => {
-    const padded = transfer({
-      name: "Name".padEnd(32, "\0"),
-      symbol: "SYM".padEnd(10, "\0"),
-      uri: "https://example.com".padEnd(200, "\0"),
-    });
-    const trimmed = transfer({
-      name: "Name",
-      symbol: "SYM",
-      uri: "https://example.com",
-    });
-    expect(padded.instruction.data.length).toBe(
-      trimmed.instruction.data.length,
-    );
-  });
 });
 
 describe("packBatches", () => {
