@@ -2,6 +2,7 @@
 
 import { compress } from "@/lib/solana/common";
 import { cn } from "@blastctrl/ui";
+import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useMemo, useState } from "react";
 import { MintListInput } from "./_components/mint-list-input";
@@ -24,6 +25,7 @@ const STEPS = [
 
 export default function TransferAuthority() {
   const { publicKey } = useWallet();
+  const network = useNetworkConfigurationStore((state) => state.network);
   const [step, setStep] = useState(0);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -77,6 +79,17 @@ export default function TransferAuthority() {
         ) : (
           "No wallet connected"
         )}
+        {" on "}
+        <span
+          className={cn(
+            "font-medium",
+            network === "mainnet-beta" ? "text-gray-900" : "text-amber-700",
+          )}
+        >
+          {networkName(network)}
+        </span>
+        . Change it in the wallet menu; your wallet should be on the same
+        network.
       </p>
 
       <div className="mt-4">
@@ -97,4 +110,14 @@ export default function TransferAuthority() {
       </div>
     </div>
   );
+}
+
+function networkName(network: string) {
+  if (network === "mainnet-beta") return "mainnet";
+  if (network === "devnet" || network === "testnet") return network;
+  try {
+    return `a custom RPC (${new URL(network).host})`;
+  } catch {
+    return "a custom RPC";
+  }
 }

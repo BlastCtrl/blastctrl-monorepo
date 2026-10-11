@@ -1,6 +1,7 @@
 import { retryWithBackoff } from "@/lib/utils";
 import type { WalletContextState } from "@solana/wallet-adapter-react";
-import type { Connection, Transaction } from "@solana/web3.js";
+import type { Connection } from "@solana/web3.js";
+import { Transaction } from "@solana/web3.js";
 
 export type BatchResult =
   | { index: number; status: "confirmed"; signature: string }
@@ -52,7 +53,8 @@ export function isWalletRefusal(err: unknown) {
 
 type Sender<B> = {
   connection: Connection;
-  wallet: Pick<WalletContextState, "signAllTransactions" | "sendTransaction">;
+  wallet: Pick<WalletContextState, "signAllTransactions" | "sendTransaction"> &
+    Partial<Pick<WalletContextState, "wallet" | "publicKey">>;
   build: (batch: B, lifetime: Lifetime) => Transaction;
 };
 
@@ -82,9 +84,10 @@ export async function sendBatches<B extends { index: number }>(
     batches.forEach(({ index }) => onStage?.(index, "signing"));
     let signed: Transaction[];
     try {
-      signed = await wallet.signAllTransactions(
-        batches.map((b) => build(b, lifetime)),
-      );
+      const transactions = batches.map((b) => build(b, lifetime));
+      signed =
+        (await signWithChain(wallet, transactions, connection.rpcEndpoint)) ??
+        (await wallet.signAllTransactions(transactions));
     } catch (err) {
       if (isWalletRefusal(err)) {
         throw new WalletRefusedError(0, batches.length, err);
@@ -151,6 +154,78 @@ export async function sendBatches<B extends { index: number }>(
     onStage?.(batch.index, "confirming");
     await report(batch.index, confirm(connection, signature, lifetime));
   }
+}
+
+type StandardAccount = { address: string; chains: readonly string[] };
+
+type StandardSignTransaction = {
+  signTransaction: (
+    ...inputs: {
+      account: StandardAccount;
+      chain: string;
+      transaction: Uint8Array;
+    }[]
+  ) => Promise<{ signedTransaction: Uint8Array }[]>;
+};
+
+/**
+ * Signs through the Wallet Standard feature behind the adapter, which takes
+ * the chain the transactions are for. The adapter's own signAllTransactions
+ * leaves it out, and Phantom then takes devnet transactions for mainnet ones
+ * and warns about a network mismatch. Null when the wallet isn't a Wallet
+ * Standard wallet that can sign for that chain; the caller then uses the
+ * adapter.
+ */
+async function signWithChain(
+  { wallet, publicKey }: Sender<never>["wallet"],
+  transactions: Transaction[],
+  endpoint: string,
+): Promise<Transaction[] | null> {
+  const standard = (
+    wallet?.adapter as
+      | {
+          wallet?: {
+            accounts?: readonly StandardAccount[];
+            features?: Record<string, unknown>;
+          };
+        }
+      | undefined
+  )?.wallet;
+  const feature = standard?.features?.["solana:signTransaction"] as
+    StandardSignTransaction | undefined;
+  if (!feature) return null;
+  const chain = chainForEndpoint(endpoint);
+  const account = standard?.accounts?.find(
+    (a) => a.address === publicKey?.toBase58(),
+  );
+  if (!account?.chains.includes(chain)) return null;
+
+  const outputs = await feature.signTransaction(
+    ...transactions.map((transaction) => ({
+      account,
+      chain,
+      transaction: transaction.serialize({
+        requireAllSignatures: false,
+        verifySignatures: false,
+      }),
+    })),
+  );
+  return outputs.map(({ signedTransaction }) =>
+    Transaction.from(signedTransaction),
+  );
+}
+
+/** The same mapping the adapter's sendTransaction uses for the chain. */
+export function chainForEndpoint(endpoint: string) {
+  if (endpoint.includes("https://api.mainnet-beta.solana.com")) {
+    return "solana:mainnet";
+  }
+  if (/\bdevnet\b/i.test(endpoint)) return "solana:devnet";
+  if (/\btestnet\b/i.test(endpoint)) return "solana:testnet";
+  if (/\blocalhost\b/i.test(endpoint) || /\b127\.0\.0\.1\b/.test(endpoint)) {
+    return "solana:localnet";
+  }
+  return "solana:mainnet";
 }
 
 export const errorMessage = (err: unknown) =>
