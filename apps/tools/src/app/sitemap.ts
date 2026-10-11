@@ -15,6 +15,7 @@ const paths = [
   "/solana-nft-tools/mint-core",
   "/solana-nft-tools/mint",
   "/solana-nft-tools/nft-faucet",
+  "/solana-nft-tools/transfer-authority",
   "/solana-nft-tools/update",
   "/solana-stake-tools",
   "/solana-stake-tools/merge-stake",
