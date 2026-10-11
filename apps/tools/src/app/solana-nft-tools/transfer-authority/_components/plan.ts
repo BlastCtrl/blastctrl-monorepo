@@ -45,11 +45,7 @@ export type VerifyPlan = Base &
     | { status: "error"; reason: string }
   );
 
-/** Metadata strings from older programs are padded with null bytes. */
-export const trimNulls = (value: string) => value.replace(/\0+$/, "");
-
-const nameOf = (metadata: Metadata | null) =>
-  metadata ? trimNulls(metadata.name) : "";
+const nameOf = (metadata: Metadata | null) => metadata?.name ?? "";
 
 const creatorsOf = (metadata: Metadata) =>
   unwrapOption(metadata.creators) ?? [];

@@ -16,7 +16,6 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import type { TransferPlan, VerifyPlan } from "./plan";
-import { trimNulls } from "./plan";
 
 /**
  * Leaves room for what wallets add before signing (Phantom's Lighthouse
@@ -53,12 +52,13 @@ export function transferInstruction(
     payer: signer,
     newUpdateAuthority: some(publicKey(newAuthority)),
     // `data` is all or nothing, so changing the creators means sending the
-    // rest of it unchanged.
+    // rest of it unchanged. Umi reads the strings without the null padding
+    // they're stored with, and the program pads them again.
     data: creators
       ? some({
-          name: trimNulls(metadata.name),
-          symbol: trimNulls(metadata.symbol),
-          uri: trimNulls(metadata.uri),
+          name: metadata.name,
+          symbol: metadata.symbol,
+          uri: metadata.uri,
           sellerFeeBasisPoints: metadata.sellerFeeBasisPoints,
           creators: some(creators),
         })
