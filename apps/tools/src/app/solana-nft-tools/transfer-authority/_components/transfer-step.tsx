@@ -1,13 +1,15 @@
 import { isPublicKey } from "@/lib/solana/common";
 import useUmi from "@/lib/hooks/use-umi";
-import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
+import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useMemo, useState } from "react";
+import { AddressInput, Label } from "./address-input";
 import { NftTable } from "./nft-table";
 import type { CreatorMode, TransferPlan } from "./plan";
 import { planTransfer } from "./plan";
 import { SendPanel } from "./send-panel";
+import { useSquadsMultisig } from "./squads";
 import type { ReadyTransfer } from "./transactions";
 import { packBatches, transferInstruction } from "./transactions";
 import { useNftMetadata } from "./use-nft-metadata";
@@ -58,21 +60,34 @@ export function TransferStep({ mints, onBusyChange }: Props) {
   const metadata = useNftMetadata(checked);
   const newCreator = sameCreator ? newAuthority : creatorInput;
 
+  // Handing NFTs to a Squads multisig account instead of its vault can't be
+  // undone, so both addresses are checked before anything is planned.
+  const authorityMultisig = useSquadsMultisig(newAuthority);
+  const creatorMultisig = useSquadsMultisig(creatorInput);
+  const checkCreator = creatorMode !== "keep" && !sameCreator;
+
   const authorityError = !newAuthority
     ? "Enter the new update authority"
     : !isPublicKey(newAuthority)
       ? "Not a valid address"
       : newAuthority === wallet
         ? "That's the connected wallet"
-        : null;
-  const creatorError =
-    creatorMode === "keep" || sameCreator
-      ? null
-      : !creatorInput
-        ? "Enter the new creator"
-        : !isPublicKey(creatorInput)
-          ? "Not a valid address"
-          : null;
+        : authorityMultisig.isPending
+          ? "Checking the address"
+          : authorityMultisig.data
+            ? "That's a Squads multisig account, not its vault"
+            : null;
+  const creatorError = !checkCreator
+    ? null
+    : !creatorInput
+      ? "Enter the new creator"
+      : !isPublicKey(creatorInput)
+        ? "Not a valid address"
+        : creatorMultisig.isPending
+          ? "Checking the address"
+          : creatorMultisig.data
+            ? "That's a Squads multisig account, not its vault"
+            : null;
   const settingsValid = !authorityError && !creatorError && !!wallet;
 
   const plans = useMemo<TransferPlan[] | null>(() => {
@@ -133,12 +148,17 @@ export function TransferStep({ mints, onBusyChange }: Props) {
     <div className="space-y-6">
       <div>
         <Label htmlFor="new-authority">New update authority</Label>
+        <p className="text-xs text-gray-500">
+          For a Squads multisig, use its vault address, not the multisig
+          account.
+        </p>
         <AddressInput
           id="new-authority"
           value={newAuthority}
           onChange={setNewAuthority}
           disabled={busy}
           error={newAuthority ? authorityError : null}
+          multisigVault={authorityMultisig.data?.vault}
         />
       </div>
 
@@ -185,6 +205,7 @@ export function TransferStep({ mints, onBusyChange }: Props) {
                   onChange={setCreatorInput}
                   disabled={busy}
                   error={creatorInput ? creatorError : null}
+                  multisigVault={creatorMultisig.data?.vault}
                 />
               </div>
             )}
@@ -269,53 +290,5 @@ export function TransferStep({ mints, onBusyChange }: Props) {
         </div>
       )}
     </div>
-  );
-}
-
-export function Label({
-  htmlFor,
-  children,
-}: {
-  htmlFor: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label htmlFor={htmlFor} className="text-sm font-medium text-gray-700">
-      {children}
-    </label>
-  );
-}
-
-function AddressInput({
-  id,
-  value,
-  onChange,
-  disabled,
-  error,
-}: {
-  id: string;
-  value: string;
-  onChange: (value: string) => void;
-  disabled?: boolean;
-  error: string | null;
-}) {
-  return (
-    <>
-      <input
-        id={id}
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value.trim())}
-        disabled={disabled}
-        spellCheck={false}
-        autoComplete="off"
-        placeholder="Wallet address"
-        className={cn(
-          "mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-50",
-          error && "border-red-300 text-red-900",
-        )}
-      />
-      {error && <p className="mt-1 text-xs text-red-700">{error}</p>}
-    </>
   );
 }
