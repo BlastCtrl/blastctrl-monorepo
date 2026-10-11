@@ -1,6 +1,5 @@
 "use client";
 
-import { errorMessage } from "@/lib/solana/send-batches";
 import { compress } from "@/lib/solana/common";
 import { cn } from "@blastctrl/ui";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -29,14 +28,8 @@ export default function TransferAuthority() {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const parsed = useMemo(() => {
-    try {
-      return parseMintList(text);
-    } catch (err) {
-      return { error: errorMessage(err) };
-    }
-  }, [text]);
-  const mints = "error" in parsed ? [] : parsed.mints;
+  const parsed = useMemo(() => parseMintList(text), [text]);
+  const mints = parsed.mints;
 
   return (
     <div className="mx-auto w-[min(100%,var(--breakpoint-md))] overflow-visible bg-white px-4 pb-5 sm:rounded-lg sm:p-6 sm:shadow-sm">
