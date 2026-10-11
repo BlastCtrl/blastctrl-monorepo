@@ -1,7 +1,7 @@
 import { chainForEndpoint } from "@/lib/solana/endpoints";
 import { retryWithBackoff } from "@/lib/utils";
 import type { WalletContextState } from "@solana/wallet-adapter-react";
-import type { Connection } from "@solana/web3.js";
+import type { Connection, TransactionInstruction } from "@solana/web3.js";
 import { Transaction } from "@solana/web3.js";
 
 export type BatchResult =
@@ -155,6 +155,72 @@ export async function sendBatches<B extends { index: number }>(
     onStage?.(batch.index, "confirming");
     await report(batch.index, confirm(connection, signature, lifetime));
   }
+}
+
+/**
+ * Sends transactions that depend on each other, in order: each is
+ * confirmed before the next goes out, and the first failure stops the rest.
+ * Wallets that can sign everything at once are asked once, and the
+ * transactions share that blockhash; others are asked per transaction.
+ * Reports how many have confirmed so far. A refusal throws
+ * `WalletRefusedError` like `sendBatches`.
+ */
+export async function sendInOrder(
+  steps: TransactionInstruction[][],
+  { connection, wallet }: Omit<Sender<never>, "build">,
+  onProgress?: (confirmed: number, total: number) => void,
+) {
+  const { publicKey } = wallet;
+  if (!publicKey) throw Error("Wallet is not connected");
+  const build = (instructions: TransactionInstruction[], lifetime: Lifetime) =>
+    new Transaction({ feePayer: publicKey, ...lifetime }).add(...instructions);
+  const signatures: string[] = [];
+  onProgress?.(0, steps.length);
+
+  if (wallet.signAllTransactions) {
+    const lifetime = await latestBlockhash(connection);
+    const transactions = steps.map((step) => build(step, lifetime));
+    let signed: Transaction[];
+    try {
+      signed =
+        (await signWithChain(wallet, transactions, connection.rpcEndpoint)) ??
+        (await wallet.signAllTransactions(transactions));
+    } catch (err) {
+      if (isWalletRefusal(err)) {
+        throw new WalletRefusedError(0, steps.length, err);
+      }
+      throw err;
+    }
+    for (const transaction of signed) {
+      const signature = await connection.sendRawTransaction(
+        transaction.serialize(),
+        SEND_OPTIONS,
+      );
+      signatures.push(await confirm(connection, signature, lifetime));
+      onProgress?.(signatures.length, steps.length);
+    }
+    return signatures;
+  }
+
+  for (const step of steps) {
+    const lifetime = await latestBlockhash(connection);
+    let signature: string;
+    try {
+      signature = await wallet.sendTransaction(
+        build(step, lifetime),
+        connection,
+        SEND_OPTIONS,
+      );
+    } catch (err) {
+      if (isWalletRefusal(err)) {
+        throw new WalletRefusedError(signatures.length, steps.length, err);
+      }
+      throw err;
+    }
+    signatures.push(await confirm(connection, signature, lifetime));
+    onProgress?.(signatures.length, steps.length);
+  }
+  return signatures;
 }
 
 type StandardAccount = { address: string; chains: readonly string[] };

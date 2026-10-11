@@ -19,7 +19,7 @@ const STEPS = [
   {
     title: "2. Verify creator",
     description:
-      "Connect the new creator's wallet. It verifies itself as a creator on each NFT.",
+      "Connect the new creator's wallet to verify it as a creator on each NFT, or propose the verifications from a Squads multisig.",
   },
 ];
 
