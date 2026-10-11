@@ -3,30 +3,7 @@ import type { Connection } from "@solana/web3.js";
 import { Keypair, SystemProgram, Transaction } from "@solana/web3.js";
 import { describe, expect, it } from "vitest";
 import type { BatchResult } from "./send-batches";
-import { chainForEndpoint, sendBatches } from "./send-batches";
-
-describe("chainForEndpoint", () => {
-  it("knows devnet and testnet RPCs by their url", () => {
-    expect(chainForEndpoint("https://api.devnet.solana.com")).toBe(
-      "solana:devnet",
-    );
-    expect(chainForEndpoint("https://devnet.helius-rpc.com/?api-key=x")).toBe(
-      "solana:devnet",
-    );
-    expect(chainForEndpoint("https://api.testnet.solana.com")).toBe(
-      "solana:testnet",
-    );
-  });
-
-  it("takes anything else for mainnet", () => {
-    expect(chainForEndpoint("https://example.mainnet.rpcpool.com/key")).toBe(
-      "solana:mainnet",
-    );
-    expect(chainForEndpoint("https://api.mainnet-beta.solana.com")).toBe(
-      "solana:mainnet",
-    );
-  });
-});
+import { sendBatches } from "./send-batches";
 
 describe("sendBatches with a Wallet Standard wallet", () => {
   const signer = Keypair.generate();

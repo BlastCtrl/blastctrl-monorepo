@@ -1,3 +1,4 @@
+import { chainForEndpoint } from "@/lib/solana/endpoints";
 import { retryWithBackoff } from "@/lib/utils";
 import type { WalletContextState } from "@solana/wallet-adapter-react";
 import type { Connection } from "@solana/web3.js";
@@ -213,19 +214,6 @@ async function signWithChain(
   return outputs.map(({ signedTransaction }) =>
     Transaction.from(signedTransaction),
   );
-}
-
-/** The same mapping the adapter's sendTransaction uses for the chain. */
-export function chainForEndpoint(endpoint: string) {
-  if (endpoint.includes("https://api.mainnet-beta.solana.com")) {
-    return "solana:mainnet";
-  }
-  if (/\bdevnet\b/i.test(endpoint)) return "solana:devnet";
-  if (/\btestnet\b/i.test(endpoint)) return "solana:testnet";
-  if (/\blocalhost\b/i.test(endpoint) || /\b127\.0\.0\.1\b/.test(endpoint)) {
-    return "solana:localnet";
-  }
-  return "solana:mainnet";
 }
 
 export const errorMessage = (err: unknown) =>
