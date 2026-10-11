@@ -1,4 +1,5 @@
 import { notify } from "@/components";
+import { walletNetworkForEndpoint } from "@/lib/solana/endpoints";
 import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
 import type { WalletError } from "@solana/wallet-adapter-base";
 import {
@@ -39,23 +40,24 @@ function WalletContextProvider({ children }: { children: ReactNode }) {
   const { network } = useNetworkConfigurationStore();
   const endpoint = useMemo(() => getEndpoint(network), [network]);
 
-  const wallets = useMemo(
-    () => [
+  const wallets = useMemo(() => {
+    const walletNetwork = walletNetworkForEndpoint(endpoint);
+    return [
       new PhantomWalletAdapter(),
-      new SolflareWalletAdapter(),
+      new SolflareWalletAdapter({ network: walletNetwork }),
       new LedgerWalletAdapter(),
       new WalletConnectWalletAdapter({
+        // WalletConnect has no testnet; it signs for devnet instead.
         network:
-          network === "mainnet-beta"
+          walletNetwork === WalletAdapterNetwork.Mainnet
             ? WalletAdapterNetwork.Mainnet
             : WalletAdapterNetwork.Devnet,
         options: {
           projectId: process.env.NEXT_PUBLIC_REOWN_PROJECT_ID,
         },
       }),
-    ],
-    [network],
-  );
+    ];
+  }, [endpoint]);
 
   const onError = useCallback((error: WalletError) => {
     if (
