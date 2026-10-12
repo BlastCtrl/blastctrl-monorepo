@@ -93,7 +93,7 @@ function GoodToKnow({
             They hold no tokens, so closing them returns their whole deposit. To
             keep some open, or pick accounts yourself, use the{" "}
             <Link href={FULL_TOOL} className={LINK}>
-              full reclaim tool
+              advanced reclaim tool
             </Link>
             .
           </Fact>
@@ -113,8 +113,8 @@ function GoodToKnow({
           )}*/}
           {stepsLeft > 0 && (
             <Fact term="There's more coming.">
-              Rent drops again in November, and every step frees up more. Come
-              back then for the next round.
+              The next reduction in rent size will be happening in November.
+              Come back then to reclaim more SOL.
             </Fact>
           )}
         </dl>
