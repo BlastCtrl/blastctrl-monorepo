@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { address, creator, metadata } from "./fixtures";
 import type { SquadsMultisig } from "./squads";
 import {
-  MAX_NFTS_PER_SQUADS_TRANSACTION,
+  MAX_VERIFICATIONS_PER_SQUADS_TRANSACTION,
   SQUADS_PROGRAM_ID,
   batchProposalSteps,
   isSquadsMultisig,
@@ -68,7 +68,7 @@ describe("batchProposalSteps", () => {
       };
     }),
     vault,
-    { maxPerTransaction: MAX_NFTS_PER_SQUADS_TRANSACTION },
+    { maxPerTransaction: MAX_VERIFICATIONS_PER_SQUADS_TRANSACTION },
   );
   const memberKey = address();
   const info: SquadsMultisig = {

@@ -129,7 +129,8 @@ function nextCreators(
   const mine = current.find((c) => c.address === wallet);
   if (!mine) {
     return {
-      error: "Your wallet isn't a creator; use “Replace all creators”",
+      error:
+        "The current update authority isn't a creator; use “Replace all creators”",
     };
   }
   if (newCreator === wallet) return { creators: null };

@@ -14,7 +14,7 @@ const STEPS = [
   {
     title: "1. Transfer",
     description:
-      "Connect the current update authority. It hands the NFTs to the new update authority and puts the new creator in its place, unverified.",
+      "Connect the current update authority, or propose it from a Squads multisig. It hands the NFTs to the new update authority and puts the new creator in its place, unverified.",
   },
   {
     title: "2. Verify creator",

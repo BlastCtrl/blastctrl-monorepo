@@ -3,13 +3,24 @@ import useUmi from "@/lib/hooks/use-umi";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { PublicKey } from "@solana/web3.js";
 import { useMemo, useState } from "react";
 import { AddressInput, Label } from "./address-input";
 import { NftTable } from "./nft-table";
 import type { CreatorMode, TransferPlan } from "./plan";
 import { planTransfer } from "./plan";
 import { SendPanel } from "./send-panel";
-import { useSquadsMultisig } from "./squads";
+import type { SignerMode } from "./signer-choice";
+import {
+  SignerModePicker,
+  SquadsMultisigField,
+  useSquadsMultisigInfo,
+} from "./signer-choice";
+import {
+  MAX_TRANSFERS_PER_SQUADS_TRANSACTION,
+  useSquadsMultisig,
+} from "./squads";
+import { SquadsPanel } from "./squads-panel";
 import type { ReadyTransfer } from "./transactions";
 import { packBatches, transferInstruction } from "./transactions";
 import { useNftMetadata } from "./use-nft-metadata";
@@ -21,9 +32,9 @@ const CREATOR_MODES: {
 }[] = [
   {
     value: "swap",
-    label: "Swap your creator entry",
+    label: "Swap the creator entry",
     description:
-      "The new creator takes your wallet's place and share. Other creators stay as they are.",
+      "The new creator takes the current update authority's place and share. Other creators stay as they are.",
   },
   {
     value: "replace",
@@ -38,6 +49,18 @@ const CREATOR_MODES: {
   },
 ];
 
+const SIGNER_MODES = {
+  wallet: {
+    label: "Sign with the connected wallet",
+    description: "The current update authority's wallet signs and sends it.",
+  },
+  squads: {
+    label: "Propose from a Squads multisig",
+    description:
+      "When a Squads vault is the current update authority: a member's wallet puts the whole transfer into one Squads proposal. The multisig approves it once, here or in the Squads app, and any member executes it.",
+  },
+};
+
 type Props = {
   mints: string[];
   onBusyChange: (busy: boolean) => void;
@@ -47,7 +70,15 @@ export function TransferStep({ mints, onBusyChange }: Props) {
   const umi = useUmi();
   const { publicKey } = useWallet();
   const { setVisible } = useWalletModal();
-  const wallet = publicKey?.toBase58() ?? "";
+  const [mode, setMode] = useState<SignerMode>("wallet");
+  const [multisigAddress, setMultisigAddress] = useState("");
+  const { multisig, error: multisigError } = useSquadsMultisigInfo(
+    multisigAddress,
+    mode === "squads",
+  );
+  /** The current update authority, empty until it's known. */
+  const authority =
+    mode === "wallet" ? (publicKey?.toBase58() ?? "") : (multisig?.vault ?? "");
 
   const [checked, setChecked] = useState<string[]>([]);
   const [newAuthority, setNewAuthority] = useState("");
@@ -70,8 +101,8 @@ export function TransferStep({ mints, onBusyChange }: Props) {
     ? "Enter the new update authority"
     : !isPublicKey(newAuthority)
       ? "Not a valid address"
-      : newAuthority === wallet
-        ? "That's the connected wallet"
+      : newAuthority === authority
+        ? "That's the current update authority"
         : authorityMultisig.isPending
           ? "Checking the address"
           : authorityMultisig.data
@@ -88,13 +119,13 @@ export function TransferStep({ mints, onBusyChange }: Props) {
           : creatorMultisig.data
             ? "That's a Squads multisig account, not its vault"
             : null;
-  const settingsValid = !authorityError && !creatorError && !!wallet;
+  const settingsValid = !authorityError && !creatorError && !!authority;
 
   const plans = useMemo<TransferPlan[] | null>(() => {
     if (!metadata.data || !settingsValid) return null;
     return checked.map((mint) =>
       planTransfer(mint, metadata.data.get(mint) ?? null, {
-        wallet,
+        wallet: authority,
         newAuthority,
         newCreator,
         creatorMode,
@@ -104,23 +135,26 @@ export function TransferStep({ mints, onBusyChange }: Props) {
     metadata.data,
     checked,
     settingsValid,
-    wallet,
+    authority,
     newAuthority,
     newCreator,
     creatorMode,
   ]);
 
   const batches = useMemo(() => {
-    if (!plans || !publicKey) return [];
+    if (!plans || !authority) return [];
     const ready = plans.filter((p): p is ReadyTransfer => p.status === "ready");
     return packBatches(
       ready.map((plan) => ({
         mint: plan.mint,
-        instruction: transferInstruction(umi, plan, wallet, newAuthority),
+        instruction: transferInstruction(umi, plan, authority, newAuthority),
       })),
-      publicKey,
+      new PublicKey(authority),
+      mode === "squads"
+        ? { maxPerTransaction: MAX_TRANSFERS_PER_SQUADS_TRANSACTION }
+        : undefined,
     );
-  }, [plans, publicKey, umi, wallet, newAuthority]);
+  }, [plans, authority, umi, newAuthority, mode]);
 
   const readyCount = batches.reduce((sum, b) => sum + b.mints.length, 0);
   const listChanged =
@@ -128,7 +162,7 @@ export function TransferStep({ mints, onBusyChange }: Props) {
     (checked.length !== mints.length || checked.some((m, i) => m !== mints[i]));
 
   const check = () => {
-    if (!publicKey) {
+    if (mode === "wallet" && !publicKey) {
       setVisible(true);
       return;
     }
@@ -146,6 +180,27 @@ export function TransferStep({ mints, onBusyChange }: Props) {
 
   return (
     <div className="space-y-6">
+      <SignerModePicker
+        name="transfer-mode"
+        legend="Who signs the transfer"
+        value={mode}
+        onChange={setMode}
+        options={SIGNER_MODES}
+        disabled={busy}
+      />
+
+      {mode === "squads" && (
+        <SquadsMultisigField
+          id="transfer-squads-multisig"
+          value={multisigAddress}
+          onChange={setMultisigAddress}
+          error={multisigError}
+          vault={multisig?.vault}
+          hint="Its first vault must be the NFTs' current update authority."
+          disabled={busy}
+        />
+      )}
+
       <div>
         <Label htmlFor="new-authority">New update authority</Label>
         <p className="text-xs text-gray-500">
@@ -227,13 +282,16 @@ export function TransferStep({ mints, onBusyChange }: Props) {
           outline
           onClick={check}
           disabled={
-            busy || metadata.isFetching || (!!publicKey && mints.length === 0)
+            busy ||
+            metadata.isFetching ||
+            mints.length === 0 ||
+            (mode === "squads" && !authority)
           }
         >
           {metadata.isFetching && (
             <SpinnerIcon className="mr-1 -ml-1 size-4 animate-spin" />
           )}
-          {!publicKey
+          {mode === "wallet" && !publicKey
             ? "Connect your wallet"
             : `Check ${mints.length} ${mints.length === 1 ? "NFT" : "NFTs"}`}
         </Button>
@@ -247,8 +305,10 @@ export function TransferStep({ mints, onBusyChange }: Props) {
 
       {checked.length > 0 && metadata.data && !settingsValid && (
         <p className="text-sm text-gray-500">
-          {authorityError ?? creatorError ?? "Connect your wallet"} to see what
-          will change.
+          {authorityError ??
+            creatorError ??
+            (mode === "wallet" ? "Connect your wallet" : multisigError)}{" "}
+          to see what will change.
         </p>
       )}
 
@@ -274,19 +334,31 @@ export function TransferStep({ mints, onBusyChange }: Props) {
                 <span className="font-mono text-xs break-all">
                   {newAuthority}
                 </span>{" "}
-                is the right address. Once the transfer goes through, this
-                wallet can&apos;t update these NFTs anymore.
+                is the right address. Once the transfer goes through, the
+                current update authority can&apos;t update these NFTs anymore.
               </span>
             </label>
           )}
 
-          <SendPanel
-            action="Transfer"
-            disabled={!acknowledged || metadata.isFetching}
-            batches={batches}
-            onBusyChange={setBusyState}
-            onSettled={() => void metadata.refetch()}
-          />
+          {mode === "wallet" ? (
+            <SendPanel
+              action="Transfer"
+              disabled={!acknowledged || metadata.isFetching}
+              batches={batches}
+              onBusyChange={setBusyState}
+              onSettled={() => void metadata.refetch()}
+            />
+          ) : (
+            multisig && (
+              <SquadsPanel
+                batches={batches}
+                multisig={multisig}
+                disabled={!acknowledged || metadata.isFetching}
+                onBusyChange={setBusyState}
+                onSettled={() => void metadata.refetch()}
+              />
+            )
+          )}
         </div>
       )}
     </div>
