@@ -20,16 +20,18 @@ import {
 import type { Batch } from "./transactions";
 
 type Props = {
-  /** The verifications that are ready, packed for Squads. */
+  /** The NFT updates that are ready, packed for Squads. */
   batches: Batch[];
   multisig: SquadsMultisig;
   /** After anything was sent, to read the NFTs again. */
   onSettled: () => void;
   onBusyChange: (busy: boolean) => void;
+  /** Blocks creating a proposal, e.g. until the user confirms an address. */
+  disabled?: boolean;
 };
 
 /**
- * Puts the verifications into one Squads batch proposal from a member's
+ * Puts the NFT updates into one Squads batch proposal from a member's
  * wallet, so the multisig approves once for all of them, then lets members
  * approve and execute it here or in the Squads app.
  */
@@ -38,6 +40,7 @@ export function SquadsPanel({
   multisig: info,
   onSettled,
   onBusyChange,
+  disabled,
 }: Props) {
   const { connection } = useConnection();
   const wallet = useWallet();
@@ -191,7 +194,7 @@ export function SquadsPanel({
         {member && closed && (
           <Button
             color="indigo"
-            disabled={busy || ready === 0 || !member.initiate}
+            disabled={busy || disabled || ready === 0 || !member.initiate}
             onClick={create}
           >
             Create a proposal for {ready} {ready === 1 ? "NFT" : "NFTs"}
@@ -302,7 +305,7 @@ function ProposalStatus({
             : ""
         }`;
       case "Executed":
-        return "Executed. Check the NFTs again to see them verified.";
+        return "Executed. Check the NFTs again to see the result.";
       case "Rejected":
         return "Rejected by the members.";
       case "Cancelled":
