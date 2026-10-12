@@ -11,7 +11,7 @@ import { SiteHeader } from "./site-header";
 /** The page's column; the band's content lines up with it. */
 const COLUMN = "mx-auto w-full max-w-5xl px-4 sm:px-8";
 
-const FULL_TOOL = "/spl-token-tools/reclaim-rent";
+const FULL_TOOL = "https://tools.blastctrl.com/spl-token-tools/reclaim-rent";
 
 const LINK =
   "font-medium text-slate-800 underline decoration-zinc-300 underline-offset-2 hover:decoration-slate-800";

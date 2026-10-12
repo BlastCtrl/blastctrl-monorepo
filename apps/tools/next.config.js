@@ -23,13 +23,50 @@ const nextConfig = {
       },
     ],
   },
-  async rewrites() {
+  async redirects() {
     return [
+      ...["tools\\.blastctrl\\.com", "reclaim\\.blastctrl\\.com"].map(
+        (host) => ({
+          source: "/reclaim-sol/:path*",
+          has: [{ type: /** @type {const} */ ("host"), value: host }],
+          destination: "https://reclaim.blastctrl.com/:path*",
+          permanent: true,
+        }),
+      ),
       {
-        source: "/blast-api/:path*",
-        destination: `${process.env.BLAST_BACKEND_URL}/:path*`,
+        // Keep other pages on the toolbox domain. Leave framework requests,
+        // APIs, and files (including the sitemap) on their original host.
+        source:
+          "/:path((?!_next(?:/|$)|api(?:/|$)|blast-api(?:/|$)|.*\\.[^/]+$).+)",
+        has: [{ type: "host", value: "reclaim\\.blastctrl\\.com" }],
+        destination: "https://tools.blastctrl.com/:path",
+        permanent: true,
       },
     ];
+  },
+  async rewrites() {
+    return {
+      // Run before the existing homepage and toolbox sitemap are resolved.
+      beforeFiles: [
+        {
+          source: "/",
+          has: [{ type: "host", value: "reclaim\\.blastctrl\\.com" }],
+          destination: "/reclaim-sol",
+        },
+        {
+          source: "/sitemap.xml",
+          has: [{ type: "host", value: "reclaim\\.blastctrl\\.com" }],
+          destination: "/reclaim-sol/sitemap.xml",
+        },
+      ],
+      afterFiles: [
+        {
+          source: "/blast-api/:path*",
+          destination: `${process.env.BLAST_BACKEND_URL}/:path*`,
+        },
+      ],
+      fallback: [],
+    };
   },
 };
 

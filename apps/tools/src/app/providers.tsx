@@ -1,6 +1,5 @@
 "use client";
 
-import { CommandPalette } from "@/components/layout/command-palette";
 import { SolanaProvider } from "@/state/context/SolanaProvider";
 import {
   QueryCache,
@@ -11,7 +10,6 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { Toaster } from "react-hot-toast";
-import { navigation } from "./_links";
 import { notify } from "@/components";
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -35,7 +33,7 @@ export function Providers({ children }: { children: ReactNode }) {
       <SolanaProvider>
         <Toaster position="bottom-left" />
         <ReactQueryDevtools initialIsOpen={false} />
-        <CommandPalette navigation={navigation}>{children}</CommandPalette>
+        {children}
       </SolanaProvider>
     </QueryClientProvider>
   );

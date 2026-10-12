@@ -31,12 +31,15 @@ export function SiteFooter() {
 
         <LinkGroup title="Tools">
           <li>
-            <Link href="/spl-token-tools/reclaim-rent" className={LINK}>
+            <Link
+              href="https://tools.blastctrl.com/spl-token-tools/reclaim-rent"
+              className={LINK}
+            >
               Reclaim rent, with options
             </Link>
           </li>
           <li>
-            <Link href="/" className={LINK}>
+            <Link href="https://tools.blastctrl.com" className={LINK}>
               All BlastCtrl tools
             </Link>
           </li>

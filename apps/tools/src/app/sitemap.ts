@@ -9,7 +9,6 @@ const paths = [
   "/gmeet-cc-capture",
   "/permanent-storage-tools",
   "/permanent-storage-tools/file-upload",
-  "/reclaim-sol",
   "/solana-nft-tools",
   "/solana-nft-tools/collections",
   "/solana-nft-tools/mint-core",
