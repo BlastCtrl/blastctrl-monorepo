@@ -54,6 +54,17 @@ describe("reclaim domain routing", () => {
     );
   });
 
+  it.each(["tools", "reclaim"])(
+    "serves the generated metadata image URL directly on %s",
+    async (subdomain) => {
+      const response = await resolve(
+        `https://${subdomain}.blastctrl.com/reclaim-sol/opengraph-image.png?cache-buster`,
+      );
+      expect(getRedirectUrl(response)).toBeNull();
+      expect(getRewrittenUrl(response)).toBeNull();
+    },
+  );
+
   it.each([
     "/spl-token-tools/reclaim-rent?network=devnet",
     "/solana-nft-tools/mint",

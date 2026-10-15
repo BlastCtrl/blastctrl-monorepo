@@ -27,7 +27,9 @@ const nextConfig = {
     return [
       ...["tools\\.blastctrl\\.com", "reclaim\\.blastctrl\\.com"].map(
         (host) => ({
-          source: "/reclaim-sol/:path*",
+          // Next.js emits this image URL in metadata; serve it directly so
+          // social crawlers can fetch it without the page migration redirect.
+          source: "/reclaim-sol/:path((?!opengraph-image\\.png(?:/|$)).*)?",
           has: [{ type: /** @type {const} */ ("host"), value: host }],
           destination: "https://reclaim.blastctrl.com/:path*",
           permanent: true,

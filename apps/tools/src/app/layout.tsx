@@ -8,6 +8,7 @@ import { Providers } from "./providers";
 import localFont from "next/font/local";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://tools.blastctrl.com/"),
   title: "Solana Tools | BlastTools",
   description: "A small toolbox for the adventuring Solana degen.",
   keywords:
