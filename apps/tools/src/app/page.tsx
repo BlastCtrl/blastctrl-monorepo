@@ -28,6 +28,12 @@ export default function Page() {
         </div>
         <div className="flex max-w-md flex-col flex-wrap gap-2 sm:max-w-lg sm:flex-row">
           <Link
+            href="https://reclaim.blastctrl.com"
+            className="inline-flex items-center justify-center rounded-lg border-2 border-teal-600 px-3 py-1.5 text-teal-950 shadow-sm hover:bg-teal-50 sm:justify-start"
+          >
+            Reclaim Excess Rent
+          </Link>
+          <Link
             href="/solana-nft-tools/update"
             className="inline-flex items-center justify-center rounded-lg border-2 border-indigo-600 px-3 py-1.5 text-indigo-950 shadow-sm hover:bg-indigo-50 sm:justify-start"
           >
