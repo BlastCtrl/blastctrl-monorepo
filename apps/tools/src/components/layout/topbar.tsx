@@ -2,6 +2,7 @@
 
 import BlastCtrlIcon from "@/../public/blastctrl_icon_white.svg";
 import { navigation } from "@/app/_links";
+import { ConnectorButton } from "@/connector/connector-button";
 import { cn } from "@blastctrl/ui";
 import {
   CloseButton,
@@ -16,9 +17,7 @@ import Link from "next/link";
 import { useContext, useEffect, useState } from "react";
 import { BAR_LINK } from "./bar-link";
 import { CommandPaletteContext } from "./command-palette";
-import { DesktopWallet } from "./desktop-wallet";
 import { GASLESS, GaslessMenu } from "./gasless-menu";
-import { MobileWallet } from "./mobile-wallet";
 import { ReclaimLink } from "./reclaim-link";
 
 const SECTIONS = navigation.filter(
@@ -98,7 +97,8 @@ export function Topbar() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center lg:hidden">
+            <div className="flex items-center gap-2 lg:hidden">
+              <ConnectorButton mobile="icon" />
               {/* Mobile menu button: the bars, or a cross while open */}
               <DisclosureButton
                 className={cn(
@@ -139,8 +139,7 @@ export function Topbar() {
               </DisclosureButton>
             </div>
             <div className="hidden lg:ml-4 lg:flex lg:items-center">
-              {/* Profile dropdown */}
-              <DesktopWallet />
+              <ConnectorButton />
             </div>
           </div>
         </div>
@@ -171,7 +170,6 @@ export function Topbar() {
             ))}
             <ReclaimLink className="mt-2 ml-3" />
           </div>
-          <MobileWallet />
         </DisclosurePanel>
       </Disclosure>
     </>
