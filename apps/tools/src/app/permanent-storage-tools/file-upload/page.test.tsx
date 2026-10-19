@@ -1,5 +1,4 @@
 // @vitest-environment happy-dom
-import { PublicKey } from "@solana/web3.js";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, StrictMode, useState } from "react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
@@ -13,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   getTokenPriceForBytes: vi.fn(),
   upload: vi.fn(),
   notify: vi.fn(),
+  // Stable across renders, like the real connector's memoised action.
+  disconnectWallet: vi.fn(),
 }));
 
 vi.mock("@ardrive/turbo-sdk/web", () => ({
@@ -20,15 +21,27 @@ vi.mock("@ardrive/turbo-sdk/web", () => ({
   OnDemandFunding: class {},
 }));
 vi.mock("@/components", () => ({ notify: mocks.notify }));
-vi.mock("@/state/use-network-configuration", () => ({
-  useNetworkConfigurationStore: () => ({ network: "mainnet-beta" }),
+vi.mock("@solana/connector/react", () => ({
+  useConnector: () => ({
+    isConnected: wallet.connected,
+    account: wallet.connected ? wallet.account : null,
+    disconnectWallet: mocks.disconnectWallet,
+  }),
+  useTransactionSigner: () => ({ signer: wallet.signer }),
+  useCluster: () => ({ type: "mainnet" }),
 }));
-vi.mock("@solana/wallet-adapter-react", () => ({
-  useWallet: () => wallet,
-  useLocalStorage: (_key: string, initial: unknown) => useState(initial),
+vi.mock("@solana/connector/compat", () => ({
+  createWalletAdapterCompat: (signer: typeof wallet.signer) => ({
+    publicKey: signer.address,
+    signMessage: signer.signMessage,
+    signTransaction: signer.signTransaction,
+  }),
 }));
-vi.mock("@solana/wallet-adapter-react-ui", () => ({
-  useWalletModal: () => ({ setVisible: vi.fn() }),
+vi.mock("@/connector/connector-dialog", () => ({
+  useConnectorDialog: () => ({ open: false, setOpen: vi.fn() }),
+}));
+vi.mock("@/lib/hooks/use-local-storage", () => ({
+  useLocalStorageState: (_key: string, initial: unknown) => useState(initial),
 }));
 vi.mock("@blastctrl/ui", () => ({
   Button: ({
@@ -50,11 +63,11 @@ vi.mock("@headlessui/react", () => ({
 }));
 vi.mock("./_components/uploads", () => ({ Uploads: () => null }));
 
-const makeWallet = () => ({
+const makeWallet = (account = "11111111111111111111111111111111") => ({
   connected: true,
-  publicKey: new PublicKey("11111111111111111111111111111111"),
-  signMessage: vi.fn(),
-  signTransaction: vi.fn(),
+  account,
+  // The connector's signer is memoised per wallet; a new object means a new wallet.
+  signer: { address: account, signMessage: vi.fn(), signTransaction: vi.fn() },
 });
 let wallet = makeWallet();
 let container: HTMLDivElement;
@@ -146,16 +159,11 @@ describe("file uploader lifecycle", () => {
     expect(container.textContent).toContain("Connect your wallet");
     expect(container.querySelector('input[type="file"]')).toBeNull();
 
-    wallet = {
-      ...makeWallet(),
-      publicKey: new PublicKey("So11111111111111111111111111111111111111112"),
-    };
+    wallet = makeWallet("So11111111111111111111111111111111111111112");
     await render();
     expect(mocks.getBalance).toHaveBeenCalledTimes(2);
     const options = mocks.authenticated.mock.lastCall?.[0];
-    expect(options.walletAdapter.publicKey.toString()).toBe(
-      wallet.publicKey.toBase58(),
-    );
+    expect(options.walletAdapter.publicKey.toString()).toBe(wallet.account);
   });
 
   it("does not show a previous wallet's balance when its request finishes late", async () => {
@@ -167,10 +175,7 @@ describe("file uploader lifecycle", () => {
         }),
     );
     await render();
-    wallet = {
-      ...makeWallet(),
-      publicKey: new PublicKey("So11111111111111111111111111111111111111112"),
-    };
+    wallet = makeWallet("So11111111111111111111111111111111111111112");
     mocks.getBalance.mockResolvedValue({ winc: "0" });
     await render();
     await act(async () => resolveOldBalance({ winc: "1000000000000" }));

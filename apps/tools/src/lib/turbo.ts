@@ -4,11 +4,13 @@ import {
   type SolanaWalletAdapter,
   type TurboAuthenticatedClient,
 } from "@ardrive/turbo-sdk/web";
-import type { WalletContextState } from "@solana/wallet-adapter-react";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+import type { WalletAdapterCompatible } from "@solana/connector/compat";
+import { getBase58Encoder } from "@solana/kit";
 import BigNumber from "bignumber.js";
 import type { Amount } from "@/types";
 import { amount, lamports, toBigNumber } from "@/types";
+
+const LAMPORTS_PER_SOL = 1_000_000_000;
 
 export const TURBO_CREDIT = {
   symbol: "Credits",
@@ -18,34 +20,34 @@ export type TurboCreditAmount = Amount<typeof TURBO_CREDIT>;
 
 export type TurboUploadResult = { id: string };
 
+/** The slice of the connector's wallet-adapter compat object that Turbo needs. */
+export type TurboWallet = Pick<
+  WalletAdapterCompatible,
+  "publicKey" | "signMessage" | "signTransaction"
+>;
+
 export class TurboStorage {
   private turbo: TurboAuthenticatedClient;
   private constructor(turbo: TurboAuthenticatedClient) {
     this.turbo = turbo;
   }
 
-  static make(
-    wallet: Pick<
-      WalletContextState,
-      "publicKey" | "signMessage" | "signTransaction"
-    >,
-  ) {
-    if (!wallet.publicKey) {
+  static make(wallet: TurboWallet) {
+    const { publicKey, signMessage, signTransaction } = wallet;
+    if (!publicKey) {
       throw new Error("Wallet is not connected");
     }
-    if (!wallet.signMessage) {
+    if (!signMessage) {
       throw new Error("Wallet does not support signing messages");
     }
-    if (!wallet.signTransaction) {
-      throw new Error("Wallet does not support signing transactions");
-    }
 
-    const { publicKey, signMessage, signTransaction } = wallet;
-
+    // Turbo's Solana adapter is modelled on the legacy wallet adapter; the
+    // connector's compat bridge provides the same signing functions over a
+    // base58 address string.
     const walletAdapter: SolanaWalletAdapter = {
       publicKey: {
-        toString: () => publicKey.toBase58(),
-        toBuffer: () => publicKey.toBuffer(),
+        toString: () => publicKey,
+        toBuffer: () => Buffer.from(getBase58Encoder().encode(publicKey)),
       },
       signMessage: (message) => signMessage(message),
       signTransaction: (tx) => signTransaction(tx),

@@ -1,26 +1,32 @@
 "use client";
 
 import { TurboStorage } from "@/lib/turbo";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { createWalletAdapterCompat } from "@solana/connector/compat";
+import { useConnector, useTransactionSigner } from "@solana/connector/react";
 import { useMemo } from "react";
 import { UploaderView } from "./_components/view";
 
 export default function FileUpload() {
-  const { connected, publicKey, signMessage, signTransaction } = useWallet();
+  const { isConnected, account, disconnectWallet } = useConnector();
+  // Turbo's SDK speaks the legacy wallet-adapter dialect (web3.js
+  // transactions, raw message signing), so bridge the connector's signer
+  // through the compat layer instead of hand-rolling conversions.
+  const { signer } = useTransactionSigner();
+
   const { storage, error } = useMemo(() => {
-    if (!connected) return { storage: null, error: null };
+    if (!isConnected || !signer) return { storage: null, error: null };
     try {
-      return {
-        storage: TurboStorage.make({ publicKey, signMessage, signTransaction }),
-        error: null,
-      };
+      const wallet = createWalletAdapterCompat(signer, {
+        disconnect: disconnectWallet,
+      });
+      return { storage: TurboStorage.make(wallet), error: null };
     } catch (error) {
       return {
         storage: null,
         error: error instanceof Error ? error.message : String(error),
       };
     }
-  }, [connected, publicKey, signMessage, signTransaction]);
+  }, [isConnected, signer, disconnectWallet]);
 
   return (
     <div>
@@ -37,7 +43,7 @@ export default function FileUpload() {
       {error ? (
         <div role="alert">{error}</div>
       ) : storage ? (
-        <UploaderView key={publicKey?.toBase58()} turbo={storage} />
+        <UploaderView key={account ?? undefined} turbo={storage} />
       ) : (
         <div>Connect your wallet to use this tool</div>
       )}
