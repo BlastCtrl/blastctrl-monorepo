@@ -45,10 +45,10 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+/** Minimum delegation under SIMD-0490 (Stake v5), in SOL. */
+const MIN_STAKE_SOL = 1;
 /** Size of a `StakeStateV2` account. */
 const STAKE_ACCOUNT_SIZE = 200n;
-/** Lockup custodian when no lockup is set (the all-zero address, as the legacy tool used). */
-const DEFAULT_CUSTODIAN = address("11111111111111111111111111111111");
 /** Same priority fee the legacy tool attached (1 lamport per compute unit). */
 const TRANSACTION_CONFIG = {
   microLamportsPerComputeUnit: 1_000_000n as MicroLamports,
@@ -68,7 +68,13 @@ const amountField = z
   .regex(/^\d+(\.\d{1,9})?$/, {
     error: "Amount must be a number with at most 9 decimals",
   })
-  .refine((v) => Number(v) > 0, { error: "Amount must be greater than 0" });
+  .refine((v) => Number(v) > 0, { error: "Amount must be greater than 0" })
+  // SIMD-0490 (Stake v5) raises the minimum delegation to 1 SOL, and new
+  // accounts can't be created below it. The amount here is the delegation;
+  // the rent-exempt reserve is funded on top of it.
+  .refine((v) => Number(v) >= MIN_STAKE_SOL, {
+    error: `Minimum stake is ${MIN_STAKE_SOL} SOL (SIMD-0490)`,
+  });
 
 /** `datetime-local` carries no zone; the tool treats the value as UTC. Outputs unix seconds. */
 const lockTimeField = z
@@ -87,11 +93,18 @@ type Toggles = {
   useLockup: boolean;
 };
 
-/** A field that is validated only while its switch is on; otherwise it is ignored. */
+/**
+ * A field that is validated only while its switch is on; otherwise it is
+ * ignored. `.optional()` matters: a bare `.transform()` still rejects a key
+ * that was never registered ("expected nonoptional").
+ */
 const when = <T extends z.ZodType>(enabled: boolean, field: T) =>
   (enabled
     ? field
-    : z.unknown().transform(() => undefined)) as unknown as z.ZodType<
+    : z
+        .unknown()
+        .optional()
+        .transform(() => undefined)) as unknown as z.ZodType<
     z.output<T> | undefined,
     z.input<T> | undefined
   >;
@@ -169,14 +182,11 @@ export function StakeAccountForm() {
       const stakeAmount = solToLamports(sol(data.amount));
       const accountLamports = lamports(stakeAmount + rentReserve);
 
-      const lockup: LockupArgs =
-        data.lockTime !== undefined
-          ? {
-              unixTimestamp: data.lockTime,
-              epoch: 0,
-              custodian: owner.address,
-            }
-          : { unixTimestamp: 0, epoch: 0, custodian: DEFAULT_CUSTODIAN };
+      const lockup: LockupArgs = {
+        unixTimestamp: data.lockTime ?? 0,
+        epoch: 0,
+        custodian: owner.address,
+      };
 
       // Create and initialize with the owner as both authorities, delegate
       // while the owner is still the staker, then hand off the authorities.
@@ -258,11 +268,14 @@ export function StakeAccountForm() {
       <Field>
         <Label className="font-medium">Stake amount</Label>
         <Input
-          {...register("amount", { required: true })}
+          {...register("amount")}
           className={inputClass}
           invalid={!!errors?.amount}
           type="text"
         />
+        {errors?.amount && (
+          <small className="text-red-600">{errors.amount.message}</small>
+        )}
       </Field>
 
       <div className="mt-4">
@@ -293,6 +306,11 @@ export function StakeAccountForm() {
                 placeholder="Address of the withdraw authority"
                 type="text"
               />
+              {errors?.withdrawAuth && (
+                <small className="text-red-600">
+                  {errors.withdrawAuth.message}
+                </small>
+              )}
             </Field>
 
             <Field>
@@ -308,6 +326,11 @@ export function StakeAccountForm() {
                 placeholder="Address of the stake authority"
                 type="text"
               />
+              {errors?.stakerAuth && (
+                <small className="text-red-600">
+                  {errors.stakerAuth.message}
+                </small>
+              )}
             </Field>
           </Fieldset>
         )}
@@ -341,6 +364,11 @@ export function StakeAccountForm() {
               placeholder="Validator vote address"
               type="text"
             />
+            {errors?.voteAddress && (
+              <small className="text-red-600">
+                {errors.voteAddress.message}
+              </small>
+            )}
           </Field>
         )}
       </div>
@@ -413,7 +441,6 @@ export function StakeAccountForm() {
       </div>
 
       <div className="mt-4 flex justify-center">
-        {errors.withdrawAuth?.message}
         {client ? (
           <Button
             disabled={isConfirming}
