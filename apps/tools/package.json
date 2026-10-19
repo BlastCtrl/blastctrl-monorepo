@@ -18,7 +18,7 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@ardrive/turbo-sdk": "^2.1.0",
+    "@ardrive/turbo-sdk": "^2.1.2",
     "@blastctrl/octane-core": "workspace:^",
     "@blastctrl/solace-sdk": "workspace:^",
     "@blastctrl/ui": "workspace:^",
