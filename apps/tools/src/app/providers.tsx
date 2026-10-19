@@ -72,16 +72,15 @@ export function Providers({ children }: { children: ReactNode }) {
     ];
 
     return getDefaultConfig({
-      appName: "ConnectorKit Example",
+      appName: "BlastCtrl Tools",
       appUrl: origin,
       autoConnect: true,
       enableMobile: true,
       clusters,
+      wallets: {
+        featured: ["solflare"],
+      },
       // additionalWallets,
-      // WalletConnect: just set to true!
-      // Project ID is auto-read from NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
-      // Metadata is auto-generated from appName/appUrl
-      // Callbacks are auto-wired by AppProvider
       walletConnect: true,
     });
   }, []);
