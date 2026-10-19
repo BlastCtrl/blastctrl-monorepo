@@ -166,15 +166,24 @@ export const ConnectorDialog = () => {
         transition
         className="fixed inset-0 bg-zinc-950/50 transition duration-200 ease-out data-closed:opacity-0"
       />
-      <div className="fixed inset-0 flex w-screen items-center justify-center p-4">
+      <div className="fixed inset-0 flex w-screen items-end justify-center sm:items-center sm:p-4">
         <DialogPanel
           transition
           className={cn(
-            "flex w-full max-w-[420px] flex-col overflow-hidden rounded-[18px] bg-white",
-            "shadow-[0_32px_64px_-16px_rgba(9,9,11,.45)]",
-            "transition duration-260 ease-[cubic-bezier(.2,.8,.2,1)] data-closed:translate-y-2 data-closed:scale-[.97] data-closed:opacity-0",
+            // Mobile: a bottom sheet that slides up. Desktop: a centered card.
+            "flex max-h-[90dvh] w-full flex-col overflow-y-auto overscroll-contain bg-white",
+            // Generous bottom padding: in-wallet browsers often overlay their own
+            // toolbars on top of the safe area.
+            "rounded-t-[22px] pt-2 pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] shadow-[0_-12px_32px_-12px_rgba(9,9,11,.25)]",
+            "transition duration-340 ease-[cubic-bezier(.32,.72,0,1)] data-closed:translate-y-full",
+            "sm:max-w-[420px] sm:rounded-[18px] sm:pt-0 sm:pb-0 sm:shadow-[0_32px_64px_-16px_rgba(9,9,11,.45)]",
+            "sm:duration-260 sm:ease-[cubic-bezier(.2,.8,.2,1)] sm:data-closed:translate-y-2 sm:data-closed:scale-[.97] sm:data-closed:opacity-0",
           )}
         >
+          <div
+            aria-hidden
+            className="mx-auto mb-0.5 h-[5px] w-9 shrink-0 rounded-[3px] bg-zinc-300 sm:hidden"
+          />
           <AnimatePresence mode="wait" initial={false}>
             {view === "list" ? (
               <motion.div
@@ -185,25 +194,35 @@ export const ConnectorDialog = () => {
                 exit={{ x: -24, opacity: 0 }}
                 transition={SLIDE}
               >
-                <header className="flex items-start gap-3 pt-[22px] pr-4 pb-[18px] pl-6">
-                  <div className="flex flex-1 flex-col gap-1">
+                <header className="flex items-start gap-2 pt-3 pr-2 pb-4 pl-5 sm:gap-3 sm:pt-[22px] sm:pr-4 sm:pb-[18px] sm:pl-6">
+                  <div className="flex flex-1 flex-col gap-1 pt-1.5 sm:pt-0">
                     <DialogTitle className="font-display text-[22px] leading-[1.2] font-semibold text-zinc-900">
                       Connect a wallet
                     </DialogTitle>
                     <p className="text-sm text-zinc-500">
-                      {detected
-                        ? "Choose a wallet detected in this browser."
-                        : "We couldn’t find a wallet in this browser."}
+                      <span className="sm:hidden">
+                        {detected
+                          ? "Choose a wallet on this device."
+                          : "We couldn’t find a wallet on this device."}
+                      </span>
+                      <span className="hidden sm:inline">
+                        {detected
+                          ? "Choose a wallet detected in this browser."
+                          : "We couldn’t find a wallet in this browser."}
+                      </span>
                     </p>
                   </div>
                   <IconButton as={CloseButton} label="Close" muted>
-                    <XMarkIcon className="size-5" strokeWidth={1.8} />
+                    <XMarkIcon
+                      className="size-[22px] sm:size-5"
+                      strokeWidth={1.8}
+                    />
                   </IconButton>
                 </header>
 
-                <div className="flex flex-col px-4">
+                <div className="flex flex-col px-3 sm:px-4">
                   {detected ? (
-                    <ul className="flex flex-col overflow-hidden rounded-[14px] border border-zinc-200">
+                    <ul className="flex flex-col overflow-hidden rounded-2xl border border-zinc-200 sm:rounded-[14px]">
                       {wallets.map((connector) => (
                         <li
                           key={connector.id}
@@ -234,23 +253,28 @@ export const ConnectorDialog = () => {
                         type="button"
                         onClick={openQr}
                         disabled={pendingId !== null && !wcPending}
-                        className="flex items-center gap-3.5 rounded-[14px] border border-blue-100 bg-blue-50 py-3 pr-4 pl-3 text-left transition-colors duration-150 hover:bg-blue-100 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden disabled:opacity-60 disabled:hover:bg-blue-50"
+                        className="flex min-h-[68px] items-center gap-3.5 rounded-2xl border border-blue-100 bg-blue-50 py-3 pr-4 pl-3 text-left transition-colors duration-150 hover:bg-blue-100 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden disabled:opacity-60 disabled:hover:bg-blue-50 sm:min-h-0 sm:rounded-[14px]"
                       >
                         <WcMark
                           icon={walletConnect.icon}
-                          className="size-9 rounded-[10px]"
+                          className="size-10 rounded-[11px] sm:size-9 sm:rounded-[10px]"
                         />
                         <span className="flex flex-1 flex-col gap-px">
-                          <span className="text-[15px] font-medium text-zinc-900">
+                          <span className="text-base font-medium text-zinc-900 sm:text-[15px]">
                             WalletConnect
                           </span>
                           <span className="text-[13px] text-zinc-600">
-                            Scan a QR code with a mobile wallet
+                            <span className="sm:hidden">
+                              Connect a wallet on another device
+                            </span>
+                            <span className="hidden sm:inline">
+                              Scan a QR code with a mobile wallet
+                            </span>
                           </span>
                         </span>
                         <ChevronRightIcon
                           aria-hidden
-                          className="size-4 text-blue-500"
+                          className="size-[18px] text-blue-500 sm:size-4"
                           strokeWidth={2}
                         />
                       </button>
@@ -259,7 +283,7 @@ export const ConnectorDialog = () => {
                 </div>
 
                 {detected ? (
-                  <footer className="mt-5 border-t border-zinc-100 bg-zinc-50 px-6 py-3.5 text-[13px] text-zinc-500">
+                  <footer className="px-5 pt-[18px] pb-[30px] text-center text-sm text-zinc-500 sm:mt-5 sm:border-t sm:border-zinc-100 sm:bg-zinc-50 sm:px-6 sm:py-3.5 sm:text-left sm:text-[13px]">
                     New to Solana?{" "}
                     <a
                       href={WALLETS_URL}
@@ -271,7 +295,7 @@ export const ConnectorDialog = () => {
                     </a>
                   </footer>
                 ) : (
-                  <div className="h-5" />
+                  <div className="h-[30px] sm:h-5" />
                 )}
               </motion.div>
             ) : (
@@ -283,15 +307,21 @@ export const ConnectorDialog = () => {
                 exit={{ x: 24, opacity: 0 }}
                 transition={SLIDE}
               >
-                <header className="flex items-center gap-1.5 pt-4.5 pr-4 pb-3.5 pl-3.5">
+                <header className="flex items-center gap-0.5 py-2 pr-2 pl-1.5 sm:gap-1.5 sm:pt-4.5 sm:pr-4 sm:pb-3.5 sm:pl-3.5">
                   <IconButton as="button" label="Back" onClick={back}>
-                    <ChevronLeftIcon className="size-5" strokeWidth={1.8} />
+                    <ChevronLeftIcon
+                      className="size-[22px] sm:size-5"
+                      strokeWidth={1.8}
+                    />
                   </IconButton>
                   <DialogTitle className="flex-1 font-display text-[22px] font-semibold text-zinc-900">
                     WalletConnect
                   </DialogTitle>
                   <IconButton as={CloseButton} label="Close" muted>
-                    <XMarkIcon className="size-5" strokeWidth={1.8} />
+                    <XMarkIcon
+                      className="size-[22px] sm:size-5"
+                      strokeWidth={1.8}
+                    />
                   </IconButton>
                 </header>
                 <WalletConnectPanel
@@ -329,8 +359,8 @@ const WalletConnectPanel = ({
   };
 
   return (
-    <div className="flex flex-col gap-[18px] px-4 pb-5">
-      <div className="flex flex-col items-center gap-3.5 rounded-2xl bg-zinc-50 px-5 pt-5.5 pb-4.5">
+    <div className="flex flex-col gap-4 px-3 pb-[30px] sm:gap-[18px] sm:px-4 sm:pb-5">
+      <div className="flex flex-col items-center gap-3.5 rounded-[18px] bg-zinc-50 px-5 pt-5.5 pb-4.5 sm:rounded-2xl">
         <div className="relative rounded-[14px] bg-white p-3 shadow-[0_0_0_1px_rgba(9,9,11,.06),0_6px_16px_-6px_rgba(9,9,11,.16)]">
           {uri ? (
             <QRCodeSVG
@@ -369,7 +399,7 @@ const WalletConnectPanel = ({
         <div className="text-[13px] font-medium text-zinc-600">
           Or copy the connection link
         </div>
-        <div className="flex h-[42px] items-center gap-2 rounded-[10px] border border-zinc-200 bg-zinc-50 pr-1 pl-3">
+        <div className="flex h-[52px] items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 pr-[5px] pl-3 sm:h-[42px] sm:rounded-[10px] sm:pr-1">
           <div className="min-w-0 flex-1 truncate font-mono text-xs text-zinc-600">
             {uri ?? "…"}
           </div>
@@ -377,7 +407,7 @@ const WalletConnectPanel = ({
             type="button"
             onClick={copy}
             disabled={!uri}
-            className="inline-flex h-8 items-center gap-1.5 rounded-[7px] bg-white px-2.5 text-[13px] font-medium text-zinc-800 shadow-[0_0_0_1px_rgba(9,9,11,.1),0_1px_2px_rgba(9,9,11,.06)] transition-colors hover:bg-zinc-50 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden disabled:opacity-50"
+            className="inline-flex h-10 items-center gap-1.5 rounded-[9px] bg-white px-3 text-sm font-medium text-zinc-800 shadow-[0_0_0_1px_rgba(9,9,11,.1),0_1px_2px_rgba(9,9,11,.06)] transition-colors hover:bg-zinc-50 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden disabled:opacity-50 sm:h-8 sm:rounded-[7px] sm:px-2.5 sm:text-[13px]"
           >
             {copied ? (
               <CheckIcon className="size-[15px]" strokeWidth={1.7} />
@@ -440,7 +470,7 @@ const IconButton = ({
     type="button"
     aria-label={label}
     className={cn(
-      "grid size-8 shrink-0 place-items-center rounded-lg transition-colors hover:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden",
+      "grid size-11 shrink-0 place-items-center rounded-[10px] transition-colors hover:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden sm:size-8 sm:rounded-lg",
       muted ? "text-zinc-400 hover:text-zinc-700" : "text-zinc-600",
       className,
     )}
@@ -466,27 +496,27 @@ const WalletRow = ({
     onClick={onSelect}
     disabled={disabled || pending}
     className={cn(
-      "flex h-15 w-full items-center gap-3.5 pr-4 pl-3 text-left transition-colors duration-150",
+      "flex h-16 w-full items-center gap-3.5 pr-4 pl-3 text-left transition-colors duration-150 sm:h-15",
       "focus-visible:bg-zinc-50 focus-visible:outline-hidden",
       pending ? "bg-zinc-50" : "bg-white hover:bg-zinc-50",
       disabled && "opacity-60",
     )}
   >
-    <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-[10px] bg-indigo-600 text-[15px] font-bold text-white shadow-[inset_0_0_0_1px_rgba(9,9,11,.08)]">
+    <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-[11px] bg-indigo-600 text-base font-bold text-white shadow-[inset_0_0_0_1px_rgba(9,9,11,.08)] sm:size-9 sm:rounded-[10px] sm:text-[15px]">
       {connector.icon ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={connector.icon} alt="" className="size-9 object-cover" />
+        <img src={connector.icon} alt="" className="size-full object-cover" />
       ) : (
         connector.name[0]?.toUpperCase()
       )}
     </span>
-    <span className="flex-1 truncate text-[15px] font-medium text-zinc-900">
+    <span className="flex-1 truncate text-base font-medium text-zinc-900 sm:text-[15px]">
       {connector.name}
     </span>
     {pending ? (
       <span className="inline-flex items-center gap-1.5 text-[13px] text-zinc-500">
         <SpinnerIcon className="size-4" />
-        Approve in {connector.name}
+        Approve<span className="hidden sm:inline"> in {connector.name}</span>
       </span>
     ) : (
       <>
@@ -497,7 +527,7 @@ const WalletRow = ({
         )}
         <ChevronRightIcon
           aria-hidden
-          className="size-4 text-zinc-300"
+          className="size-[18px] text-zinc-300 sm:size-4"
           strokeWidth={2}
         />
       </>
@@ -506,7 +536,7 @@ const WalletRow = ({
 );
 
 const NoWallets = () => (
-  <div className="flex flex-col items-center gap-1.5 rounded-[14px] border border-dashed border-zinc-300 bg-zinc-50 px-6 pt-7 pb-6 text-center">
+  <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 px-5 pt-7 pb-5.5 text-center sm:rounded-[14px] sm:px-6 sm:pb-6">
     <div aria-hidden className="relative mb-2.5 h-12 w-[104px]">
       <span className="absolute top-1.5 left-1.5 size-10 rotate-[-10deg] rounded-[11px] border border-dashed border-zinc-300 bg-white" />
       <span className="absolute top-1.5 right-1.5 size-10 rotate-10 rounded-[11px] border border-dashed border-zinc-300 bg-white" />
@@ -520,14 +550,26 @@ const NoWallets = () => (
         />
       </span>
     </div>
-    <div className="text-[15px] font-semibold text-zinc-900">
+    <div className="text-base font-semibold text-zinc-900 sm:text-[15px]">
       No wallets detected
     </div>
     <p className="max-w-[280px] text-sm text-pretty text-zinc-600">
-      Install a Solana wallet extension, then refresh this page.
+      <span className="sm:hidden">
+        Open this page in your wallet app&apos;s browser, or install a Solana
+        wallet.
+      </span>
+      <span className="hidden sm:inline">
+        Install a Solana wallet extension, then refresh this page.
+      </span>
     </p>
-    <div className="mt-2.5">
-      <Button outline href={WALLETS_URL} target="_blank" rel="noreferrer">
+    <div className="mt-2.5 w-full sm:w-auto">
+      <Button
+        outline
+        href={WALLETS_URL}
+        target="_blank"
+        rel="noreferrer"
+        className="h-12 w-full rounded-xl text-[15px] sm:h-auto sm:w-auto sm:rounded-lg sm:text-sm/6"
+      >
         Browse Solana wallets ↗
       </Button>
     </div>
