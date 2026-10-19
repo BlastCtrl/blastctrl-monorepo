@@ -7,9 +7,8 @@ import {
 } from "@/components/description-list";
 import { InfoTooltip } from "@/components/info-tooltip";
 import { notify } from "@/components/notification";
-import { isPublicKey } from "@/lib/solana/common";
-import { signWithWalletFirst } from "@/lib/solana/send";
-import { retryWithBackoff } from "@/lib/utils";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { useKitClient } from "@/connector/use-kit-client";
 import { Button, cn, SpinnerIcon, Switch, SwitchGroup } from "@blastctrl/ui";
 import {
   Dialog,
@@ -21,60 +20,110 @@ import {
   Label,
 } from "@headlessui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import {
-  ComputeBudgetProgram,
-  Keypair,
-  LAMPORTS_PER_SOL,
-  Lockup,
-  PublicKey,
-  StakeAuthorizationLayout,
-  StakeProgram,
-  Transaction,
-} from "@solana/web3.js";
+  getAuthorizeInstruction,
+  getDelegateStakeInstruction,
+  getInitializeInstruction,
+  STAKE_PROGRAM_ADDRESS,
+  StakeAuthorize,
+  type LockupArgs,
+} from "@solana-program/stake";
+import { getCreateAccountInstruction } from "@solana-program/system";
+import {
+  address,
+  generateKeyPairSigner,
+  isAddress,
+  isSolanaError,
+  lamports,
+  sol,
+  solToLamports,
+  type Instruction,
+  type MicroLamports,
+} from "@solana/kit";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-// Empty, or a valid public key. Not a union with z.literal(""): when every
-// branch fails, zod 4 reports "Invalid input" instead of our message.
-const optionalPublicKey = z
+/** Size of a `StakeStateV2` account. */
+const STAKE_ACCOUNT_SIZE = 200n;
+/** Lockup custodian when no lockup is set (the all-zero address, as the legacy tool used). */
+const DEFAULT_CUSTODIAN = address("11111111111111111111111111111111");
+/** Same priority fee the legacy tool attached (1 lamport per compute unit). */
+const TRANSACTION_CONFIG = {
+  microLamportsPerComputeUnit: 1_000_000n as MicroLamports,
+};
+
+const addressField = z
   .string()
-  .refine((v) => v === "" || isPublicKey(v), {
-    message: "Not a valid public key",
+  .trim()
+  .refine(isAddress, { error: "Not a valid public key" })
+  .transform(address);
+
+/** Kept as a string: `sol()` parses decimal strings exactly, a float would not. */
+const amountField = z
+  .string()
+  .trim()
+  .min(1, { error: "Amount is required" })
+  .regex(/^\d+(\.\d{1,9})?$/, {
+    error: "Amount must be a number with at most 9 decimals",
   })
-  .transform((v) => (v === "" ? "" : new PublicKey(v)))
-  .optional();
+  .refine((v) => Number(v) > 0, { error: "Amount must be greater than 0" });
 
-const formSchema = z.object({
-  amount: z
-    .string()
-    .min(1, "Amount is required")
-    .transform((v) => +v)
-    .refine((amount) => !isNaN(amount), { message: "Amount must be a number" })
-    .refine((amount) => amount > 0, {
-      message: "Amount must be greater than 0",
-    }),
-  voteAddress: optionalPublicKey,
-  withdrawAuth: optionalPublicKey,
-  stakerAuth: optionalPublicKey,
-  lockTime: z
-    .string()
-    // TODO: need to do better validation here
-    .transform((v) => v + "Z")
-    .optional()
-    .or(z.literal("")),
-});
+/** `datetime-local` carries no zone; the tool treats the value as UTC. Outputs unix seconds. */
+const lockTimeField = z
+  .string()
+  .min(1, { error: "Unlock date is required" })
+  .transform((v) => Date.parse(`${v}Z`))
+  .refine((ms) => !Number.isNaN(ms), { error: "Not a valid date" })
+  .refine((ms) => ms > Date.now(), {
+    error: "Unlock date must be in the future",
+  })
+  .transform((ms) => Math.floor(ms / 1000));
 
-type FormSchemaFields = z.input<typeof formSchema>;
-type FormSchemaOutput = z.output<typeof formSchema>;
+type Toggles = {
+  useDelegate: boolean;
+  useAuthorities: boolean;
+  useLockup: boolean;
+};
+
+/** A field that is validated only while its switch is on; otherwise it is ignored. */
+const when = <T extends z.ZodType>(enabled: boolean, field: T) =>
+  (enabled
+    ? field
+    : z.unknown().transform(() => undefined)) as unknown as z.ZodType<
+    z.output<T> | undefined,
+    z.input<T> | undefined
+  >;
+
+// The switches live outside the form, so the schema is rebuilt from them on
+// every validation (see the resolver below). Inline `required` rules on
+// `register` would be ignored once a resolver is in place.
+const createFormSchema = (t: Toggles) =>
+  z.object({
+    amount: amountField,
+    voteAddress: when(t.useDelegate, addressField),
+    withdrawAuth: when(t.useAuthorities, addressField),
+    stakerAuth: when(t.useAuthorities, addressField),
+    lockTime: when(t.useLockup, lockTimeField),
+  });
+
+type FormSchema = ReturnType<typeof createFormSchema>;
+type FormSchemaFields = z.input<FormSchema>;
+type FormSchemaOutput = z.output<FormSchema>;
+
+const errorMessage = (error: unknown) => {
+  if (isSolanaError(error)) {
+    // Program errors (e.g. insufficient funds) are wrapped; surface the inner one.
+    const cause = error.cause;
+    return cause instanceof Error ? cause.message : error.message;
+  }
+  return error instanceof Error ? error.message : String(error);
+};
 
 export function StakeAccountForm() {
-  const { connection } = useConnection();
-  const { publicKey, signTransaction } = useWallet();
-  const { setVisible } = useWalletModal();
+  const { client } = useKitClient({ transactionConfig: TRANSACTION_CONFIG });
+  const { setOpen } = useConnectorDialog();
   const [isConfirming, setIsConfirming] = useState(false);
   const [useLockup, setUseLockup] = useState(false);
   const [useDelegate, setUseDelegate] = useState(false);
@@ -88,130 +137,113 @@ export function StakeAccountForm() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<FormSchemaFields, unknown, FormSchemaOutput>({
-    resolver: zodResolver(formSchema),
+  } = useForm<FormSchemaFields, Toggles, FormSchemaOutput>({
+    context: { useDelegate, useAuthorities, useLockup },
+    resolver: (values, context, options) =>
+      zodResolver(createFormSchema(context!))(values, context, options),
     defaultValues: {
       voteAddress: "GREEDkpTvpKzcGvBu9qd36yk6BfjTWPShB67gLWuixMv",
     },
   });
 
   const onSubmit = async (data: FormSchemaOutput) => {
-    if (!publicKey) {
-      setVisible(true);
+    if (!client) {
+      setOpen(true);
       return;
     }
     setSubmitData(data);
   };
 
   const submitTransaction = async (data: FormSchemaOutput) => {
-    if (!signTransaction || !publicKey) return;
+    if (!client) return;
+    setIsConfirming(true);
 
     try {
-      const { context, value } = await retryWithBackoff(() =>
-        connection.getLatestBlockhashAndContext("confirmed"),
+      const owner = client.payer;
+      const stake = await generateKeyPairSigner();
+      // The entered amount is what gets delegated, so the rent-exempt reserve
+      // is funded on top of it rather than taken out of it.
+      const rentReserve = await client.getMinimumBalance(
+        Number(STAKE_ACCOUNT_SIZE),
       );
+      const stakeAmount = solToLamports(sol(data.amount));
+      const accountLamports = lamports(stakeAmount + rentReserve);
 
-      const tx = new Transaction();
-      const signer = Keypair.generate();
-      const stakeAmount = data.amount * LAMPORTS_PER_SOL;
+      const lockup: LockupArgs =
+        data.lockTime !== undefined
+          ? {
+              unixTimestamp: data.lockTime,
+              epoch: 0,
+              custodian: owner.address,
+            }
+          : { unixTimestamp: 0, epoch: 0, custodian: DEFAULT_CUSTODIAN };
 
-      let lockup;
-      if (useLockup && data.lockTime) {
-        const unixTimestamp = Math.floor(
-          new Date(data.lockTime).getTime() / 1000,
-        );
-        lockup = new Lockup(unixTimestamp, 0, publicKey);
-      }
-
-      tx.add(
-        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1e6 }),
-        StakeProgram.createAccount({
-          fromPubkey: publicKey,
-          lamports: stakeAmount,
-          stakePubkey: signer.publicKey,
-          authorized: {
-            staker: publicKey,
-            withdrawer: publicKey,
-          },
-          lockup,
+      // Create and initialize with the owner as both authorities, delegate
+      // while the owner is still the staker, then hand off the authorities.
+      const instructions: Instruction[] = [
+        getCreateAccountInstruction({
+          payer: owner,
+          newAccount: stake,
+          lamports: accountLamports,
+          space: STAKE_ACCOUNT_SIZE,
+          programAddress: STAKE_PROGRAM_ADDRESS,
         }),
-      );
+        getInitializeInstruction({
+          stake: stake.address,
+          arg0: { staker: owner.address, withdrawer: owner.address },
+          arg1: lockup,
+        }),
+      ];
 
-      if (useDelegate && data.voteAddress) {
-        tx.add(
-          StakeProgram.delegate({
-            authorizedPubkey: publicKey,
-            votePubkey: data.voteAddress,
-            stakePubkey: signer.publicKey,
+      if (data.voteAddress) {
+        instructions.push(
+          getDelegateStakeInstruction({
+            stake: stake.address,
+            vote: data.voteAddress,
+            stakeAuthority: owner,
           }),
         );
       }
 
-      if (useAuthorities && data.stakerAuth) {
-        tx.add(
-          StakeProgram.authorize({
-            authorizedPubkey: publicKey,
-            newAuthorizedPubkey: data.stakerAuth,
-            stakePubkey: signer.publicKey,
-            stakeAuthorizationType: StakeAuthorizationLayout.Staker,
-            custodianPubkey: publicKey,
+      if (data.stakerAuth) {
+        instructions.push(
+          getAuthorizeInstruction({
+            stake: stake.address,
+            authority: owner,
+            arg0: data.stakerAuth,
+            arg1: StakeAuthorize.Staker,
           }),
         );
       }
-      if (useAuthorities && data.withdrawAuth) {
-        tx.add(
-          StakeProgram.authorize({
-            authorizedPubkey: publicKey,
-            newAuthorizedPubkey: data.withdrawAuth,
-            stakePubkey: signer.publicKey,
-            stakeAuthorizationType: StakeAuthorizationLayout.Withdrawer,
-            custodianPubkey: publicKey,
+      if (data.withdrawAuth) {
+        instructions.push(
+          getAuthorizeInstruction({
+            stake: stake.address,
+            authority: owner,
+            // Required when a lockup is in force; harmless otherwise.
+            lockupAuthority: owner,
+            arg0: data.withdrawAuth,
+            arg1: StakeAuthorize.Withdrawer,
           }),
         );
       }
 
-      tx.feePayer = publicKey;
-      tx.recentBlockhash = value.blockhash;
-
-      const signed = await signWithWalletFirst(tx, signTransaction, [signer]);
-
-      const signature = await connection.sendRawTransaction(
-        signed.serialize(),
-        {
-          minContextSlot: context.slot,
-          maxRetries: 0,
-          preflightCommitment: "confirmed",
-          skipPreflight: true,
-        },
-      );
-      if (!isConfirming) {
-        setIsConfirming(true);
-      }
-
-      console.log(signature);
-
-      const result = await connection.confirmTransaction(
-        {
-          signature,
-          blockhash: value.blockhash,
-          lastValidBlockHeight: value.lastValidBlockHeight,
-        },
-        "confirmed",
-      );
-
-      if (result.value.err) throw Error(JSON.stringify(result.value.err));
+      // One transaction: the client fetches a blockhash, estimates compute
+      // units, signs with the wallet and the new stake keypair, sends, and
+      // waits for confirmation.
+      const result = await client.sendTransaction(instructions);
 
       notify({
         type: "success",
         title: "Transaction confirmed",
-        txid: signature,
+        txid: result.context.signature,
       });
       setSubmitData(null);
     } catch (error) {
       notify({
         type: "error",
         title: "Transaction error",
-        description: error instanceof Error ? error.message : String(error),
+        description: errorMessage(error),
       });
     } finally {
       setIsConfirming(false);
@@ -255,7 +287,7 @@ export function StakeAccountForm() {
                 staking authorities
               </Label>
               <Input
-                {...register("withdrawAuth", { required: useAuthorities })}
+                {...register("withdrawAuth")}
                 className={inputClass}
                 invalid={!!errors?.withdrawAuth}
                 placeholder="Address of the withdraw authority"
@@ -270,7 +302,7 @@ export function StakeAccountForm() {
                 authority
               </Label>
               <Input
-                {...register("stakerAuth", { required: useAuthorities })}
+                {...register("stakerAuth")}
                 className={inputClass}
                 invalid={!!errors?.stakerAuth}
                 placeholder="Address of the stake authority"
@@ -303,7 +335,7 @@ export function StakeAccountForm() {
             </Label>
 
             <Input
-              {...register("voteAddress", { required: useDelegate })}
+              {...register("voteAddress")}
               className={inputClass}
               invalid={!!errors?.voteAddress}
               placeholder="Validator vote address"
@@ -355,18 +387,8 @@ export function StakeAccountForm() {
                   className={inputClass}
                   placeholder="Address of the lockup custodian"
                   type="text"
-                  value={publicKey?.toString() ?? ""}
+                  value={client?.payer.address ?? ""}
                 />
-                {/* <Button
-                  type="button"
-                  onClick={() =>
-                    setValue("custodian", PublicKey.default.toString())
-                  }
-                  className="absolute! right-0 top-0 scale-90"
-                  plain
-                >
-                  Set to empty pubkey
-                </Button> */}
               </div>
             </Field>
 
@@ -392,9 +414,9 @@ export function StakeAccountForm() {
 
       <div className="mt-4 flex justify-center">
         {errors.withdrawAuth?.message}
-        {publicKey ? (
+        {client ? (
           <Button
-            disabled={isConfirming || !publicKey}
+            disabled={isConfirming}
             color="indigo"
             type="submit"
             className="w-[min(320px,100%)]"
@@ -406,10 +428,7 @@ export function StakeAccountForm() {
             )}
           </Button>
         ) : (
-          <Button
-            onClick={() => setVisible(true)}
-            className="w-[min(320px,100%)]"
-          >
+          <Button onClick={() => setOpen(true)} className="w-[min(320px,100%)]">
             Connect your wallet
           </Button>
         )}
@@ -423,7 +442,7 @@ export function StakeAccountForm() {
       >
         <div className="fixed inset-0 w-screen overflow-y-auto p-4">
           <div className="flex min-h-full items-center justify-center">
-            <DialogPanel className="max-w-lg min-w-[300px] space-y-4 rounded-lg bg-white p-4 shadow-sm">
+            <DialogPanel className="max-w-lg min-w-75 space-y-4 rounded-lg bg-white p-4 shadow-sm">
               <DialogTitle className="font-bold">
                 Confirm Stake Account Creation
               </DialogTitle>
@@ -432,54 +451,57 @@ export function StakeAccountForm() {
                 <div>
                   <DescriptionList className="w-full">
                     <DescriptionTerm>Staked Amount</DescriptionTerm>
-                    <DescriptionDetails>{submitData.amount}</DescriptionDetails>
-                    {useDelegate && submitData.voteAddress && (
+                    <DescriptionDetails>
+                      {submitData.amount} SOL
+                      <span className="block text-xs text-zinc-500">
+                        The rent-exempt reserve is added on top of this.
+                      </span>
+                    </DescriptionDetails>
+                    {submitData.voteAddress && (
                       <>
                         <DescriptionTerm>
                           Validator Vote Address
                         </DescriptionTerm>
                         <DescriptionDetails className="truncate">
-                          {submitData.voteAddress.toString()}
+                          {submitData.voteAddress}
                         </DescriptionDetails>
                       </>
                     )}
-                    {useAuthorities && submitData.withdrawAuth && (
+                    {submitData.withdrawAuth && (
                       <>
                         <DescriptionTerm>Withdraw Authority</DescriptionTerm>
                         <DescriptionDetails className="truncate">
-                          {submitData.withdrawAuth.toString()}
+                          {submitData.withdrawAuth}
                         </DescriptionDetails>
                       </>
                     )}
-                    {useAuthorities && submitData.stakerAuth && (
+                    {submitData.stakerAuth && (
                       <>
                         <DescriptionTerm>Staker Authority</DescriptionTerm>
                         <DescriptionDetails className="truncate">
-                          {submitData.stakerAuth.toString()}
+                          {submitData.stakerAuth}
                         </DescriptionDetails>
                       </>
                     )}
-                    {useLockup && submitData.lockTime && (
+                    {submitData.lockTime !== undefined && (
                       <>
                         <DescriptionTerm>Lockup (UTC)</DescriptionTerm>
                         <DescriptionDetails>
-                          {new Date(submitData.lockTime).toLocaleString(
+                          {new Date(submitData.lockTime * 1000).toLocaleString(
                             undefined,
-                            {
-                              timeZone: "UTC",
-                            },
+                            { timeZone: "UTC" },
                           )}
                         </DescriptionDetails>
                         <DescriptionTerm>Lockup (Local)</DescriptionTerm>
                         <DescriptionDetails>
-                          {new Date(submitData.lockTime).toLocaleString()}
+                          {new Date(
+                            submitData.lockTime * 1000,
+                          ).toLocaleString()}
                         </DescriptionDetails>
 
                         <DescriptionTerm>Lockup (timestamp)</DescriptionTerm>
                         <DescriptionDetails>
-                          {Math.floor(
-                            new Date(submitData.lockTime).getTime() / 1000,
-                          )}
+                          {submitData.lockTime}
                         </DescriptionDetails>
                       </>
                     )}
@@ -488,7 +510,7 @@ export function StakeAccountForm() {
                       <>
                         <DescriptionTerm>Lockup Custodian</DescriptionTerm>
                         <DescriptionDetails className="truncate">
-                          {publicKey?.toString()}
+                          {client?.payer.address}
                         </DescriptionDetails>
                       </>
                     )}
