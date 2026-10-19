@@ -8,6 +8,7 @@ import {
 import { InfoTooltip } from "@/components/info-tooltip";
 import { notify } from "@/components/notification";
 import { useConnectorDialog } from "@/connector/connector-dialog";
+import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient } from "@/connector/use-kit-client";
 import { Button, cn, SpinnerIcon, Switch, SwitchGroup } from "@blastctrl/ui";
 import {
@@ -33,12 +34,10 @@ import {
   address,
   generateKeyPairSigner,
   isAddress,
-  isSolanaError,
   lamports,
   sol,
   solToLamports,
   type Instruction,
-  type MicroLamports,
 } from "@solana/kit";
 import Link from "next/link";
 import { useState } from "react";
@@ -49,10 +48,6 @@ import { z } from "zod";
 const MIN_STAKE_SOL = 1;
 /** Size of a `StakeStateV2` account. */
 const STAKE_ACCOUNT_SIZE = 200n;
-/** Same priority fee the legacy tool attached (1 lamport per compute unit). */
-const TRANSACTION_CONFIG = {
-  microLamportsPerComputeUnit: 1_000_000n as MicroLamports,
-};
 
 const addressField = z
   .string()
@@ -125,17 +120,8 @@ type FormSchema = ReturnType<typeof createFormSchema>;
 type FormSchemaFields = z.input<FormSchema>;
 type FormSchemaOutput = z.output<FormSchema>;
 
-const errorMessage = (error: unknown) => {
-  if (isSolanaError(error)) {
-    // Program errors (e.g. insufficient funds) are wrapped; surface the inner one.
-    const cause = error.cause;
-    return cause instanceof Error ? cause.message : error.message;
-  }
-  return error instanceof Error ? error.message : String(error);
-};
-
 export function StakeAccountForm() {
-  const { client } = useKitClient({ transactionConfig: TRANSACTION_CONFIG });
+  const { client } = useKitClient();
   const { setOpen } = useConnectorDialog();
   const [isConfirming, setIsConfirming] = useState(false);
   const [useLockup, setUseLockup] = useState(false);
@@ -253,7 +239,7 @@ export function StakeAccountForm() {
       notify({
         type: "error",
         title: "Transaction error",
-        description: errorMessage(error),
+        description: transactionErrorMessage(error),
       });
     } finally {
       setIsConfirming(false);

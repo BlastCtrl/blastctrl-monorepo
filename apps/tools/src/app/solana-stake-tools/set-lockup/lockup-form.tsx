@@ -1,34 +1,32 @@
 "use client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { isPublicKey, lamportsToSolString } from "@/lib/solana/common";
-import { Field, Fieldset, Input, Label, Legend } from "@headlessui/react";
-import type { InputProps } from "@headlessui/react";
+
+import { Badge } from "@/components/badge";
 import {
   DescriptionDetails,
   DescriptionList,
   DescriptionTerm,
 } from "@/components/description-list";
-import type { FormEvent, ReactNode } from "react";
-import { ArrowUturnLeftIcon } from "@heroicons/react/16/solid";
-
-import { Button, cn, SpinnerIcon } from "@blastctrl/ui";
+import { notify } from "@/components/notification";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
+import { lamportsToSolString } from "@/lib/solana/common";
+import { useCurrentEpoch } from "@/state/queries/use-epoch";
 import { useStakeAccount } from "@/state/queries/use-stake-account";
 import type { StakeAccountType } from "@/state/queries/use-stake-account";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import {
-  ComputeBudgetProgram,
-  PublicKey,
-  StakeProgram,
-  Transaction,
-} from "@solana/web3.js";
-import { notify } from "@/components/notification";
-import { retryWithBackoff } from "@/lib/utils";
-import { getSetLockupInstruction } from "@/lib/solana/stake";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { ZodError } from "zod";
-import { currentEpochQuery } from "@/state/queries/use-epoch";
-import { Badge } from "@/components/badge";
+import { Button, cn, SpinnerIcon } from "@blastctrl/ui";
+import { Field, Fieldset, Input, Label, Legend } from "@headlessui/react";
+import type { InputProps } from "@headlessui/react";
+import { ArrowUturnLeftIcon } from "@heroicons/react/16/solid";
+import { getSetLockupInstruction } from "@solana-program/stake";
+import { useConnector } from "@solana/connector/react";
+import { address, isAddress, type Address } from "@solana/kit";
+import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import type { FormEvent, ReactNode } from "react";
+
+/** The all-zero address: setting it as custodian makes the lockup unmodifiable until it expires. */
+const DISABLED_CUSTODIAN = "11111111111111111111111111111111";
 
 function getLockupStatus(
   stakeData: StakeAccountType | undefined,
@@ -36,35 +34,32 @@ function getLockupStatus(
 ): boolean | undefined {
   if (stakeData === undefined) return undefined;
   if (currentEpoch === undefined) return undefined;
-  const lockupEpoch = stakeData.data.info.meta.lockup.epoch;
-  const lockupTimestamp = stakeData.data.info.meta.lockup.unixTimestamp;
-  const currentTimestamp = Math.floor(Date.now() / 1000);
+  const { epoch: lockupEpoch, unixTimestamp: lockupTimestamp } =
+    stakeData.meta.lockup;
+  const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
 
-  return lockupTimestamp > currentTimestamp || lockupEpoch > currentEpoch;
+  return (
+    lockupTimestamp > currentTimestamp || lockupEpoch > BigInt(currentEpoch)
+  );
 }
 
 const DISABLE_OVERRIDE = true;
 
 export function LockupFormContainer() {
-  const { connection } = useConnection();
   const queryClient = useQueryClient();
   const [stakeAccAddr, setStakeAccAddr] = useState("");
   const { data, error, refetch, isLoading } = useStakeAccount(
     stakeAccAddr,
     DISABLE_OVERRIDE,
   );
-  useQuery(currentEpochQuery(connection)); // prefetch
+  useCurrentEpoch(); // prefetch
 
   const isSuccess = !!stakeAccAddr && !!data;
-  const isInvalid = stakeAccAddr !== "" && !isPublicKey(stakeAccAddr);
+  const isInvalid = stakeAccAddr !== "" && !isAddress(stakeAccAddr);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    console.log("Submit attempt");
     e.preventDefault();
-    if (isSuccess || isInvalid) {
-      console.log(isSuccess, isInvalid, "early return");
-      return;
-    }
+    if (isSuccess || isInvalid) return;
     await refetch();
   };
 
@@ -111,17 +106,7 @@ export function LockupFormContainer() {
           <p className="font-medium">
             There was an error loading the staking account with the message:
           </p>
-          {error instanceof ZodError ? (
-            <div className="space-y-1">
-              {error.issues.map((e, i) => (
-                <p key={i} className="font-medium text-red-600">
-                  {e.path.join(".")}: {e.message}
-                </p>
-              ))}
-            </div>
-          ) : (
-            <p className="font-medium text-red-600">{error.message}</p>
-          )}
+          <p className="font-medium text-red-600">{error.message}</p>
         </div>
       )}
 
@@ -134,7 +119,7 @@ export function LockupFormContainer() {
           <SetLockupTransactionBuilder
             reset={reset}
             stakeData={data}
-            stakePubkey={new PublicKey(stakeAccAddr)}
+            stakeAddress={address(stakeAccAddr)}
           />
         </>
       )}
@@ -147,16 +132,12 @@ function StakeAccountDescription({
 }: {
   stakeData: StakeAccountType;
 }) {
-  const { connection } = useConnection();
-  const { publicKey } = useWallet();
-  const { data: epochData } = useQuery(currentEpochQuery(connection));
+  const { account } = useConnector();
+  const { data: epochData } = useCurrentEpoch();
 
-  const withdrawAuthMatch =
-    publicKey?.toString() === stakeData.data.info.meta.authorized.withdrawer;
-  const stakerAuthMatch =
-    publicKey?.toString() === stakeData.data.info.meta.authorized.staker;
-  const custodianMatch =
-    publicKey?.toString() === stakeData.data.info.meta.lockup.custodian;
+  const withdrawAuthMatch = account === stakeData.meta.authorized.withdrawer;
+  const stakerAuthMatch = account === stakeData.meta.authorized.staker;
+  const custodianMatch = account === stakeData.meta.lockup.custodian;
   const isLockupActive = getLockupStatus(stakeData, epochData?.epoch);
 
   return (
@@ -167,8 +148,8 @@ function StakeAccountDescription({
       </DescriptionDetails>
       <DescriptionTerm>Delegated Voter</DescriptionTerm>
       <DescriptionDetails className="truncate">
-        {stakeData.data.info.stake
-          ? stakeData.data.info.stake.delegation.voter
+        {stakeData.stake
+          ? stakeData.stake.delegation.voterPubkey
           : "Undelegated"}
       </DescriptionDetails>
       <DescriptionTerm>Withdraw Auth</DescriptionTerm>
@@ -176,41 +157,41 @@ function StakeAccountDescription({
         data-match={withdrawAuthMatch}
         className="truncate data-[match=true]:underline"
       >
-        {stakeData.data.info.meta.authorized.withdrawer}
+        {stakeData.meta.authorized.withdrawer}
       </DescriptionDetails>
       <DescriptionTerm>Staking Auth</DescriptionTerm>
       <DescriptionDetails
         data-match={stakerAuthMatch}
         className="truncate data-[match=true]:underline"
       >
-        {stakeData.data.info.meta.authorized.staker}
+        {stakeData.meta.authorized.staker}
       </DescriptionDetails>
       <DescriptionTerm>Lockup Auth (Custodian)</DescriptionTerm>
       <DescriptionDetails
         data-match={custodianMatch}
         className="truncate data-[match=true]:underline"
       >
-        {stakeData.data.info.meta.lockup.custodian ?? "None"}
+        {stakeData.meta.lockup.custodian ?? "None"}
       </DescriptionDetails>
-      {stakeData.data.info.meta.lockup.unixTimestamp > 0 ? (
+      {stakeData.meta.lockup.unixTimestamp > 0n ? (
         <>
           <DescriptionTerm>Lockup (Local time)</DescriptionTerm>
           <DescriptionDetails className="truncate">
             {new Date(
-              stakeData.data.info.meta.lockup.unixTimestamp * 1000,
+              Number(stakeData.meta.lockup.unixTimestamp) * 1000,
             ).toLocaleString()}
           </DescriptionDetails>
           <DescriptionTerm>Lockup Timestamp</DescriptionTerm>
           <DescriptionDetails className="truncate">
-            {stakeData.data.info.meta.lockup.unixTimestamp}
+            {stakeData.meta.lockup.unixTimestamp.toString()}
           </DescriptionDetails>
         </>
       ) : null}
-      {stakeData.data.info.meta.lockup.epoch > 0 ? (
+      {stakeData.meta.lockup.epoch > 0n ? (
         <>
           <DescriptionTerm>Lockup epoch</DescriptionTerm>
           <DescriptionDetails className="truncate">
-            {stakeData.data.info.meta.lockup.epoch}
+            {stakeData.meta.lockup.epoch.toString()}
           </DescriptionDetails>
         </>
       ) : null}
@@ -229,28 +210,28 @@ function StakeAccountDescription({
 }
 
 function SetLockupTransactionBuilder({
-  stakePubkey,
+  stakeAddress,
   stakeData,
   reset,
 }: {
-  stakePubkey: PublicKey;
+  stakeAddress: Address;
   stakeData: StakeAccountType;
   reset: () => void;
 }) {
-  const { connection } = useConnection();
-  const { data } = useQuery(currentEpochQuery(connection));
-  const { publicKey, sendTransaction } = useWallet();
+  const { client } = useKitClient();
+  const { setOpen } = useConnectorDialog();
+  const { data: epochData } = useCurrentEpoch();
   const [custodian, setCustodian] = useState("");
   const [timestamp, setTimestamp] = useState("");
   const [epoch, setEpoch] = useState("");
   const [isConfirming, setIsConfirming] = useState(false);
-  const { setVisible } = useWalletModal();
 
-  const { refetch } = useStakeAccount(stakePubkey.toString());
+  const { refetch } = useStakeAccount(stakeAddress);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!publicKey || !sendTransaction) return;
+    if (!client) return;
+    const owner = client.payer;
 
     if (custodian === "" && timestamp === "" && epoch === "") {
       notify({
@@ -259,74 +240,52 @@ function SetLockupTransactionBuilder({
       });
       return;
     }
-
-    // possible fail condition:
-    if (
-      getLockupStatus(stakeData, data?.epoch) === false &&
-      stakeData.data.info.meta.authorized.withdrawer !== publicKey.toString()
-    ) {
-      window.confirm(
-        "This transaction might fail due to: lockup has expired and connected wallet does not match the withdrawer authority.",
-      );
-    }
-
-    if (
-      getLockupStatus(stakeData, data?.epoch) &&
-      stakeData.data.info.meta.lockup.custodian !== publicKey.toString()
-    ) {
-      window.confirm(
-        "This transaction might fail due to: lockup is currently active and connected wallet does not match the lockup custodian.",
-      );
-    }
-
-    try {
-      const { context, value } = await retryWithBackoff(() =>
-        connection.getLatestBlockhashAndContext("confirmed"),
-      );
-
-      const tx = new Transaction();
-      tx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10e6 }));
-
-      tx.add(
-        getSetLockupInstruction(
-          StakeProgram.programId,
-          stakePubkey,
-          {
-            custodian: custodian ? new PublicKey(custodian) : undefined,
-            epoch: epoch ? Number(epoch) : undefined,
-            unixTimestamp: timestamp ? Number(timestamp) : undefined,
-          },
-          publicKey,
-        ),
-      );
-
-      const signature = await sendTransaction(tx, connection, {
-        minContextSlot: context.slot,
-        maxRetries: 0,
-        preflightCommitment: "confirmed",
-        skipPreflight: true,
+    if (custodian !== "" && !isAddress(custodian)) {
+      notify({
+        type: "error",
+        description: "Custodian is not a valid address.",
       });
-      if (!isConfirming) {
-        setIsConfirming(true);
-      }
+      return;
+    }
 
-      console.log(signature);
+    // Likely failure conditions; let the user back out.
+    const lockupActive = getLockupStatus(stakeData, epochData?.epoch);
+    if (
+      lockupActive === false &&
+      stakeData.meta.authorized.withdrawer !== owner.address &&
+      !window.confirm(
+        "This transaction might fail: the lockup has expired and the connected wallet is not the withdraw authority. Continue anyway?",
+      )
+    ) {
+      return;
+    }
+    if (
+      lockupActive &&
+      stakeData.meta.lockup.custodian !== owner.address &&
+      !window.confirm(
+        "This transaction might fail: the lockup is active and the connected wallet is not the lockup custodian. Continue anyway?",
+      )
+    ) {
+      return;
+    }
 
-      const result = await connection.confirmTransaction(
-        {
-          signature,
-          blockhash: value.blockhash,
-          lastValidBlockHeight: value.lastValidBlockHeight,
-        },
-        "confirmed",
-      );
-
-      if (result.value.err) throw Error(JSON.stringify(result.value.err));
+    setIsConfirming(true);
+    try {
+      // Empty fields are sent as `null`, which leaves that lockup value untouched.
+      const result = await client.sendTransaction([
+        getSetLockupInstruction({
+          stake: stakeAddress,
+          authority: owner,
+          unixTimestamp: timestamp ? Number(timestamp) : null,
+          epoch: epoch ? Number(epoch) : null,
+          custodian: custodian ? address(custodian) : null,
+        }),
+      ]);
 
       notify({
         type: "success",
         title: "Transaction confirmed",
-        txid: signature,
+        txid: result.context.signature,
       });
 
       await refetch();
@@ -334,7 +293,7 @@ function SetLockupTransactionBuilder({
       notify({
         type: "error",
         title: "Transaction error",
-        description: error instanceof Error ? error.message : String(error),
+        description: transactionErrorMessage(error),
       });
     } finally {
       setIsConfirming(false);
@@ -373,7 +332,7 @@ function SetLockupTransactionBuilder({
               <InsetButton
                 handleClick={() =>
                   void setTimestamp(
-                    stakeData.data.info.meta.lockup.unixTimestamp.toString(),
+                    stakeData.meta.lockup.unixTimestamp.toString(),
                   )
                 }
               />
@@ -383,7 +342,9 @@ function SetLockupTransactionBuilder({
           <Field className="w-full">
             <Label className="font-medium sm:text-sm/6">
               Lockup epoch
-              {data?.epoch !== undefined ? ` (current: ${data.epoch})` : null}
+              {epochData?.epoch !== undefined
+                ? ` (current: ${epochData.epoch})`
+                : null}
             </Label>
             <div className="flex rounded-lg bg-white/5 shadow-xs">
               <StyledInput
@@ -399,9 +360,7 @@ function SetLockupTransactionBuilder({
               />
               <InsetButton
                 handleClick={() =>
-                  void setEpoch(
-                    stakeData.data.info.meta.lockup.epoch.toString(),
-                  )
+                  void setEpoch(stakeData.meta.lockup.epoch.toString())
                 }
               />
             </div>
@@ -414,7 +373,7 @@ function SetLockupTransactionBuilder({
                 autoCorrect="false"
                 value={custodian}
                 onChange={({ target }) => setCustodian(target.value)}
-                invalid={custodian !== "" && !isPublicKey(custodian)}
+                invalid={custodian !== "" && !isAddress(custodian)}
                 placeholder="New lockup custodian"
               />
               <InsetButton
@@ -422,27 +381,23 @@ function SetLockupTransactionBuilder({
                   window.alert(
                     "This will set the custodian to a non-existing wallet. It will not be possible to modify the lockup until it expires.",
                   );
-                  void setCustodian(PublicKey.default.toString());
+                  void setCustodian(DISABLED_CUSTODIAN);
                 }}
               >
                 Disable
               </InsetButton>
               <InsetButton
                 handleClick={() =>
-                  void setCustodian(stakeData.data.info.meta.lockup.custodian)
+                  void setCustodian(stakeData.meta.lockup.custodian)
                 }
               />
             </div>
           </Field>
         </Fieldset>
 
-        {!publicKey ? (
+        {!client ? (
           <div className="flex justify-end">
-            <Button
-              onClick={() => void setVisible(true)}
-              type="button"
-              color="indigo"
-            >
+            <Button onClick={() => setOpen(true)} type="button" color="indigo">
               Connect your wallet
             </Button>
           </div>
