@@ -1,19 +1,19 @@
 "use client";
 
-import { StakeProgram } from "@solana/web3.js";
-import { useRentQuery } from "./rent-query";
-import { SplitManualForm } from "./split-manual-form";
-import { SplitGraphicForm } from "./split-graphic-form";
-import { Tab, TabList, TabGroup, TabPanel, TabPanels } from "@headlessui/react";
-import { Box } from "./box";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { STAKE_ACCOUNT_SIZE } from "@/lib/solana/stake-account";
+import { useRentQuery } from "@/state/queries/use-rent";
 import { Button } from "@blastctrl/ui";
+import { Tab, TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/react";
+import { useConnector } from "@solana/connector/react";
+import { Box } from "./box";
+import { SplitGraphicForm } from "./split-graphic-form";
+import { SplitManualForm } from "./split-manual-form";
 
 export default function StakeLockupManagement() {
-  useRentQuery(StakeProgram.space); // prefetch
-  const { publicKey } = useWallet();
-  const { setVisible } = useWalletModal();
+  useRentQuery(STAKE_ACCOUNT_SIZE); // prefetch
+  const { account } = useConnector();
+  const { setOpen } = useConnectorDialog();
 
   return (
     <TabGroup>
@@ -44,10 +44,10 @@ export default function StakeLockupManagement() {
           </TabList>
         </div>
       </Box>
-      {publicKey ? (
+      {account ? (
         <TabPanels>
           <TabPanel>
-            <SplitGraphicForm />
+            <SplitGraphicForm owner={account} />
           </TabPanel>
           <TabPanel>
             <SplitManualForm />
@@ -59,7 +59,7 @@ export default function StakeLockupManagement() {
             color="indigo"
             type="button"
             className="w-full"
-            onClick={() => setVisible(true)}
+            onClick={() => setOpen(true)}
           >
             Connect your wallet
           </Button>

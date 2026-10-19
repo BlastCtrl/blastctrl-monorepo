@@ -10,6 +10,7 @@ import { notify } from "@/components/notification";
 import { useConnectorDialog } from "@/connector/connector-dialog";
 import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient } from "@/connector/use-kit-client";
+import { STAKE_ACCOUNT_SIZE } from "@/lib/solana/stake-account";
 import { Button, cn, SpinnerIcon, Switch, SwitchGroup } from "@blastctrl/ui";
 import {
   Dialog,
@@ -46,8 +47,6 @@ import { z } from "zod";
 
 /** Minimum delegation under SIMD-0490 (Stake v5), in SOL. */
 const MIN_STAKE_SOL = 1;
-/** Size of a `StakeStateV2` account. */
-const STAKE_ACCOUNT_SIZE = 200n;
 
 const addressField = z
   .string()
@@ -162,9 +161,7 @@ export function StakeAccountForm() {
       const stake = await generateKeyPairSigner();
       // The entered amount is what gets delegated, so the rent-exempt reserve
       // is funded on top of it rather than taken out of it.
-      const rentReserve = await client.getMinimumBalance(
-        Number(STAKE_ACCOUNT_SIZE),
-      );
+      const rentReserve = await client.getMinimumBalance(STAKE_ACCOUNT_SIZE);
       const stakeAmount = solToLamports(sol(data.amount));
       const accountLamports = lamports(stakeAmount + rentReserve);
 
@@ -181,7 +178,7 @@ export function StakeAccountForm() {
           payer: owner,
           newAccount: stake,
           lamports: accountLamports,
-          space: STAKE_ACCOUNT_SIZE,
+          space: BigInt(STAKE_ACCOUNT_SIZE),
           programAddress: STAKE_PROGRAM_ADDRESS,
         }),
         getInitializeInstruction({

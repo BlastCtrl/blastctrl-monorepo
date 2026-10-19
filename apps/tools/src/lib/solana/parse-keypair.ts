@@ -1,4 +1,5 @@
-import { Keypair } from "@solana/web3.js";
+import { createKeyPairSignerFromBytes, type KeyPairSigner } from "@solana/kit";
+
 interface ParseKeypairError {
   success: false;
   error: string;
@@ -6,17 +7,17 @@ interface ParseKeypairError {
 
 interface ParseKeypairSuccess {
   success: true;
-  keypair: Keypair;
+  signer: KeyPairSigner;
 }
 
 type ParseKeypairResult = ParseKeypairError | ParseKeypairSuccess;
 
+/** Reads a Solana CLI style keypair file (JSON array of 64 bytes) into a kit signer. */
 export async function parseJsonKeypair(
   file: File,
 ): Promise<ParseKeypairResult> {
   try {
-    const jsonString = await file.text();
-    const parsed = JSON.parse(jsonString);
+    const parsed: unknown = JSON.parse(await file.text());
 
     if (!Array.isArray(parsed) || parsed.length !== 64) {
       return {
@@ -24,7 +25,6 @@ export async function parseJsonKeypair(
         error: "Invalid keypair format - must be array of 64 numbers",
       };
     }
-
     if (!parsed.every((n) => typeof n === "number" && n >= 0 && n <= 255)) {
       return {
         success: false,
@@ -32,13 +32,8 @@ export async function parseJsonKeypair(
       };
     }
 
-    const secretKey = Uint8Array.from(parsed);
-    const keypair = Keypair.fromSecretKey(secretKey);
-
-    return {
-      success: true,
-      keypair,
-    };
+    const signer = await createKeyPairSignerFromBytes(Uint8Array.from(parsed));
+    return { success: true, signer };
   } catch (err) {
     return {
       success: false,

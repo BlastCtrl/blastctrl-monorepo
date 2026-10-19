@@ -1,39 +1,41 @@
 "use client";
 
+import { notify } from "@/components/notification";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
+import { lamportsToSol, lamportsToSolString } from "@/lib/solana/common";
+import { STAKE_ACCOUNT_SIZE } from "@/lib/solana/stake-account";
+import { useRentQuery } from "@/state/queries/use-rent";
 import { useUserStakeAccounts } from "@/state/queries/use-user-stake-accounts";
 import type { StakeAccountType } from "@/state/queries/use-user-stake-accounts";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { Button, SpinnerIcon } from "@blastctrl/ui";
+import { Field, Label } from "@headlessui/react";
+import {
+  ClipboardDocumentCheckIcon,
+  ClipboardDocumentIcon,
+} from "@heroicons/react/24/solid";
+import * as Slider from "@radix-ui/react-slider";
+import {
+  getSplitInstruction,
+  STAKE_PROGRAM_ADDRESS,
+} from "@solana-program/stake";
+import { getCreateAccountInstruction } from "@solana-program/system";
+import { generateKeyPairSigner, lamports, type Address } from "@solana/kit";
 import type { SyntheticEvent } from "react";
 import { useState } from "react";
-import { lamportsToSol, lamportsToSolString } from "@/lib/solana/common";
-import { signWithWalletFirst } from "@/lib/solana/send";
-import {
-  ClipboardDocumentIcon,
-  ClipboardDocumentCheckIcon,
-} from "@heroicons/react/24/solid";
-import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { Box } from "./box";
-import { Field, Label } from "@headlessui/react";
-import * as Slider from "@radix-ui/react-slider";
-import { retryWithBackoff } from "@/lib/utils";
-import { Keypair, StakeProgram, Transaction } from "@solana/web3.js";
-import { notify } from "@/components/notification";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { PickerDialog } from "./picker-dialog";
-import { useRentQuery } from "./rent-query";
 
-export function SplitGraphicForm() {
-  const { publicKey } = useWallet();
-  const { data, isLoading, error } = useUserStakeAccounts(
-    publicKey ?? undefined,
-  );
+export function SplitGraphicForm({ owner }: { owner: Address }) {
+  const { data, isLoading, error } = useUserStakeAccounts(owner);
   const [selectedAccount, setSelectedAccount] =
     useState<StakeAccountType | null>(null);
   const [isCopied, setIsCopied] = useState(false);
 
   const copyToClipboard = () => {
     if (selectedAccount) {
-      void navigator.clipboard.writeText(selectedAccount.accountId.toString());
+      void navigator.clipboard.writeText(selectedAccount.address);
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     }
@@ -57,6 +59,7 @@ export function SplitGraphicForm() {
           <div className="flex items-center gap-4">
             <div className="mt-1 w-72">
               <PickerDialog
+                owner={owner}
                 data={data}
                 selectedAccount={selectedAccount}
                 setSelectedAccount={setSelectedAccount}
@@ -78,149 +81,117 @@ export function SplitGraphicForm() {
           </div>
         </Field>
       </Box>
-      {selectedAccount && <SplitFormInner selectedAccount={selectedAccount} />}
+      {selectedAccount && (
+        <SplitFormInner owner={owner} selectedAccount={selectedAccount} />
+      )}
     </>
   );
 }
 
 function SplitFormInner({
+  owner,
   selectedAccount,
 }: {
+  owner: Address;
   selectedAccount: StakeAccountType;
 }) {
-  const { connection } = useConnection();
+  const { client } = useKitClient();
+  const { setOpen } = useConnectorDialog();
   const [isConfirming, setIsConfirming] = useState(false);
   const [formSuccess, setFormSuccess] = useState("");
-  const { publicKey, signTransaction } = useWallet();
-  const { setVisible } = useWalletModal();
-  const { data: rentExemption, refetch } = useRentQuery(StakeProgram.space);
+  const { refetch: refetchRent } = useRentQuery(STAKE_ACCOUNT_SIZE);
 
-  // multiply the lamports by the percent
-  // check for error => percent is >= 100 or <= 0
-  // Do not allow submit if there's an error
-  // show red borders if there's an input error
+  // Slider math works in plain numbers; a stake account's balance is well
+  // below 2^53 lamports.
+  const totalLamports = Number(selectedAccount.lamports);
+  const totalSol = lamportsToSol(totalLamports);
+
   const [inputs, setInputs] = useState(() => {
-    const original = selectedAccount.lamports * 0.5;
+    const original = totalLamports * 0.5;
     return {
       percent: 50,
       originalStake: lamportsToSolString(original),
-      newStake: lamportsToSolString(selectedAccount.lamports - original),
+      newStake: lamportsToSolString(totalLamports - original),
     };
   });
 
   const inputError = inputs.percent >= 100 || inputs.percent <= 0;
 
   const handleSlider = (value: number) => {
-    const original = (selectedAccount.lamports * value) / 100;
+    const original = (totalLamports * value) / 100;
     setInputs({
       percent: value,
       originalStake: lamportsToSolString(original),
-      newStake: lamportsToSolString(selectedAccount.lamports - original),
+      newStake: lamportsToSolString(totalLamports - original),
     });
   };
   const handleLeftInput = (stakeStr: string) => {
     const stake = Number(stakeStr);
-    const source = lamportsToSol(selectedAccount.lamports);
-    const percent = (stake / source) * 100;
     setInputs({
-      percent,
+      percent: (stake / totalSol) * 100,
       originalStake: stakeStr,
-      newStake: (source - stake).toLocaleString("fullwide", fullwide),
+      newStake: (totalSol - stake).toLocaleString("fullwide", fullwide),
     });
   };
-
   const handleRightInput = (stakeStr: string) => {
     const stake = Number(stakeStr);
-    const source = lamportsToSol(selectedAccount.lamports);
-    const percent = 100 - (stake / source) * 100;
     setInputs({
-      percent,
-      originalStake: (source - stake).toLocaleString("fullwide", fullwide),
+      percent: 100 - (stake / totalSol) * 100,
+      originalStake: (totalSol - stake).toLocaleString("fullwide", fullwide),
       newStake: stakeStr,
     });
   };
 
   const handleSubmit = async (e: SyntheticEvent) => {
     e.preventDefault();
-    if (!publicKey || !signTransaction || !selectedAccount) {
-      throw Error("publicKey || signTransaction unsupported");
-    }
-    if (inputError) return;
+    if (!client || inputError) return;
 
     if (
-      selectedAccount.data.info.meta.authorized.staker !== publicKey.toString()
+      selectedAccount.meta.authorized.staker !== owner &&
+      !window.confirm(
+        'Your wallet doesn\'t have the "staker" authority over this staking account. This action will likely fail. Continue anyway?',
+      )
     ) {
-      window.alert(
-        'Your wallet doesn\'t have the "staker" authority over this staking account. This action will likely fail.',
-      );
+      return;
     }
 
+    setIsConfirming(true);
     try {
-      await refetch({ throwOnError: true });
-      const { context, value } = await retryWithBackoff(() =>
-        connection.getLatestBlockhashAndContext("confirmed"),
+      const { data: rentExemption } = await refetchRent({ throwOnError: true });
+      const splitStake = await generateKeyPairSigner();
+      const newAccountLamports = lamports(
+        BigInt(Math.round((1 - inputs.percent / 100) * totalLamports)),
       );
 
-      const stakeAccount = Keypair.generate();
-      const tx = new Transaction();
-      const newAccountBalanceLamports = +(
-        (1 - inputs.percent / 100) *
-        selectedAccount.lamports
-      ).toFixed(0);
-
-      tx.add(
-        // ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1e6 }),
-        StakeProgram.split(
-          {
-            authorizedPubkey: publicKey,
-            stakePubkey: selectedAccount.accountId,
-            splitStakePubkey: stakeAccount.publicKey,
-            lamports: newAccountBalanceLamports,
-          },
-          rentExemption ?? 0,
-        ),
-      );
-
-      tx.feePayer = publicKey;
-      tx.recentBlockhash = value.blockhash;
-      const signed = await signWithWalletFirst(tx, signTransaction, [
-        stakeAccount,
+      // Same shape as the legacy StakeProgram.split with a rent reserve: fund
+      // the destination's rent from the wallet, then split into it.
+      const result = await client.sendTransaction([
+        getCreateAccountInstruction({
+          payer: client.payer,
+          newAccount: splitStake,
+          lamports: rentExemption ?? 0n,
+          space: BigInt(STAKE_ACCOUNT_SIZE),
+          programAddress: STAKE_PROGRAM_ADDRESS,
+        }),
+        getSplitInstruction({
+          stake: selectedAccount.address,
+          splitStake: splitStake.address,
+          stakeAuthority: client.payer,
+          args: newAccountLamports,
+        }),
       ]);
-      const signature = await connection.sendRawTransaction(
-        signed.serialize(),
-        {
-          minContextSlot: context.slot,
-          maxRetries: 0,
-          preflightCommitment: "confirmed",
-          skipPreflight: true,
-        },
-      );
-      if (!isConfirming) {
-        setIsConfirming(true);
-      }
-
-      const result = await connection.confirmTransaction(
-        {
-          signature,
-          blockhash: value.blockhash,
-          lastValidBlockHeight: value.lastValidBlockHeight,
-        },
-        "confirmed",
-      );
-
-      if (result.value.err) throw Error(JSON.stringify(result.value.err));
 
       notify({
         type: "success",
         title: "Transaction confirmed",
-        txid: signature,
+        txid: result.context.signature,
       });
-      setFormSuccess(stakeAccount.publicKey.toString());
+      setFormSuccess(splitStake.address);
     } catch (error) {
       notify({
         type: "error",
         title: "Transaction error",
-        description: error instanceof Error ? error.message : String(error),
+        description: transactionErrorMessage(error),
       });
     } finally {
       setIsConfirming(false);
@@ -232,9 +203,7 @@ function SplitFormInner({
       <Box>
         <div className="text-left">
           <p className="text-sm font-medium">Current Stake Amount</p>
-          <p className="text-lg font-bold">
-            {lamportsToSol(selectedAccount.lamports)} SOL
-          </p>
+          <p className="text-lg font-bold">{totalSol} SOL</p>
         </div>
 
         <div className="">
@@ -301,10 +270,10 @@ function SplitFormInner({
           </div>
         </div>
 
-        {!publicKey ? (
+        {!client ? (
           <div className="mt-6">
             <Button
-              onClick={() => void setVisible(true)}
+              onClick={() => setOpen(true)}
               type="button"
               color="indigo"
               className="w-full"
@@ -316,7 +285,7 @@ function SplitFormInner({
           <div className="mt-6">
             <Button
               type="submit"
-              disabled={inputError}
+              disabled={inputError || isConfirming}
               color="indigo"
               className="w-full"
             >
