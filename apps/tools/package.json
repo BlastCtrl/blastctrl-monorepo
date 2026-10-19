@@ -59,7 +59,7 @@
     "devalue": "^5.7.1",
     "jwt-decode": "^4.0.0",
     "motion": "^13.4.4",
-    "next": "16.4.0",
+    "next": "16.4.2",
     "papaparse": "^5.5.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -73,6 +73,8 @@
   "devDependencies": {
     "@blastctrl/eslint-config": "workspace:*",
     "@blastctrl/prettier-config": "workspace:*",
+    "@blastctrl/tailwind-config": "workspace:*",
+    "@blastctrl/typescript-config": "workspace:*",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/bn.js": "^5.1.5",
     "@types/bs58": "^4.0.1",
@@ -82,7 +84,7 @@
     "@types/react-dom": "19.3.0",
     "arweave": "^1.15.0",
     "buffer": "^6.0.3",
-    "csstype": "^3.1.3",
+    "csstype": "^3.2.3",
     "eslint": "10.11.0",
     "happy-dom": "^20.14.5",
     "jiti": "^1.21.0",
@@ -91,9 +93,7 @@
     "tailwindcss": "^4.3.3",
     "typescript": "6.0.3",
     "vite-tsconfig-paths": "^5.1.2",
-    "vitest": "^3.2.7",
-    "@blastctrl/typescript-config": "workspace:*",
-    "@blastctrl/tailwind-config": "workspace:*"
+    "vitest": "^3.2.7"
   },
   "prettier": "@blastctrl/prettier-config"
 }
