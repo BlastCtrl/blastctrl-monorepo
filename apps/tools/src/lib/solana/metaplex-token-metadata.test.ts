@@ -4,6 +4,7 @@ import {
   getUnverifyCollectionV1InstructionDataSerializer,
   getUpdateV1InstructionDataSerializer,
   getVerifyCollectionV1InstructionDataSerializer,
+  getVerifyCreatorV1InstructionDataSerializer,
   TokenStandard,
   type MetadataAccountDataArgs,
 } from "@metaplex-foundation/mpl-token-metadata";
@@ -30,6 +31,7 @@ import {
   findMetadataAddress,
   removeFromCollectionInstructions,
   updateNftInstructions,
+  verifyCreatorInstructions,
 } from "./metaplex-token-metadata";
 
 const TOKEN_METADATA_PROGRAM = address(
@@ -288,6 +290,8 @@ describe("fetchTokenMetadata", () => {
       uri: "https://arweave.net/x",
       sellerFeeBasisPoints: 550,
       creators: [{ address: wallet, share: 100, verified: true }],
+      isMutable: true,
+      tokenStandard: TokenStandard.NonFungible,
       collection: null,
     });
   });
@@ -428,5 +432,26 @@ describe("removeFromCollectionInstructions", () => {
       { address: other, role: AccountRole.READONLY },
       { address: findMetadataAddress(other), role: AccountRole.WRITABLE },
     ]);
+  });
+});
+
+describe("verifyCreatorInstructions", () => {
+  it("has the creator sign for the NFT's metadata account", () => {
+    const [verify, ...rest] = verifyCreatorInstructions(wallet, mint);
+
+    expect(rest).toEqual([]);
+    expect(verify?.programAddress).toBe(TOKEN_METADATA_PROGRAM);
+    expect(verify?.data).toEqual(
+      getVerifyCreatorV1InstructionDataSerializer().serialize({}),
+    );
+    // verifyCreatorV1: authority, delegateRecord, metadata, …
+    expect(verify?.accounts?.[0]).toEqual({
+      address: wallet,
+      role: AccountRole.READONLY_SIGNER,
+    });
+    expect(verify?.accounts?.[2]).toEqual({
+      address: findMetadataAddress(mint),
+      role: AccountRole.WRITABLE,
+    });
   });
 });

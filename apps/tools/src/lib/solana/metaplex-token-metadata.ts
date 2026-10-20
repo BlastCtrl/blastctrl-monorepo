@@ -4,12 +4,14 @@ import {
   findMetadataPda,
   getMetadataAccountDataSerializer,
   mintV1,
+  MPL_TOKEN_METADATA_PROGRAM_ID,
   printSupply,
   TokenStandard,
   unverifyCollectionV1,
   updateMetadataAccountV2,
   updateV1,
   verifyCollectionV1,
+  verifyCreatorV1,
   type CreatorArgs,
   type DataV2Args,
 } from "@metaplex-foundation/mpl-token-metadata";
@@ -33,6 +35,12 @@ import {
   toUmiPublicKey,
   toUmiSigner,
 } from "./metaplex-umi";
+
+export { TokenStandard };
+
+export const TOKEN_METADATA_PROGRAM_ADDRESS = address(
+  MPL_TOKEN_METADATA_PROGRAM_ID,
+);
 
 /** The fields this app writes to a token's metadata account. */
 export type TokenMetadataFields = Pick<DataV2Args, "name" | "symbol" | "uri">;
@@ -180,19 +188,26 @@ export type NftCollection = {
   verified: boolean;
 };
 
-/**
- * What this app reads from a metadata account: the `Data` struct it writes
- * back with `updateV1`, plus the update authority it checks first and the
- * collection link the collection tools go by.
- */
-export type TokenMetadata = {
-  updateAuthority: Address;
+/** The `Data` struct of a metadata account, which `updateV1` replaces as one. */
+export type TokenMetadataData = {
   name: string;
   symbol: string;
   uri: string;
   /** Royalties in basis points, 0–10000. */
   sellerFeeBasisPoints: number;
   creators: NftCreator[] | null;
+};
+
+/**
+ * What this app reads from a metadata account: the `Data` struct it writes
+ * back with `updateV1`, plus what the tools check before writing: the update
+ * authority, mutability, the token standard and the collection link.
+ */
+export type TokenMetadata = TokenMetadataData & {
+  updateAuthority: Address;
+  isMutable: boolean;
+  /** Null on metadata from before token standards existed. */
+  tokenStandard: TokenStandard | null;
   collection: NftCollection | null;
 };
 
@@ -220,11 +235,30 @@ function decodeTokenMetadata(bytes: Uint8Array): TokenMetadata {
         share: creator.share,
         verified: creator.verified,
       })) ?? null,
+    isMutable: data.isMutable,
+    tokenStandard: fromUmiOption(data.tokenStandard),
     collection: collection && {
       key: address(collection.key),
       verified: collection.verified,
     },
   };
+}
+
+/**
+ * The metadata of an account that may be anything: null unless the Token
+ * Metadata program owns it and its bytes decode.
+ */
+function decodeIfTokenMetadata(
+  account: { programAddress: Address; data: Uint8Array } | null,
+): TokenMetadata | null {
+  if (!account || account.programAddress !== TOKEN_METADATA_PROGRAM_ADDRESS) {
+    return null;
+  }
+  try {
+    return decodeTokenMetadata(account.data);
+  } catch {
+    return null;
+  }
 }
 
 /** Reads the Token Metadata account of `mint`; null when the mint has none. */
@@ -241,7 +275,8 @@ const ACCOUNTS_PER_REQUEST = 100;
 
 /**
  * {@link fetchTokenMetadata} for many mints at once, a hundred accounts per
- * request. Same order as `mints`; null for each mint without metadata.
+ * request. Same order as `mints`; null for each mint without metadata, which
+ * includes an address that isn't a mint at all.
  */
 export async function fetchTokenMetadatas(
   rpc: Rpc<GetMultipleAccountsApi>,
@@ -249,14 +284,13 @@ export async function fetchTokenMetadatas(
 ): Promise<(TokenMetadata | null)[]> {
   const accounts = await Promise.all(
     chunk(mints.map(findMetadataAddress), ACCOUNTS_PER_REQUEST).map(
-      (addresses) => fetchEncodedAccounts(rpc, addresses),
+      (addresses) =>
+        fetchEncodedAccounts(rpc, addresses, { commitment: "confirmed" }),
     ),
   );
   return accounts
     .flat()
-    .map((account) =>
-      account.exists ? decodeTokenMetadata(account.data) : null,
-    );
+    .map((account) => decodeIfTokenMetadata(account.exists ? account : null));
 }
 
 export type UpdateNftFields = {
@@ -264,7 +298,7 @@ export type UpdateNftFields = {
    * The whole `Data` struct, which the program replaces as one. Omit to leave
    * it untouched, which immutable metadata requires.
    */
-  data?: Omit<TokenMetadata, "updateAuthority" | "collection">;
+  data?: TokenMetadataData;
   newUpdateAuthority?: Address;
   isMutable?: boolean;
   primarySaleHappened?: boolean;
@@ -351,6 +385,24 @@ export function removeFromCollectionInstructions(
       authority: toUmiSigner(wallet),
       metadata: findMetadataPda(umi, { mint: toUmiPublicKey(mint) }),
       collectionMint: toUmiPublicKey(collection),
+    }),
+  );
+}
+
+/**
+ * Marks `wallet` as a verified creator of `mint`. The wallet must already be
+ * in the creator list; verifying is the one change to a creator entry that
+ * the creator makes, so no update authority is needed.
+ */
+export function verifyCreatorInstructions(
+  wallet: Address,
+  mint: Address,
+): Instruction[] {
+  const umi = getUmi();
+  return toKitInstructions(
+    verifyCreatorV1(umi, {
+      authority: toUmiSigner(wallet),
+      metadata: findMetadataPda(umi, { mint: toUmiPublicKey(mint) }),
     }),
   );
 }

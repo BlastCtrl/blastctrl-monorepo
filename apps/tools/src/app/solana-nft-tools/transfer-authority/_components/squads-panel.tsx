@@ -1,22 +1,30 @@
 import { notify } from "@/components";
+import { useAppRpc } from "@/connector/app-rpc";
+import { useConnectorDialog } from "@/connector/connector-dialog";
 import {
   WalletRefusedError,
-  errorMessage,
+  kitBatchSender,
+  runtimeDefaultComputeUnits,
   sendInOrder,
-} from "@/lib/solana/send-batches";
-import { Button, SpinnerIcon } from "@blastctrl/ui";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import type { BatchProposal, Steps, SquadsMultisig } from "./squads";
+} from "@/connector/send-batches";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
 import {
   approveInstruction,
   batchProposalSteps,
   executeSteps,
   fetchBatchProposal,
   fetchSquadsMultisig,
-} from "./squads";
+  type BatchProposal,
+  type SquadsMultisig,
+  type Steps,
+} from "@/lib/solana/squads-multisig";
+import { Button, SpinnerIcon } from "@blastctrl/ui";
+import { useConnector, useConnectorClient } from "@solana/connector/react";
+import type { Address, Instruction } from "@solana/kit";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { EXECUTE_COMPUTE_UNITS } from "./squads";
 import type { Batch } from "./transactions";
 
 type Props = {
@@ -42,26 +50,26 @@ export function SquadsPanel({
   onBusyChange,
   disabled,
 }: Props) {
-  const { connection } = useConnection();
-  const wallet = useWallet();
-  const { setVisible } = useWalletModal();
+  const { client } = useKitClient();
+  const { account } = useConnector();
+  const { rpc, network } = useAppRpc();
+  const rpcUrl = useConnectorClient()?.getRpcUrl() ?? null;
+  const { setOpen } = useConnectorDialog();
   const [index, setIndex] = useState<bigint | null>(null);
   const [indexInput, setIndexInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
 
-  const me = wallet.publicKey?.toBase58();
+  const me = account ?? undefined;
   const member = info.members.find((m) => m.address === me);
 
   const proposal = useQuery({
-    queryKey: [
-      "squads-batch",
-      connection.rpcEndpoint,
-      info.address,
-      index?.toString(),
-    ],
-    queryFn: () => fetchBatchProposal(connection, info.address, index!),
-    enabled: index !== null,
+    queryKey: ["squads-batch", network, info.address, index?.toString()],
+    queryFn: () => {
+      if (!rpc) throw Error("RPC not available");
+      return fetchBatchProposal(rpc, info.address, index!);
+    },
+    enabled: index !== null && !!rpc,
     refetchInterval: busy ? false : 20_000,
   });
 
@@ -70,12 +78,27 @@ export function SquadsPanel({
   const closed =
     !current || current.status === "Rejected" || current.status === "Cancelled";
 
-  const run = async (label: string, steps: () => Promise<Steps>) => {
+  /**
+   * The steps depend on each other, so they can't be simulated for a compute
+   * budget before they land; each gets the runtime's default unless told
+   * otherwise.
+   */
+  const run = async (
+    label: string,
+    steps: () => Promise<Steps>,
+    computeUnitLimit: (
+      instructions: Instruction[],
+    ) => number = runtimeDefaultComputeUnits,
+  ) => {
+    if (!client) return;
     setBusy(true);
     onBusyChange(true);
     try {
-      await sendInOrder(await steps(), { connection, wallet }, (done, total) =>
-        setProgress(`${label}: ${done} of ${total} transactions confirmed`),
+      await sendInOrder(
+        await steps(),
+        kitBatchSender(client, { computeUnitLimit }),
+        (done, total) =>
+          setProgress(`${label}: ${done} of ${total} transactions confirmed`),
       );
     } catch (err) {
       const refused = err instanceof WalletRefusedError;
@@ -84,7 +107,7 @@ export function SquadsPanel({
         title: refused ? "Cancelled in your wallet" : `${label} failed`,
         description: refused
           ? undefined
-          : `${errorMessage(err)} Whatever confirmed before this stays; check the status and carry on from there.`,
+          : `${transactionErrorMessage(err)} Whatever confirmed before this stays; check the status and carry on from there.`,
       });
     } finally {
       setBusy(false);
@@ -98,7 +121,7 @@ export function SquadsPanel({
   const create = () =>
     run("Creating the proposal", async () => {
       // Read the multisig again for the index the batch will get.
-      const fresh = await fetchSquadsMultisig(connection, info.address);
+      const fresh = rpc && (await fetchSquadsMultisig(rpc, info.address));
       if (!fresh || !member) throw Error("Couldn't read the multisig");
       const next = fresh.transactionIndex + 1n;
       setIndex(next);
@@ -107,7 +130,7 @@ export function SquadsPanel({
         multisig: fresh,
         member,
         index: next,
-        batches,
+        transactions: batches.map((b) => b.instructions),
       });
     });
 
@@ -117,20 +140,27 @@ export function SquadsPanel({
         multisig: info,
         member: member!,
         index: draft.index,
-        batches,
+        transactions: batches.map((b) => b.instructions),
         from: draft.size + 1,
       }),
     );
 
   const approve = (active: BatchProposal) =>
     run("Approving", async () => [
-      [approveInstruction(info, member!, active.index)],
+      [approveInstruction(info.address, member!.address, active.index)],
     ]);
 
   const execute = (approved: BatchProposal) =>
-    run("Executing", () => executeSteps(connection, info, member!, approved));
+    run(
+      "Executing",
+      () => {
+        if (!rpcUrl) throw Error("RPC not available");
+        return executeSteps(rpcUrl, info, member!, approved);
+      },
+      () => EXECUTE_COMPUTE_UNITS,
+    );
 
-  const memberProblem = !wallet.publicKey
+  const memberProblem = !account
     ? "Connect the wallet of a multisig member to create, approve or execute the proposal."
     : !member
       ? "The connected wallet isn't a member of this multisig."
@@ -154,8 +184,8 @@ export function SquadsPanel({
       {memberProblem && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
           <span>{memberProblem}</span>
-          {!wallet.publicKey && (
-            <Button outline onClick={() => setVisible(true)}>
+          {!account && (
+            <Button outline onClick={() => setOpen(true)}>
               Connect wallet
             </Button>
           )}
@@ -283,7 +313,7 @@ function ProposalStatus({
   threshold: number;
   timeLock: number;
   expected: number;
-  me: string | undefined;
+  me: Address | undefined;
 }) {
   const text = () => {
     if (loading) return "Loading…";

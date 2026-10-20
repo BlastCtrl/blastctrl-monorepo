@@ -1,8 +1,8 @@
-import useUmi from "@/lib/hooks/use-umi";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { useTokenMetadata } from "@/state/queries/use-token-metadata";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { PublicKey } from "@solana/web3.js";
+import { useConnector } from "@solana/connector/react";
+import type { Address } from "@solana/kit";
 import { useMemo, useState } from "react";
 import { NftTable } from "./nft-table";
 import { planVerify } from "./plan";
@@ -17,7 +17,6 @@ import { MAX_VERIFICATIONS_PER_SQUADS_TRANSACTION } from "./squads";
 import { SquadsPanel } from "./squads-panel";
 import type { ReadyVerify } from "./transactions";
 import { packBatches, verifyInstruction } from "./transactions";
-import { useNftMetadata } from "./use-nft-metadata";
 
 const MODES = {
   wallet: {
@@ -32,14 +31,13 @@ const MODES = {
 };
 
 type Props = {
-  mints: string[];
+  mints: Address[];
   onBusyChange: (busy: boolean) => void;
 };
 
 export function VerifyStep({ mints, onBusyChange }: Props) {
-  const umi = useUmi();
-  const { publicKey } = useWallet();
-  const { setVisible } = useWalletModal();
+  const { account } = useConnector();
+  const { setOpen } = useConnectorDialog();
 
   const [mode, setMode] = useState<SignerMode>("wallet");
   const [multisigAddress, setMultisigAddress] = useState("");
@@ -47,12 +45,11 @@ export function VerifyStep({ mints, onBusyChange }: Props) {
     multisigAddress,
     mode === "squads",
   );
-  const [checked, setChecked] = useState<string[]>([]);
-  const metadata = useNftMetadata(checked);
+  const [checked, setChecked] = useState<Address[]>([]);
+  const metadata = useTokenMetadata(checked);
 
-  /** The creator whose verification gets built, empty until it's known. */
-  const creator =
-    mode === "wallet" ? (publicKey?.toBase58() ?? "") : (multisig?.vault ?? "");
+  /** The creator whose verification gets built, null until it's known. */
+  const creator = mode === "wallet" ? account : (multisig?.vault ?? null);
 
   const plans = useMemo(() => {
     if (!metadata.data || !creator) return null;
@@ -68,22 +65,22 @@ export function VerifyStep({ mints, onBusyChange }: Props) {
         .filter((p): p is ReadyVerify => p.status === "ready")
         .map((plan) => ({
           mint: plan.mint,
-          instruction: verifyInstruction(umi, plan, creator),
+          instruction: verifyInstruction(plan, creator),
         })),
-      new PublicKey(creator),
+      creator,
       mode === "squads"
         ? { maxPerTransaction: MAX_VERIFICATIONS_PER_SQUADS_TRANSACTION }
         : undefined,
     );
-  }, [plans, creator, umi, mode]);
+  }, [plans, creator, mode]);
 
   const listChanged =
     checked.length > 0 &&
     (checked.length !== mints.length || checked.some((m, i) => m !== mints[i]));
 
   const check = () => {
-    if (mode === "wallet" && !publicKey) {
-      setVisible(true);
+    if (mode === "wallet" && !account) {
+      setOpen(true);
       return;
     }
     if (!listChanged && checked.length > 0) {
@@ -94,7 +91,7 @@ export function VerifyStep({ mints, onBusyChange }: Props) {
   };
 
   const checkLabel =
-    mode === "wallet" && !publicKey
+    mode === "wallet" && !account
       ? "Connect your wallet"
       : `Check ${mints.length} ${mints.length === 1 ? "NFT" : "NFTs"}`;
 

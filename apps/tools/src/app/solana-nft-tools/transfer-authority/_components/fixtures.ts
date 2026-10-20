@@ -1,40 +1,34 @@
 import type {
-  Creator,
-  Metadata,
-} from "@metaplex-foundation/mpl-token-metadata";
-import { TokenStandard } from "@metaplex-foundation/mpl-token-metadata";
-import type { PublicKey } from "@metaplex-foundation/umi";
-import { none, some } from "@metaplex-foundation/umi";
-import { Keypair } from "@solana/web3.js";
+  NftCreator,
+  TokenMetadata,
+} from "@/lib/solana/metaplex-token-metadata";
+import { TokenStandard } from "@/lib/solana/metaplex-token-metadata";
+import { getAddressDecoder, type Address } from "@solana/kit";
 
-export const address = () =>
-  Keypair.generate().publicKey.toBase58() as PublicKey;
+/** A random address; not necessarily on the curve, which nothing here minds. */
+export const address = (): Address =>
+  getAddressDecoder().decode(crypto.getRandomValues(new Uint8Array(32)));
 
 export const creator = (
-  addr: string,
+  address: Address,
   share: number,
   verified = false,
-): Creator => ({ address: addr as PublicKey, share, verified });
+): NftCreator => ({ address, share, verified });
 
 /** Only the fields the tool reads are meaningful. */
 export function metadata(
-  overrides: Partial<Omit<Metadata, "creators">> & {
-    creators?: Creator[] | null;
-  } = {},
-): Metadata {
-  const { creators = [], ...rest } = overrides;
+  overrides: Partial<TokenMetadata> = {},
+): TokenMetadata {
   return {
-    publicKey: address(),
     updateAuthority: address(),
-    mint: address(),
     name: "Test NFT",
     symbol: "TEST",
     uri: "https://example.com/nft.json",
     sellerFeeBasisPoints: 500,
-    primarySaleHappened: false,
+    creators: [],
     isMutable: true,
-    tokenStandard: some(TokenStandard.NonFungible),
-    ...rest,
-    creators: creators ? some(creators) : none(),
-  } as Metadata;
+    tokenStandard: TokenStandard.NonFungible,
+    collection: null,
+    ...overrides,
+  };
 }

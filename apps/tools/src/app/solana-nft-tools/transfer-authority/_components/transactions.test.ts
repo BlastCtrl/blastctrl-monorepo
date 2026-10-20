@@ -1,9 +1,8 @@
-import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import {
-  MPL_TOKEN_METADATA_PROGRAM_ID,
-  mplTokenMetadata,
-} from "@metaplex-foundation/mpl-token-metadata";
-import { PublicKey } from "@solana/web3.js";
+  findMetadataAddress,
+  TOKEN_METADATA_PROGRAM_ADDRESS,
+} from "@/lib/solana/metaplex-token-metadata";
+import { AccountRole, isSignerRole } from "@solana/kit";
 import { describe, expect, it } from "vitest";
 import { address, creator, metadata } from "./fixtures";
 import type { ReadyTransfer, ReadyVerify } from "./transactions";
@@ -16,54 +15,44 @@ import {
   verifyInstruction,
 } from "./transactions";
 
-// Building instructions needs no RPC; the endpoint is never called.
-const umi = createUmi("http://127.0.0.1:8899").use(mplTokenMetadata());
 const wallet = address();
-const feePayer = new PublicKey(wallet);
 const newAuthority = address();
 
 const transfer = (overrides: Parameters<typeof metadata>[0] = {}) => {
+  const mint = address();
   const md = metadata({ updateAuthority: wallet, ...overrides });
   const plan: ReadyTransfer = {
     status: "ready",
-    mint: md.mint,
+    mint,
     name: md.name,
     metadata: md,
     creators: [creator(newAuthority, 100)],
   };
-  return {
-    mint: plan.mint,
-    instruction: transferInstruction(umi, plan, wallet, newAuthority),
-  };
+  return { mint, instruction: transferInstruction(plan, wallet, newAuthority) };
 };
 
 const verify = () => {
+  const mint = address();
   const md = metadata({ creators: [creator(wallet, 100)] });
   const plan: ReadyVerify = {
     status: "ready",
-    mint: md.mint,
+    mint,
     name: md.name,
     metadata: md,
   };
-  return { mint: plan.mint, instruction: verifyInstruction(umi, plan, wallet) };
+  return { mint, instruction: verifyInstruction(plan, wallet) };
 };
 
 describe("transferInstruction", () => {
   it("is signed by the wallet and writes the NFT's metadata account", () => {
-    const md = metadata({ updateAuthority: wallet });
-    const { instruction } = transfer({
-      publicKey: md.publicKey,
-      mint: md.mint,
-    });
-    expect(instruction.programId.toBase58()).toBe(
-      MPL_TOKEN_METADATA_PROGRAM_ID,
-    );
-    const signers = instruction.keys.filter((k) => k.isSigner);
-    expect(signers.map((k) => k.pubkey.toBase58())).toEqual([wallet, wallet]);
-    const writable = instruction.keys.find(
-      (k) => k.pubkey.toBase58() === md.publicKey,
-    );
-    expect(writable?.isWritable).toBe(true);
+    const { mint, instruction } = transfer();
+    expect(instruction.programAddress).toBe(TOKEN_METADATA_PROGRAM_ADDRESS);
+    const signers = instruction.accounts!.filter((a) => isSignerRole(a.role));
+    expect(signers.map((a) => a.address)).toEqual([wallet, wallet]);
+    expect(
+      instruction.accounts!.find((a) => a.address === findMetadataAddress(mint))
+        ?.role,
+    ).toBe(AccountRole.WRITABLE);
   });
 });
 
@@ -72,10 +61,10 @@ describe("packBatches", () => {
     const items = Array.from({ length: 25 }, () =>
       transfer({ uri: `https://arweave.net/${"x".repeat(43)}` }),
     );
-    const batches = packBatches(items, feePayer);
+    const batches = packBatches(items, wallet);
     expect(batches.flatMap((b) => b.mints)).toEqual(items.map((i) => i.mint));
     for (const batch of batches) {
-      expect(transactionSize(batch.instructions, feePayer)).toBeLessThanOrEqual(
+      expect(transactionSize(batch.instructions, wallet)).toBeLessThanOrEqual(
         MAX_TRANSACTION_BYTES,
       );
     }
@@ -85,7 +74,7 @@ describe("packBatches", () => {
 
   it("caps verifications per transaction, though more would fit", () => {
     const items = Array.from({ length: 25 }, verify);
-    const batches = packBatches(items, feePayer);
+    const batches = packBatches(items, wallet);
     expect(batches.map((b) => b.mints.length)).toEqual([
       MAX_NFTS_PER_TRANSACTION,
       MAX_NFTS_PER_TRANSACTION,
@@ -96,7 +85,7 @@ describe("packBatches", () => {
 
   it("gives an oversized instruction a transaction of its own", () => {
     const items = [transfer(), transfer()];
-    const batches = packBatches(items, feePayer, { maxBytes: 100 });
+    const batches = packBatches(items, wallet, { maxBytes: 100 });
     expect(batches.map((b) => b.mints.length)).toEqual([1, 1]);
   });
 });

@@ -1,9 +1,8 @@
-import { isPublicKey } from "@/lib/solana/common";
-import useUmi from "@/lib/hooks/use-umi";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { useTokenMetadata } from "@/state/queries/use-token-metadata";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { PublicKey } from "@solana/web3.js";
+import { useConnector } from "@solana/connector/react";
+import { address, isAddress, type Address } from "@solana/kit";
 import { useMemo, useState } from "react";
 import { AddressInput, Label } from "./address-input";
 import { NftTable } from "./nft-table";
@@ -23,7 +22,6 @@ import {
 import { SquadsPanel } from "./squads-panel";
 import type { ReadyTransfer } from "./transactions";
 import { packBatches, transferInstruction } from "./transactions";
-import { useNftMetadata } from "./use-nft-metadata";
 
 const CREATOR_MODES: {
   value: CreatorMode;
@@ -62,25 +60,23 @@ const SIGNER_MODES = {
 };
 
 type Props = {
-  mints: string[];
+  mints: Address[];
   onBusyChange: (busy: boolean) => void;
 };
 
 export function TransferStep({ mints, onBusyChange }: Props) {
-  const umi = useUmi();
-  const { publicKey } = useWallet();
-  const { setVisible } = useWalletModal();
+  const { account } = useConnector();
+  const { setOpen } = useConnectorDialog();
   const [mode, setMode] = useState<SignerMode>("wallet");
   const [multisigAddress, setMultisigAddress] = useState("");
   const { multisig, error: multisigError } = useSquadsMultisigInfo(
     multisigAddress,
     mode === "squads",
   );
-  /** The current update authority, empty until it's known. */
-  const authority =
-    mode === "wallet" ? (publicKey?.toBase58() ?? "") : (multisig?.vault ?? "");
+  /** The current update authority, null until it's known. */
+  const authority = mode === "wallet" ? account : (multisig?.vault ?? null);
 
-  const [checked, setChecked] = useState<string[]>([]);
+  const [checked, setChecked] = useState<Address[]>([]);
   const [newAuthority, setNewAuthority] = useState("");
   const [creatorMode, setCreatorMode] = useState<CreatorMode>("swap");
   const [sameCreator, setSameCreator] = useState(true);
@@ -88,7 +84,7 @@ export function TransferStep({ mints, onBusyChange }: Props) {
   const [acknowledged, setAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const metadata = useNftMetadata(checked);
+  const metadata = useTokenMetadata(checked);
   const newCreator = sameCreator ? newAuthority : creatorInput;
 
   // Handing NFTs to a Squads multisig account instead of its vault can't be
@@ -99,7 +95,7 @@ export function TransferStep({ mints, onBusyChange }: Props) {
 
   const authorityError = !newAuthority
     ? "Enter the new update authority"
-    : !isPublicKey(newAuthority)
+    : !isAddress(newAuthority)
       ? "Not a valid address"
       : newAuthority === authority
         ? "That's the current update authority"
@@ -112,7 +108,7 @@ export function TransferStep({ mints, onBusyChange }: Props) {
     ? null
     : !creatorInput
       ? "Enter the new creator"
-      : !isPublicKey(creatorInput)
+      : !isAddress(creatorInput)
         ? "Not a valid address"
         : creatorMultisig.isPending
           ? "Checking the address"
@@ -122,14 +118,17 @@ export function TransferStep({ mints, onBusyChange }: Props) {
   const settingsValid = !authorityError && !creatorError && !!authority;
 
   const plans = useMemo<TransferPlan[] | null>(() => {
-    if (!metadata.data || !settingsValid) return null;
+    if (!metadata.data || !settingsValid || !authority) return null;
+    const settings = {
+      wallet: authority,
+      newAuthority: address(newAuthority),
+      // In keep mode the creator isn't used, and may not have been entered.
+      newCreator:
+        creatorMode === "keep" ? address(newAuthority) : address(newCreator),
+      creatorMode,
+    };
     return checked.map((mint) =>
-      planTransfer(mint, metadata.data.get(mint) ?? null, {
-        wallet: authority,
-        newAuthority,
-        newCreator,
-        creatorMode,
-      }),
+      planTransfer(mint, metadata.data.get(mint) ?? null, settings),
     );
   }, [
     metadata.data,
@@ -147,14 +146,18 @@ export function TransferStep({ mints, onBusyChange }: Props) {
     return packBatches(
       ready.map((plan) => ({
         mint: plan.mint,
-        instruction: transferInstruction(umi, plan, authority, newAuthority),
+        instruction: transferInstruction(
+          plan,
+          authority,
+          address(newAuthority),
+        ),
       })),
-      new PublicKey(authority),
+      authority,
       mode === "squads"
         ? { maxPerTransaction: MAX_TRANSFERS_PER_SQUADS_TRANSACTION }
         : undefined,
     );
-  }, [plans, authority, umi, newAuthority, mode]);
+  }, [plans, authority, newAuthority, mode]);
 
   const readyCount = batches.reduce((sum, b) => sum + b.mints.length, 0);
   const listChanged =
@@ -162,8 +165,8 @@ export function TransferStep({ mints, onBusyChange }: Props) {
     (checked.length !== mints.length || checked.some((m, i) => m !== mints[i]));
 
   const check = () => {
-    if (mode === "wallet" && !publicKey) {
-      setVisible(true);
+    if (mode === "wallet" && !account) {
+      setOpen(true);
       return;
     }
     if (!listChanged && checked.length > 0) {
@@ -291,7 +294,7 @@ export function TransferStep({ mints, onBusyChange }: Props) {
           {metadata.isFetching && (
             <SpinnerIcon className="mr-1 -ml-1 size-4 animate-spin" />
           )}
-          {mode === "wallet" && !publicKey
+          {mode === "wallet" && !account
             ? "Connect your wallet"
             : `Check ${mints.length} ${mints.length === 1 ? "NFT" : "NFTs"}`}
         </Button>

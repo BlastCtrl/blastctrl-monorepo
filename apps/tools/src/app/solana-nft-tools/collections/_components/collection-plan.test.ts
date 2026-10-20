@@ -2,6 +2,7 @@ import type { TokenMetadata } from "@/lib/solana/metaplex-token-metadata";
 import {
   addToCollectionInstructions,
   removeFromCollectionInstructions,
+  TokenStandard,
 } from "@/lib/solana/metaplex-token-metadata";
 import {
   address,
@@ -46,6 +47,8 @@ const metadata = (fields: Partial<TokenMetadata> = {}): TokenMetadata => ({
   uri: "https://arweave.net/x",
   sellerFeeBasisPoints: 0,
   creators: null,
+  isMutable: true,
+  tokenStandard: TokenStandard.NonFungible,
   collection: null,
   ...fields,
 });

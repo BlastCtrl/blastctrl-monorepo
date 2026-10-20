@@ -7,6 +7,7 @@ import {
   isSolanaError,
   isTransactionModifyingSigner,
   sendAndConfirmTransactionFactory,
+  setTransactionMessageComputeUnitLimit,
   setTransactionMessageLifetimeUsingBlockhash,
   SOLANA_ERROR__SIGNER__WALLET_MULTISIGN_UNIMPLEMENTED,
   type Instruction,
@@ -113,8 +114,25 @@ export type BatchSender = {
   sendAndConfirm: (transaction: PreparedTransaction) => Promise<Signature>;
 };
 
+export type BatchSenderOptions = {
+  /**
+   * Sets this compute unit limit instead of simulating for one. For
+   * transactions that depend on each other: a simulation of one fails until
+   * the one before it has landed. {@link runtimeDefaultComputeUnits} is what
+   * a transaction gets with no limit of its own.
+   */
+  computeUnitLimit?: (instructions: Instruction[]) => number;
+};
+
+/** The budget the runtime gives a transaction that sets none: 200,000 per instruction, up to the cap. */
+export const runtimeDefaultComputeUnits = (instructions: Instruction[]) =>
+  Math.min(1_400_000, 200_000 * instructions.length);
+
 /** The kit client's RPC and wallet signer as a {@link BatchSender}. */
-export function kitBatchSender(client: KitClient): BatchSender {
+export function kitBatchSender(
+  client: KitClient,
+  { computeUnitLimit }: BatchSenderOptions = {},
+): BatchSender {
   const signer = client.payer;
   if (!isTransactionModifyingSigner(signer)) {
     throw new Error("The connected wallet can't sign transactions");
@@ -138,10 +156,16 @@ export function kitBatchSender(client: KitClient): BatchSender {
           ).value,
       ),
     prepare: async (instructions, lifetime) => {
-      const planned = await client.planTransaction(instructions);
-      const message = await estimateAndSetResourceLimits(
-        setTransactionMessageLifetimeUsingBlockhash(lifetime, planned),
+      const planned = setTransactionMessageLifetimeUsingBlockhash(
+        lifetime,
+        await client.planTransaction(instructions),
       );
+      const message = computeUnitLimit
+        ? setTransactionMessageComputeUnitLimit(
+            computeUnitLimit(instructions),
+            planned,
+          )
+        : await estimateAndSetResourceLimits(planned);
       return compileTransaction(message);
     },
     sign: (transactions) => signer.modifyAndSignTransactions(transactions),
@@ -309,4 +333,78 @@ async function sendOneByOne<B extends { index: number }>(
       (err: unknown) => fail(batch.index, err),
     );
   }
+}
+
+/**
+ * Sends transactions that depend on each other, in order: each is confirmed
+ * before the next goes out, and the first failure stops the rest. The wallet
+ * is asked once for all of them, or per transaction when it can't do that,
+ * like {@link sendBatches}. Reports how many have confirmed so far and
+ * resolves with their signatures. A refusal throws `WalletRefusedError`.
+ *
+ * The sender must not simulate, since a step's accounts may not exist until
+ * the step before it lands: use `kitBatchSender(client, { computeUnitLimit })`.
+ */
+export async function sendInOrder(
+  steps: Instruction[][],
+  sender: BatchSender,
+  onProgress?: (confirmed: number, total: number) => void,
+): Promise<Signature[]> {
+  const signatures: Signature[] = [];
+  onProgress?.(0, steps.length);
+  if (steps.length === 0) return signatures;
+
+  const lifetime = await sender.latestBlockhash();
+  const transactions = await Promise.all(
+    steps.map((step) => sender.prepare(step, lifetime)),
+  );
+  let signed: readonly PreparedTransaction[];
+  try {
+    signed = await sender.sign(transactions);
+  } catch (err) {
+    if (
+      isSolanaError(err, SOLANA_ERROR__SIGNER__WALLET_MULTISIGN_UNIMPLEMENTED)
+    ) {
+      return sendRestInOrder(steps, sender, signatures, onProgress);
+    }
+    if (isWalletRefusal(err)) {
+      throw new WalletRefusedError(0, steps.length, err);
+    }
+    throw err;
+  }
+
+  for (const transaction of signed.slice(0, steps.length)) {
+    signatures.push(await sender.sendAndConfirm(transaction));
+    onProgress?.(signatures.length, steps.length);
+  }
+  // A wallet may hand back fewer than it was given; the rest are asked for
+  // one at a time.
+  return sendRestInOrder(steps, sender, signatures, onProgress);
+}
+
+/** The steps after `signatures.length`, each with its own prompt and blockhash. */
+async function sendRestInOrder(
+  steps: Instruction[][],
+  sender: BatchSender,
+  signatures: Signature[],
+  onProgress?: (confirmed: number, total: number) => void,
+): Promise<Signature[]> {
+  for (const step of steps.slice(signatures.length)) {
+    const transaction = await sender.prepare(
+      step,
+      await sender.latestBlockhash(),
+    );
+    let signed: PreparedTransaction;
+    try {
+      [signed] = (await sender.sign([transaction])) as [PreparedTransaction];
+    } catch (err) {
+      if (isWalletRefusal(err)) {
+        throw new WalletRefusedError(signatures.length, steps.length, err);
+      }
+      throw err;
+    }
+    signatures.push(await sender.sendAndConfirm(signed));
+    onProgress?.(signatures.length, steps.length);
+  }
+  return signatures;
 }

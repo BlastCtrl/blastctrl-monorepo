@@ -11,6 +11,7 @@ import {
   WalletRefusedError,
   isWalletRefusal,
   sendBatches,
+  sendInOrder,
   type BatchResult,
   type BatchSender,
   type BlockhashLifetime,
@@ -282,5 +283,85 @@ describe("isWalletRefusal", () => {
     expect(
       isWalletRefusal(Error("Failed", { cause: Error("Simulation failed") })),
     ).toBe(false);
+  });
+});
+
+describe("sendInOrder", () => {
+  /** Five steps; step `i` has `i + 1` instructions so `prepare` can tell them apart. */
+  const steps = batches.map((b) => Array<Instruction>(b.index + 1).fill(noop));
+
+  const runInOrder = async (sender: BatchSender) => {
+    const progress: number[] = [];
+    const outcome = await sendInOrder(steps, sender, (confirmed) =>
+      progress.push(confirmed),
+    ).then(
+      (signatures) => ({ signatures, err: undefined }),
+      (err: unknown) => ({ signatures: undefined, err }),
+    );
+    return { ...outcome, progress };
+  };
+
+  it("asks once, then confirms one after another", async () => {
+    const prompts: number[] = [];
+    let inFlight = 0;
+    let overlapped = false;
+    const { signatures, progress } = await runInOrder(
+      senderWith({
+        sign: async (transactions) => {
+          prompts.push(transactions.length);
+          return transactions;
+        },
+        sendAndConfirm: async (transaction) => {
+          if (inFlight++ > 0) overlapped = true;
+          await Promise.resolve();
+          inFlight--;
+          return `signature-${transaction.messageBytes[0]}` as Signature;
+        },
+      }),
+    );
+    expect(prompts).toEqual([5]);
+    expect(overlapped).toBe(false);
+    expect(signatures).toEqual([1, 2, 3, 4, 5].map((n) => `signature-${n}`));
+    expect(progress).toEqual([0, 1, 2, 3, 4, 5]);
+  });
+
+  it("stops at the first failure, keeping what confirmed", async () => {
+    let sent = 0;
+    const { err, progress } = await runInOrder(
+      senderWith({
+        sendAndConfirm: async () => {
+          if (++sent === 3) throw Error("Transaction failed");
+          return `signature-${sent}` as Signature;
+        },
+      }),
+    );
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(WalletRefusedError);
+    expect(sent).toBe(3);
+    expect(progress).toEqual([0, 1, 2]);
+  });
+
+  it("asks per step when the wallet can't batch, and says how far it got when refused", async () => {
+    const wallet = perTransactionWallet(3, Error("User rejected the request."));
+    const { err, progress } = await runInOrder(
+      senderWith({ sign: wallet.sign }),
+    );
+    expect(err).toBeInstanceOf(WalletRefusedError);
+    expect(err).toMatchObject({ sent: 2, of: 5 });
+    expect(progress).toEqual([0, 1, 2]);
+  });
+
+  it("asks for the rest one at a time when fewer come back", async () => {
+    let prompts = 0;
+    const { signatures } = await runInOrder(
+      senderWith({
+        sign: async (transactions) => {
+          prompts++;
+          return transactions.slice(0, 1);
+        },
+      }),
+    );
+    expect(prompts).toBe(5);
+    expect(signatures).toHaveLength(5);
   });
 });
