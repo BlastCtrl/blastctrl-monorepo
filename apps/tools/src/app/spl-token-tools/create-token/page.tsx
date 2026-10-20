@@ -7,28 +7,25 @@ import {
   notify,
   notifyPromise,
 } from "@/components";
-import { TurboStorage } from "@/lib/turbo";
-import { useWalletConnection } from "@/state/use-wallet-connection";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { simulateUnsigned } from "@/connector/simulate";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
+import { compress } from "@/lib/solana/common";
 import {
-  createMetadataInstruction,
-  updateMetadataInstruction,
-} from "@/lib/solana";
-import { compress, isPublicKey } from "@/lib/solana/common";
+  createMetadataInstructions,
+  updateMetadataInstructions,
+} from "@/lib/solana/token-metadata";
+import { TurboStorage } from "@/lib/turbo";
 import { cn } from "@blastctrl/ui";
 import { ChevronUpDownIcon } from "@heroicons/react/20/solid";
-import { WalletError } from "@solana/wallet-adapter-base";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { TransactionInstruction } from "@solana/web3.js";
-import { PublicKey } from "@solana/web3.js";
+import { createWalletAdapterCompat } from "@solana/connector/compat";
+import { useConnector, useTransactionSigner } from "@solana/connector/react";
+import { address, isAddress } from "@solana/kit";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { UploadFile } from "./_components/upload-file";
-import useUmi from "@/lib/hooks/use-umi";
-import type { Instruction, TransactionBuilder } from "@metaplex-foundation/umi";
-import { publicKey } from "@metaplex-foundation/umi";
-import * as base58 from "bs58";
 
 type TokenData = {
   mint: string;
@@ -42,10 +39,36 @@ type TokenData = {
 const actions = ["Add", "Update"] as const;
 type Actions = (typeof actions)[number];
 
+/** Shown when an Arweave upload fails; the funds, if any were spent, are recoverable. */
+const uploadErrorDescription = (err: unknown) => (
+  <div className="break-normal">
+    <p>
+      There has been an error while uploading with the message:{" "}
+      <span className="font-medium break-all text-yellow-300">
+        {err instanceof Error ? err.message : String(err)}
+      </span>
+      .
+    </p>
+    <p className="mt-2">
+      You can recover any lost funds on the{" "}
+      <Link
+        href="/permanent-storage-tools/file-upload"
+        className="font-medium text-blue-300"
+      >
+        /permanent-storage-tools
+      </Link>{" "}
+      page.
+    </p>
+  </div>
+);
+
 export default function CreateToken() {
-  const wallet = useWallet();
-  const { setVisible } = useWalletModal();
-  const { simulateVersionedTransaction } = useWalletConnection();
+  const { disconnectWallet } = useConnector();
+  const { client } = useKitClient();
+  // Turbo speaks the legacy wallet-adapter dialect; bridge the connector's
+  // byte signer through the compat layer, as the file-upload tool does.
+  const { signer } = useTransactionSigner();
+  const { setOpen } = useConnectorDialog();
   const [isConfirming, setIsConfirming] = useState(false);
   const [selectedAction, setSelectedAction] = useState<Actions>(actions[0]);
   const {
@@ -54,207 +77,129 @@ export default function CreateToken() {
     handleSubmit,
     setValue,
   } = useForm<TokenData>({});
-  const umi = useUmi();
 
   const onSubmit = async (data: TokenData) => {
-    if (!wallet.publicKey) {
-      setVisible(true);
+    if (!client || !signer) {
+      setOpen(true);
       return;
     }
 
     setIsConfirming(true);
-    const turbo = await TurboStorage.make(wallet);
-
-    // Test if creating metadata is possible
-    const ixs: Instruction[] =
-      selectedAction === "Add"
-        ? createMetadataInstruction(
-            umi,
-            publicKey(wallet.publicKey.toBase58()),
-            publicKey(data.mint),
-            {},
-          ).getInstructions()
-        : updateMetadataInstruction(
-            umi,
-            publicKey(wallet.publicKey.toBase58()),
-            publicKey(data.mint),
-            {},
-          ).getInstructions();
-    const { value } = await simulateVersionedTransaction(
-      ixs.map(
-        (ix) =>
-          new TransactionInstruction({
-            keys: ix.keys.map((key) => ({
-              ...key,
-              pubkey: new PublicKey(key.pubkey),
-            })),
-            programId: new PublicKey(ix.programId),
-            data: Buffer.from(ix.data),
-          }),
-      ),
-    );
-
-    if (value.err) {
-      setIsConfirming(false);
-
-      return notify({
-        type: "error",
-        title: `${selectedAction} Metadata Error`,
-        description: (
-          <>
-            <p className="mb-1.5">
-              {selectedAction === "Add" ? "Adding" : "Updating"} metadata to
-              this token is not possible due to the error:{" "}
-            </p>
-            <code className="py-6 break-all">{JSON.stringify(value.err)}</code>
-          </>
-        ),
-      });
-    }
-
-    // Upload image
-    let imageUri: string | undefined;
-
-    if (data.image) {
-      imageUri = await notifyPromise(
-        turbo.uploadFile(data.image).then((r) => `https://arweave.net/${r.id}`),
-        {
-          loading: { description: "Uploading image to Arweave..." },
-          success: { description: "Image upload complete" },
-          error: (err) => {
-            setIsConfirming(false);
-            console.log(err);
-            return {
-              title: "Image Upload Error",
-              description: (
-                <div className="break-normal">
-                  <p>
-                    There has been an error while uploading with the message:{" "}
-                    <span className="font-medium break-all text-yellow-300">
-                      {err?.message}
-                    </span>
-                    .
-                  </p>
-                  <p className="mt-2">
-                    You can recover any lost funds on the{" "}
-                    <Link
-                      href="/permanent-storage-tools/file-upload"
-                      className="font-medium text-blue-300"
-                    >
-                      /permanent-storage-tools
-                    </Link>{" "}
-                    page.
-                  </p>
-                </div>
-              ),
-            };
-          },
-        },
-      );
-    }
-
-    const json = {
-      name: data.name,
-      symbol: data.symbol,
-      image: imageUri,
-      description: data?.description,
-      external_url: data.external_url,
-    };
-    const metadataFile = new File([JSON.stringify(json)], "metadata.json", {
-      type: "application/json",
-    });
-
-    const metadataUri = await notifyPromise(
-      turbo.uploadFile(metadataFile).then((r) => `https://arweave.net/${r.id}`),
-      {
-        loading: { description: "Uploading metadata file to Arweave..." },
-        success: { description: "JSON upload complete" },
-        error: (err) => {
-          setIsConfirming(false);
-          console.log({ err });
-          return {
-            title: "JSON upload error",
-            description: (
-              <div className="break-normal">
-                <p>
-                  There has been an error while uploading with the message:{" "}
-                  <span className="font-medium break-all text-yellow-300">
-                    {err?.message}
-                  </span>
-                  .
-                </p>
-                <p className="mt-2">
-                  You can recover any lost funds on the{" "}
-                  <Link
-                    href="/permanent-storage-tools/file-upload"
-                    className="font-medium text-blue-300"
-                  >
-                    /storage
-                  </Link>{" "}
-                  page.
-                </p>
-              </div>
-            ),
-          };
-        },
-      },
-    );
-
     try {
-      let tx: TransactionBuilder;
-      if (selectedAction === "Add") {
-        tx = createMetadataInstruction(
-          umi,
-          publicKey(wallet.publicKey),
-          publicKey(data.mint),
-          {
-            name: data.name,
-            symbol: data.symbol,
-            uri: metadataUri,
-          },
-        );
-      } else {
-        tx = updateMetadataInstruction(
-          umi,
-          publicKey(wallet.publicKey),
-          publicKey(data.mint),
-          {
-            name: data.name,
-            symbol: data.symbol,
-            uri: metadataUri,
-          },
-        );
-      }
-      await notifyPromise(tx.sendAndConfirm(umi), {
-        loading: { description: "Confirming transaction" },
-        success: (value) => ({
-          txid: base58.encode(value.signature),
-          title: `${selectedAction} Metadata Success`,
+      const owner = client.payer.address;
+      const mint = address(data.mint);
+      const build =
+        selectedAction === "Add"
+          ? createMetadataInstructions
+          : updateMetadataInstructions;
+
+      // Simulate with empty fields first: this fails fast when the wallet is
+      // not the authority, before anything is uploaded.
+      const simulation = await simulateUnsigned(client, build(owner, mint, {}));
+      if (simulation.err) {
+        notify({
+          type: "error",
+          title: `${selectedAction} Metadata Error`,
           description: (
             <>
-              Metadata {selectedAction === "Add" ? "created" : "updated"} for
-              token{" "}
-              <span className="font-medium text-blue-300">
-                {compress(data.mint, 4)}
-              </span>
+              <p className="mb-1.5">
+                {selectedAction === "Add" ? "Adding" : "Updating"} metadata to
+                this token is not possible due to the error:{" "}
+              </p>
+              <code className="py-6 break-all">
+                {JSON.stringify(simulation.err)}
+              </code>
             </>
           ),
-        }),
-        error: (err) => ({
-          title: "Error Creating Metadata",
-          description: err?.message,
-        }),
-      });
-    } catch (err) {
-      if (err instanceof WalletError) {
-        // The onError callback in the walletconnect context will handle it
+        });
         return;
       }
+
+      const turbo = TurboStorage.make(
+        createWalletAdapterCompat(signer, { disconnect: disconnectWallet }),
+      );
+      const upload = (
+        file: File,
+        loading: string,
+        success: string,
+        title: string,
+      ) =>
+        notifyPromise(
+          turbo.uploadFile(file).then((r) => `https://arweave.net/${r.id}`),
+          {
+            loading: { description: loading },
+            success: { description: success },
+            error: (err) => ({
+              title,
+              description: uploadErrorDescription(err),
+            }),
+          },
+        );
+
+      // The toasts report upload failures; stop quietly after one.
+      let imageUri: string | undefined;
+      if (data.image) {
+        imageUri = await upload(
+          data.image,
+          "Uploading image to Arweave...",
+          "Image upload complete",
+          "Image Upload Error",
+        ).catch(() => undefined);
+        if (!imageUri) return;
+      }
+
+      const json = {
+        name: data.name,
+        symbol: data.symbol,
+        image: imageUri,
+        description: data.description,
+        external_url: data.external_url,
+      };
+      const metadataUri = await upload(
+        new File([JSON.stringify(json)], "metadata.json", {
+          type: "application/json",
+        }),
+        "Uploading metadata file to Arweave...",
+        "JSON upload complete",
+        "JSON upload error",
+      ).catch(() => undefined);
+      if (!metadataUri) return;
+
+      await notifyPromise(
+        client.sendTransaction(
+          build(owner, mint, {
+            name: data.name,
+            symbol: data.symbol,
+            uri: metadataUri,
+          }),
+        ),
+        {
+          loading: { description: "Confirming transaction" },
+          success: (result) => ({
+            txid: result.context.signature,
+            title: `${selectedAction} Metadata Success`,
+            description: (
+              <>
+                Metadata {selectedAction === "Add" ? "created" : "updated"} for
+                token{" "}
+                <span className="font-medium text-blue-300">
+                  {compress(data.mint, 4)}
+                </span>
+              </>
+            ),
+          }),
+          error: (err) => ({
+            title: "Error Creating Metadata",
+            description: transactionErrorMessage(err),
+          }),
+        },
+      ).catch(() => undefined);
+    } catch (err) {
       console.log({ err });
       notify({
         type: "error",
         title: "Error Creating Metadata",
-        description: err instanceof Error ? err.message : String(err),
+        description: transactionErrorMessage(err),
       });
     } finally {
       setIsConfirming(false);
@@ -310,8 +255,9 @@ export default function CreateToken() {
                   required: true,
                   validate: {
                     isValid: (value) =>
-                      isPublicKey(value) ?? "Not a valid public key",
+                      isAddress(value.trim()) || "Not a valid address",
                   },
+                  setValueAs: (value: string) => value.trim(),
                 })}
                 error={errors?.mint}
               />
@@ -337,7 +283,7 @@ export default function CreateToken() {
                 required: true,
                 maxLength: {
                   value: 10,
-                  message: "Max symbol length is",
+                  message: "Max symbol length is 10",
                 },
               })}
               error={errors?.symbol}
@@ -356,7 +302,7 @@ export default function CreateToken() {
               {...register("external_url", {
                 required: false,
               })}
-              error={errors?.symbol}
+              error={errors?.external_url}
             />
             <InputMultiline
               label="Description"

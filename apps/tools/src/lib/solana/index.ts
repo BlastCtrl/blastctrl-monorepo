@@ -6,4 +6,4 @@ export {
   normalizeTokenAmount,
 } from "./common";
 export { tryGetErrorCodeFromMessage } from "./errors";
-export * from "./instruction-helpers";
+export * from "./token-metadata";

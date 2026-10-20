@@ -1,12 +1,8 @@
+import { simulateUnsigned } from "@/connector/simulate";
 import { useKitClient } from "@/connector/use-kit-client";
 import type { ParsedTokenAccount } from "@/state/queries/use-owner-assets";
 import { Button } from "@blastctrl/ui/button";
 import { Dialog } from "@headlessui/react";
-import {
-  compileTransaction,
-  getBase64EncodedWireTransaction,
-  setTransactionMessageLifetimeUsingBlockhash,
-} from "@solana/kit";
 import { useState } from "react";
 import {
   ACCOUNTS_PER_TRANSACTION,
@@ -30,27 +26,11 @@ export const SimulateStep = () => {
   /** Simulates closing each account on its own, keeping the ones that succeed. */
   const simulateCloseTransactions = async (accounts: ParsedTokenAccount[]) => {
     if (!client) return;
-    const { value: latestBlockhash } = await client.rpc
-      .getLatestBlockhash()
-      .send();
 
     const simulations = await Promise.allSettled(
-      accounts.map(async (acc) => {
-        // Unsigned simulation: the planner sets the fee payer, we add a
-        // lifetime so the message compiles, and the RPC skips signatures.
-        const message = setTransactionMessageLifetimeUsingBlockhash(
-          latestBlockhash,
-          await client.planTransaction([
-            closeAccountInstruction(acc, client.payer),
-          ]),
-        );
-        return client.rpc
-          .simulateTransaction(
-            getBase64EncodedWireTransaction(compileTransaction(message)),
-            { encoding: "base64", sigVerify: false, commitment: "confirmed" },
-          )
-          .send();
-      }),
+      accounts.map((acc) =>
+        simulateUnsigned(client, [closeAccountInstruction(acc, client.payer)]),
+      ),
     );
 
     const good: ParsedTokenAccount[] = [];
@@ -59,8 +39,8 @@ export const SimulateStep = () => {
         console.log(simulation.reason);
         return;
       }
-      if (simulation.value.value.err) {
-        console.log(simulation.value.value.err, simulation.value.value.logs);
+      if (simulation.value.err) {
+        console.log(simulation.value.err, simulation.value.logs);
         return;
       }
       good.push(accounts[i]!);
