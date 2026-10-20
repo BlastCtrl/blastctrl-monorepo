@@ -1,7 +1,6 @@
 "use client";
 
 import BlastCtrlIcon from "@/../public/blastctrl_icon_white.svg";
-import BonkSmall from "@/../public/bonk_small.png";
 import { navigation } from "@/app/_links";
 import { cn } from "@blastctrl/ui";
 import { Disclosure } from "@headlessui/react";
@@ -10,9 +9,16 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
 import Image from "next/image";
 import Link from "next/link";
 import { useContext, useEffect, useState } from "react";
+import { BAR_LINK } from "./bar-link";
 import { CommandPaletteContext } from "./command-palette";
 import { DesktopWallet } from "./desktop-wallet";
+import { GASLESS, GaslessMenu } from "./gasless-menu";
 import { MobileWallet } from "./mobile-wallet";
+import { ReclaimLink } from "./reclaim-link";
+
+const SECTIONS = navigation.filter(
+  (nav) => !nav.in && !GASLESS.some((swap) => swap.href === nav.href),
+);
 
 export function Topbar() {
   const { setIsOpen } = useContext(CommandPaletteContext);
@@ -47,40 +53,18 @@ export function Topbar() {
                       />
                     </Link>
                   </div>
-                  <div className="hidden lg:ml-6 lg:flex">
-                    {navigation
-                      .filter(
-                        (nav) => !nav.in && nav.name !== "Gasless Bonk Swap",
-                      )
-                      .map((item) => (
-                        <Link
-                          key={item.name}
-                          href={item.href}
-                          className="rounded-md px-3 py-2 text-base font-medium text-white hover:bg-primary-focus"
-                        >
-                          {item.name}
-                        </Link>
-                      ))}
-                    <Link
-                      href="/gasless-bonk-swap"
-                      className={cn(
-                        "group ml-2 inline-flex max-w-[42px] items-center space-x-2 overflow-hidden rounded-full",
-                        "bg-linear-to-r from-[#f97100] to-[#fdce00] hover:max-w-full",
-                        "pr-4 pl-0.5 text-sm font-medium text-white",
-                        "transition-all duration-500",
-                      )}
-                    >
-                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full">
-                        <Image
-                          src={BonkSmall}
-                          alt="Bonk"
-                          className="h-auto w-full"
-                        />
-                      </div>
-                      <span className="items-center text-lg font-bold">
-                        Bonk!
-                      </span>
-                    </Link>
+                  <div className="hidden lg:ml-6 lg:flex lg:items-center">
+                    {SECTIONS.map((item) => (
+                      <Link
+                        key={item.name}
+                        href={item.href}
+                        className={BAR_LINK}
+                      >
+                        {item.name}
+                      </Link>
+                    ))}
+                    <GaslessMenu />
+                    <ReclaimLink className="ml-2" />
                   </div>
                 </div>
                 <div className="flex flex-1 items-center justify-center px-2 lg:ml-6 lg:justify-end">
@@ -107,7 +91,7 @@ export function Topbar() {
                       >
                         Search
                       </button>
-                      <div className="absolute inset-y-0 right-0 hidden py-1.5 pr-1.5 sm:flex">
+                      <div className="absolute inset-y-0 right-0 hidden py-1.5 pr-1.5 sm:flex lg:hidden xl:flex">
                         <kbd className="inline-flex items-center rounded-sm border border-transparent px-2 font-sans text-sm font-medium text-gray-200 shadow-xs">
                           {modifierKey}K
                         </kbd>
@@ -163,46 +147,31 @@ export function Topbar() {
             </div>
 
             <Disclosure.Panel className="lg:hidden">
-              {({ close }) => (
-                <>
-                  <div className="flex w-full flex-col items-start gap-y-1 px-2 pt-2 pb-3">
-                    {navigation
-                      .filter(
-                        (nav) => !nav.in && nav.name !== "Gasless Bonk Swap",
-                      )
-                      .map((item) => (
-                        <Disclosure.Button key={item.name}>
-                          <Link
-                            key={item.name}
-                            href={item.href}
-                            onClick={() => close()}
-                            className="block w-full rounded-md px-3 py-2 text-base font-medium text-white hover:bg-primary-focus hover:text-white"
-                          >
-                            {item.name}
-                          </Link>
-                        </Disclosure.Button>
-                      ))}
-                    <Disclosure.Button>
-                      <Link
-                        href={"/gasless-bonk-swap"}
-                        onClick={() => close()}
-                        className="inline-flex w-full items-center gap-x-2 rounded-md px-3 py-2 text-base font-medium text-white hover:bg-primary-focus hover:text-white"
-                      >
-                        <Image
-                          unoptimized={true}
-                          className="shrink-0 overflow-hidden rounded-full"
-                          height={36}
-                          width={36}
-                          src={BonkSmall}
-                          alt="Bonk"
-                        />
-                        Bonk!
-                      </Link>
-                    </Disclosure.Button>
-                  </div>
-                  <MobileWallet />
-                </>
-              )}
+              <div className="flex w-full flex-col items-start gap-y-1 px-2 pt-2 pb-3">
+                {SECTIONS.map((item) => (
+                  <Disclosure.Button
+                    key={item.name}
+                    as={Link}
+                    href={item.href}
+                    className={BAR_LINK}
+                  >
+                    {item.name}
+                  </Disclosure.Button>
+                ))}
+                {GASLESS.map(({ name, href, Icon }) => (
+                  <Disclosure.Button
+                    key={href}
+                    as={Link}
+                    href={href}
+                    className={cn(BAR_LINK, "inline-flex items-center gap-x-2")}
+                  >
+                    <Icon className="size-6" />
+                    {name}
+                  </Disclosure.Button>
+                ))}
+                <ReclaimLink className="mt-2 ml-3" />
+              </div>
+              <MobileWallet />
             </Disclosure.Panel>
           </>
         )}
