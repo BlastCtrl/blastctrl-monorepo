@@ -14,10 +14,10 @@ import {
 import { useConnection } from "@solana/wallet-adapter-react";
 import type { AccountInfo, Connection } from "@solana/web3.js";
 import { PublicKey } from "@solana/web3.js";
+import { useAppRpc, type AppRpc } from "@/connector/app-rpc";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useDasApi } from "./das";
-import type { DasAsset, HeliusResponse } from "./types";
-import { assetDataQueryKey } from "./use-asset-data";
+import type { DasAsset } from "./types";
+import { assetDataQueryKey, fetchAssets } from "./use-asset-data";
 
 const reclaimableAccountsKey = (owner: string, network: string) =>
   ["reclaimable-accounts", owner, network] as const;
@@ -40,7 +40,7 @@ type ParsedTokenAccountInfo = ParsedTokenState & {
 export function useReclaimableAccounts(owner: string) {
   const { connection } = useConnection();
   const queryClient = useQueryClient();
-  const { network, url } = useDasApi();
+  const { rpc, dasAvailable, network } = useAppRpc();
 
   return useQuery<ReclaimableAccount[]>({
     queryKey: reclaimableAccountsKey(owner, network),
@@ -54,7 +54,7 @@ export function useReclaimableAccounts(owner: string) {
       ]);
       const accounts = [...tokenAccounts, ...mints];
       const assets = await fetchAssets(
-        url,
+        dasAvailable ? rpc : null,
         accounts.map((a) => a.mint),
       );
 
@@ -75,7 +75,7 @@ export function useReclaimableAccounts(owner: string) {
 /** Checks a single mint address for the paste box on the Mints tab. */
 export async function lookupMint(
   connection: Connection,
-  dasUrl: string | null,
+  dasRpc: AppRpc | null,
   address: string,
   owner: string,
 ): Promise<MintLookup> {
@@ -85,7 +85,7 @@ export async function lookupMint(
   const result = classifyMint(address, info, owner);
   if (result.status === "not-a-mint") return result;
 
-  const assets = await fetchAssets(dasUrl, [address]);
+  const assets = await fetchAssets(dasRpc, [address]);
   const asset = assets.get(address);
   if (result.status !== "ok") {
     return { ...result, name: displayName(address, asset) };
@@ -256,41 +256,4 @@ function withAssetInfo(
 
 function displayName(mint: string, asset: DasAsset | undefined): string {
   return asset?.content?.metadata?.name || compress(mint, 4);
-}
-
-/** Names and images for display. Failing here must not fail the scan. */
-async function fetchAssets(url: string | null, mints: string[]) {
-  const assets = new Map<string, DasAsset>();
-  if (!url || mints.length === 0) return assets;
-
-  try {
-    // getAssetBatch takes at most 1000 ids per call.
-    const batches = await Promise.all(
-      chunk([...new Set(mints)], 1000).map(async (ids) => {
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            id: "reclaimable-accounts",
-            method: "getAssetBatch",
-            params: { ids },
-          }),
-        });
-        if (!response.ok) {
-          throw Error(`getAssetBatch failed: ${response.status}`);
-        }
-        const data = (await response.json()) as HeliusResponse<
-          (DasAsset | null)[]
-        >;
-        return data.result;
-      }),
-    );
-    for (const asset of batches.flat()) {
-      if (asset) assets.set(asset.id, asset);
-    }
-  } catch (err) {
-    console.log(err instanceof Error ? err.message : String(err));
-  }
-  return assets;
 }

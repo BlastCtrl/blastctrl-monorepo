@@ -38,12 +38,7 @@ export const NftSelector = ({ control }: UseControllerProps<FormInputs>) => {
 
   return (
     <>
-      <Combobox
-        as="div"
-        ref={ref}
-        name={"mint"}
-        onChange={onChange}
-      >
+      <Combobox as="div" ref={ref} name={"mint"} onChange={onChange}>
         <NftComboboxInput
           selectedMint={value}
           onChange={setQuery}
@@ -77,13 +72,13 @@ export const NftSelector = ({ control }: UseControllerProps<FormInputs>) => {
               <span className="flex items-center gap-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={userNft.content.links.image}
+                  src={userNft.content?.links?.image}
                   alt=""
                   height={24}
                   width={24}
                   className="size-5 rounded-full"
                 />
-                {userNft.content.metadata.name}
+                {userNft.content?.metadata.name}
               </span>
               <span
                 aria-hidden="true"

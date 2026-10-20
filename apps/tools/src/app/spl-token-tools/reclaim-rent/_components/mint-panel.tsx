@@ -1,5 +1,5 @@
 import { compress, isPublicKey } from "@/lib/solana/common";
-import { useDasApi } from "@/state/queries/das";
+import { useAppRpc } from "@/connector/app-rpc";
 import { lookupMint } from "@/state/queries/use-reclaimable-accounts";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { useConnection } from "@solana/wallet-adapter-react";
@@ -28,12 +28,13 @@ export function MintPanel({
   onToggleAll,
 }: Props) {
   const { connection } = useConnection();
-  const { url } = useDasApi();
+  const { rpc: dasRpc, dasAvailable } = useAppRpc();
   const [address, setAddress] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const check = useMutation({
-    mutationFn: (mint: string) => lookupMint(connection, url, mint, owner),
+    mutationFn: (mint: string) =>
+      lookupMint(connection, dasAvailable ? dasRpc : null, mint, owner),
     onSuccess: (result) => {
       if (result.status === "ok") {
         onAdd(result.account);

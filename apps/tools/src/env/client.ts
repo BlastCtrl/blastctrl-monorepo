@@ -8,8 +8,6 @@ export const env = createEnv({
     // Optional. RPC used when the wallet is on devnet; falls back to the
     // public https://api.devnet.solana.com when unset.
     NEXT_PUBLIC_RPC_ENDPOINT_DEVNET: z.url().optional(),
-    NEXT_PUBLIC_DAS_API: z.url(),
-    NEXT_PUBLIC_DAS_API_DEVNET: z.url().optional(),
     // Reclaim-rent tool: the wallet that receives the service fee and the
     // fee as a share of the reclaimed excess, in basis points (500 = 5%).
     // Leave both unset (or the rate at 0) for no fee.
@@ -28,8 +26,6 @@ export const env = createEnv({
     NEXT_PUBLIC_RPC_ENDPOINT: process.env.NEXT_PUBLIC_RPC_ENDPOINT,
     NEXT_PUBLIC_RPC_ENDPOINT_DEVNET:
       process.env.NEXT_PUBLIC_RPC_ENDPOINT_DEVNET,
-    NEXT_PUBLIC_DAS_API: process.env.NEXT_PUBLIC_DAS_API,
-    NEXT_PUBLIC_DAS_API_DEVNET: process.env.NEXT_PUBLIC_DAS_API_DEVNET,
     NEXT_PUBLIC_RECLAIM_RENT_FEE_RECIPIENT:
       process.env.NEXT_PUBLIC_RECLAIM_RENT_FEE_RECIPIENT,
     NEXT_PUBLIC_RECLAIM_RENT_FEE_BPS:

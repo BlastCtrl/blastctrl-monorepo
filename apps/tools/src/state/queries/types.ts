@@ -1,109 +1,57 @@
-export type HeliusResponse<TResult> = {
+/**
+ * Digital Asset Standard (DAS) types, declared against the Metaplex reference
+ * implementation that Triton runs (`digital-asset-rpc-infrastructure`). Only
+ * the parameters and fields this app reads are declared; extend them when a
+ * tool needs more. Optionality follows the Rust structs: a field that is
+ * `Option<>` there is omitted from the JSON when absent.
+ */
+
+/** `getAsset` params. `showFungible` adds `token_info` for SPL mints. */
+export type GetAssetParams = {
   id: string;
-  jsonrpc: string;
-  result: TResult;
+  options?: { showFungible?: boolean };
 };
 
-export type TokenInfo = {
-  balance: number;
-  supply: number;
-  decimals: number;
-  token_program: string;
-  associated_token_address: string;
-  mint_authority: string;
-  freeze_authority?: string;
+/**
+ * `getAssets` (Helius: `getAssetBatch`) params. At most 1000 ids per call;
+ * ids that are not found come back as `null` in the same position.
+ */
+export type GetAssetsParams = { ids: string[] };
+
+/**
+ * `searchAssets` params. `tokenType` takes the reference `TokenTypeClass`
+ * variants in PascalCase (Triton's docs use `"All"`); Helius spells them in
+ * camelCase instead. Default `limit` is 1000, the maximum.
+ */
+export type SearchAssetsParams = {
+  ownerAddress?: string;
+  authorityAddress?: string;
+  tokenType?: "Fungible" | "NonFungible" | "Compressed" | "Nft" | "All";
 };
 
-export type SearchAssetsByOwnerResponse = {
+export type SearchAssetsResult = {
   total: number;
   limit: number;
-  page: number;
-  items: {
-    interface: string;
-    id: string;
-    authorities: string[];
-    creators: string[];
-    mutable: boolean;
-    burnt: boolean;
-    content: {
-      metadata: any;
-      links: any;
-    };
-    token_info: TokenInfo;
-    mint_extensions: {
-      confidential_transfer_mint: {
-        authority: string;
-        auto_approve_new_accounts: boolean;
-        auditor_elgamal_pubkey: string;
-      };
-      confidential_transfer_fee_config: {
-        authority: string;
-        withdraw_withheld_authority_elgamal_pubkey: string;
-        harvest_to_mint_enabled: boolean;
-        withheld_amount: string;
-      };
-      transfer_fee_config: {
-        transfer_fee_config_authority: string;
-        withdraw_withheld_authority: string;
-      };
-      metadata_pointer: {
-        authority: string;
-        metadata_address: string;
-      };
-      mint_close_authority: {
-        close_authority: string;
-      };
-      permanent_delegate: {
-        delegate: string;
-      };
-      transfer_hook: {
-        authority: string;
-        program_id: string;
-      };
-      interest_bearing_config: {
-        rate_authority: string;
-      };
-      default_account_state: string;
-    };
-    inscription: {
-      contentType: string;
-      encoding: string;
-      validationHash: string;
-      inscriptionDataAccount: string;
-      authority: string;
-    };
-  }[];
+  items: DasAsset[];
 };
 
+/** A DAS asset, trimmed to the fields the app reads. */
 export type DasAsset = {
-  interface:
-    | "V1_NFT"
-    | "V1_PRINT"
-    | "LEGACY_NFT"
-    | "V2_NFT"
-    | "FungibleAsset"
-    | "FungibleToken"
-    | "Custom"
-    | "Identity"
-    | "Executable"
-    | "ProgrammableNFT";
   id: string;
-  authorities: string[];
-  creators: string[];
   mutable: boolean;
   burnt: boolean;
-  content: {
-    metadata: any;
-    links: any;
+  content?: {
+    json_uri: string;
+    /** Free-form off-chain metadata; `name` and `symbol` are usually set. */
+    metadata: { name?: string; symbol?: string };
+    links?: { image?: string };
   };
-  token_info: {
-    symbol: string;
-    supply: number;
-    decimals: number;
-    token_program: string;
-    price_info: {
-      price_per_token: number;
-      currency: string;
-    };
-  };
+  authorities?: { address: string; scopes: string[] }[];
+  creators?: { address: string; share: number; verified: boolean }[];
+  royalty?: { basis_points: number; primary_sale_happened: boolean };
+  /**
+   * SPL mint info, present when requested with `showFungible`. `symbol` is a
+   * provider extension: Triton documents it, the reference struct lacks it.
+   */
+  token_info?: { decimals: number; symbol?: string };
 };

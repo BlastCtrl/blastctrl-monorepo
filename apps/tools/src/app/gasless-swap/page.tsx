@@ -22,6 +22,7 @@ import { Popover, PopoverButton, PopoverPanel } from "./_components/popover";
 import { TokenQuote } from "./_components/token-quote";
 import { TokenSelectPanel } from "./_components/token-select-panel";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAppRpc } from "@/connector/app-rpc";
 import { jupTokensQuery } from "@/state/queries/use-jup-tokens";
 
 type FormData = {
@@ -39,6 +40,7 @@ type SelectToken = {
 export default function GaslessSwap() {
   const { network } = useNetworkConfigurationStore();
   const { publicKey, signTransaction } = useWallet();
+  const { rpc: appRpc } = useAppRpc();
   const { setVisible } = useWalletModal();
   const {
     register,
@@ -67,7 +69,7 @@ export default function GaslessSwap() {
 
   const prefetchJupTokens = () => {
     void queryClient.prefetchQuery(
-      jupTokensQuery(publicKey?.toString() ?? "", false),
+      jupTokensQuery(appRpc, publicKey?.toString() ?? "", false),
     );
   };
 

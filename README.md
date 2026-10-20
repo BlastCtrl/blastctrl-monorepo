@@ -32,7 +32,6 @@ You will need to setup the following environment variables in the `apps/tools/.e
 
 ```
 NEXT_PUBLIC_RPC_ENDPOINT=
-NEXT_PUBLIC_DAS_API=
 JUP_SWAP_API=
 REDIS_URL=
 REDIS_TOKEN=

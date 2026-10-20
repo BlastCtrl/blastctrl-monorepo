@@ -1,7 +1,7 @@
 "use client";
 
 import { InputGroup, notify } from "@/components";
-import type { NftAsset } from "@/state/queries/use-owner-nfts";
+import type { DasAsset } from "@/state/queries/types";
 import { useOwnerNfts } from "@/state/queries/use-owner-nfts";
 import { isPublicKey } from "@/lib/solana/common";
 import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
@@ -99,16 +99,19 @@ export default function Update() {
   const mint = watch("mint");
   const isCreatorAddable = fields.length < MAX_CREATORS;
 
-  const setFormValues = (nft: NftAsset) => {
+  const setFormValues = (nft: DasAsset) => {
     if (nft) {
-      setValue("name", nft.content?.metadata?.name);
-      setValue("symbol", nft.content?.metadata?.symbol);
-      setValue("uri", nft.content?.json_uri);
-      setValue("updateAuthority", nft.authorities[0]?.address ?? "");
+      setValue("name", nft.content?.metadata.name ?? "");
+      setValue("symbol", nft.content?.metadata.symbol ?? "");
+      setValue("uri", nft.content?.json_uri ?? "");
+      setValue("updateAuthority", nft.authorities?.[0]?.address ?? "");
       setValue("isMutable", nft.mutable);
-      setValue("primarySaleHappened", nft.royalty.primary_sale_happened);
-      setValue("sellerFeeBasisPoints", nft.royalty.basis_points);
-      nft.creators.forEach((creator, idx) => {
+      setValue(
+        "primarySaleHappened",
+        nft.royalty?.primary_sale_happened ?? false,
+      );
+      setValue("sellerFeeBasisPoints", nft.royalty?.basis_points ?? 0);
+      nft.creators?.forEach((creator, idx) => {
         update(idx, { address: creator.address, share: creator.share });
       });
     }
@@ -144,10 +147,7 @@ export default function Update() {
       return;
     }
 
-    const shareTotal = data.creators.reduce(
-      (sum, { share }) => sum + share,
-      0,
-    );
+    const shareTotal = data.creators.reduce((sum, { share }) => sum + share, 0);
     if (data.creators.length > 0 && shareTotal !== 100) {
       setFocus(`creators.${"0"}.share`);
       notify({

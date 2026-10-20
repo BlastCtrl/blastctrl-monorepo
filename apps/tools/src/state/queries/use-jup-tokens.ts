@@ -1,3 +1,4 @@
+import { useAppRpc, type AppRpc } from "@/connector/app-rpc";
 import { useQuery, queryOptions } from "@tanstack/react-query";
 
 type TokensResponse = {
@@ -12,32 +13,13 @@ type TokensResponse = {
   };
 };
 
-type AssetsResponse = {
-  jsonrpc: string;
-  id: string;
-  result: {
-    total: number;
-    limit: number;
-    cursor: string;
-    items: Array<{
-      interface: string;
-      id: string;
-      content: Record<string, any>;
-      token_info: {
-        balance: number;
-        supply: number;
-        decimals: 0;
-        token_program: string;
-        associated_token_address: string;
-        [key: string]: any;
-      };
-    }>;
-  };
-};
-
 const ignoreList = ["Bonk", "SOL"];
 
-export function jupTokensQuery(wallet = "", useUnknownTokens: boolean) {
+export function jupTokensQuery(
+  rpc: AppRpc | null,
+  wallet = "",
+  useUnknownTokens: boolean,
+) {
   return queryOptions<Array<TokensResponse>, Error>({
     queryKey: ["jup-tokens", wallet || "none", useUnknownTokens],
     queryFn: async () => {
@@ -57,42 +39,24 @@ export function jupTokensQuery(wallet = "", useUnknownTokens: boolean) {
         return jupResponse.json();
       }
 
-      const assetsFetch = fetch(process.env.NEXT_PUBLIC_DAS_API!, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: "helius-test",
-          method: "searchAssets",
-          params: {
-            ownerAddress: wallet,
-            tokenType: "fungible",
-          },
-        }),
-      });
-      const [jupResponse, assetsResponse] = await Promise.all([
+      if (!rpc) throw new Error("RPC not available");
+      const [jupResponse, userAssets] = await Promise.all([
         jupFetch,
-        assetsFetch,
+        rpc
+          .searchAssets({ ownerAddress: wallet, tokenType: "Fungible" })
+          .send(),
       ]);
 
-      if (!jupResponse.ok || !assetsResponse.ok) {
+      if (!jupResponse.ok) {
         if (jupResponse.status === 429) {
           throw new Error("Rate limit exceeded");
         }
         throw new Error("Network response was not ok");
       }
 
-      const [jupTokens, userAssets] = await Promise.all([
-        jupResponse.json() as Promise<TokensResponse[]>,
-        assetsResponse.json() as Promise<AssetsResponse>,
-      ]);
+      const jupTokens = (await jupResponse.json()) as TokensResponse[];
 
-      console.log(userAssets);
-
-      const set = new Set(userAssets?.result?.items?.map((asset) => asset?.id));
+      const set = new Set(userAssets.items.map((asset) => asset.id));
       const intersectionTokens = jupTokens
         .filter((token) => set.has(token.id))
         .reverse();
@@ -114,5 +78,6 @@ export function jupTokensQuery(wallet = "", useUnknownTokens: boolean) {
  * @returns
  */
 export function useJupTokens(wallet = "", useUnknownTokens: boolean) {
-  return useQuery(jupTokensQuery(wallet, useUnknownTokens));
+  const { rpc } = useAppRpc();
+  return useQuery(jupTokensQuery(rpc, wallet, useUnknownTokens));
 }
