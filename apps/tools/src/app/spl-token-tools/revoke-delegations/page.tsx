@@ -1,113 +1,75 @@
 "use client";
 
+import { notify } from "@/components";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
+import { TOKEN_2022_PROGRAM_ADDRESS } from "@/lib/solana/token-programs";
 import { useDelegatedAssets } from "@/state/queries/use-delegated-assets";
 import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { AccountList } from "./_components";
-import { retryWithBackoff } from "@/lib/utils";
 import {
-  createApproveInstruction,
-  TOKEN_2022_PROGRAM_ID,
-} from "@solana/spl-token";
-import { PublicKey, Transaction } from "@solana/web3.js";
-import { notify } from "@/components";
+  getApproveInstruction,
+  TOKEN_PROGRAM_ADDRESS,
+} from "@solana-program/token";
+import { useConnector } from "@solana/connector/react";
+import { address, type Address } from "@solana/kit";
+import { AccountList } from "./_components/account-list";
+
+/** Dev only: token accounts of the dev wallet to delegate so the list has rows. */
+const DEV_DELEGATE = address("AuKct4JHSMhftUHZHmkiSLUAC7uevUdJjhvUhSpTitJC");
+const DEV_ACCOUNTS = {
+  token: address("D59omT4FmyyGnegtLCCBNCjNAh7vAWJHn14Ux1faN7Ha"),
+  token2022: address("6kCzhxTd5UAMnbGYnQw1vrCuYP18taxskvouuQijvbFx"),
+};
 
 export default function RevokeDelegations() {
-  const { connection } = useConnection();
-  const { connected, publicKey, sendTransaction } = useWallet();
-  const { setVisible } = useWalletModal();
-  const { data, isFetching, refetch } = useDelegatedAssets(
-    publicKey?.toString() ?? "",
-  );
-
-  const handleDelegateAccount = async () => {
-    if (!publicKey || !sendTransaction) return;
-    const { value } = await retryWithBackoff(() =>
-      connection.getLatestBlockhashAndContext({ commitment: "confirmed" }),
-    );
-    // const token = new PublicKey("BWia4unXYeEZAeZeTQFQ2sKoeQQmeGhGmVQ7z4GZJJnx");
-    const tokenAccount = new PublicKey(
-      "D59omT4FmyyGnegtLCCBNCjNAh7vAWJHn14Ux1faN7Ha",
-    );
-    const delegate = new PublicKey(
-      "AuKct4JHSMhftUHZHmkiSLUAC7uevUdJjhvUhSpTitJC",
-    );
-    const tx = new Transaction().add(
-      createApproveInstruction(tokenAccount, delegate, publicKey, 25 * 1e8),
-    );
-
-    tx.recentBlockhash = value.blockhash;
-    tx.feePayer = publicKey;
-    const signature = await sendTransaction(tx, connection, {
-      preflightCommitment: "confirmed",
-      skipPreflight: true,
-      maxRetries: 0,
-    });
-    await connection.confirmTransaction({
-      blockhash: value.blockhash,
-      lastValidBlockHeight: value.lastValidBlockHeight,
-      signature,
-    });
-
-    notify({
-      type: "success",
-      title: "Transaction confirmed",
-      txid: signature,
-    });
-  };
-  const handleDelegate22Account = async () => {
-    if (!publicKey || !sendTransaction) return;
-    const { value } = await retryWithBackoff(() =>
-      connection.getLatestBlockhashAndContext({ commitment: "confirmed" }),
-    );
-    const tokenAccount = new PublicKey(
-      "6kCzhxTd5UAMnbGYnQw1vrCuYP18taxskvouuQijvbFx",
-    );
-    const delegate = new PublicKey(
-      "AuKct4JHSMhftUHZHmkiSLUAC7uevUdJjhvUhSpTitJC",
-    );
-    const tx = new Transaction().add(
-      createApproveInstruction(
-        tokenAccount,
-        delegate,
-        publicKey,
-        25 * 1e8,
-        [],
-        TOKEN_2022_PROGRAM_ID,
-      ),
-    );
-
-    tx.recentBlockhash = value.blockhash;
-    tx.feePayer = publicKey;
-    const signature = await sendTransaction(tx, connection, {
-      preflightCommitment: "confirmed",
-      skipPreflight: true,
-      maxRetries: 0,
-    });
-    await connection.confirmTransaction({
-      blockhash: value.blockhash,
-      lastValidBlockHeight: value.lastValidBlockHeight,
-      signature,
-    });
-
-    notify({
-      type: "success",
-      title: "Transaction confirmed",
-      txid: signature,
-    });
-  };
+  const { isConnected, account } = useConnector();
+  const { client } = useKitClient();
+  const { setOpen } = useConnectorDialog();
+  const { data, isFetching, refetch } = useDelegatedAssets(account ?? "");
 
   const handleLoad = async () => {
-    if (!connected) {
-      setVisible(true);
+    if (!isConnected) {
+      setOpen(true);
       return;
     }
     void refetch();
   };
 
+  /** Dev only: approve 25 tokens (8 decimals) to the dev delegate. */
+  const handleDelegateDev = async (
+    source: Address,
+    programAddress: Address,
+  ) => {
+    if (!client) return;
+    try {
+      const result = await client.sendTransaction([
+        getApproveInstruction(
+          {
+            source,
+            delegate: DEV_DELEGATE,
+            owner: client.payer,
+            amount: 2_500_000_000n,
+          },
+          { programAddress },
+        ),
+      ]);
+      notify({
+        type: "success",
+        title: "Transaction confirmed",
+        txid: result.context.signature,
+      });
+    } catch (error) {
+      notify({
+        type: "error",
+        title: "Transaction error",
+        description: transactionErrorMessage(error),
+      });
+    }
+  };
+
   const buttonText = () => {
-    if (!connected) return "Connect your wallet";
+    if (!isConnected) return "Connect your wallet";
     if (isFetching)
       return (
         <>
@@ -161,10 +123,23 @@ export default function RevokeDelegations() {
             </Button>
             {process.env.NODE_ENV === "development" && (
               <>
-                <Button onClick={handleDelegateAccount}>
+                <Button
+                  disabled={!client}
+                  onClick={() =>
+                    handleDelegateDev(DEV_ACCOUNTS.token, TOKEN_PROGRAM_ADDRESS)
+                  }
+                >
                   DEV: delegate the TOKENI account
                 </Button>
-                <Button onClick={handleDelegate22Account}>
+                <Button
+                  disabled={!client}
+                  onClick={() =>
+                    handleDelegateDev(
+                      DEV_ACCOUNTS.token2022,
+                      TOKEN_2022_PROGRAM_ADDRESS,
+                    )
+                  }
+                >
                   DEV: delegate the TOKENI22 account
                 </Button>
               </>

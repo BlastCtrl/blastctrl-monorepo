@@ -1,17 +1,19 @@
-import { Dialog } from "@headlessui/react";
-import { useCloseAccountsStore } from "./wizard-context";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { chunk, retryWithBackoff } from "@/lib/utils";
-import type { ParsedTokenAccount } from "@/state/queries/use-owner-assets";
-import { createCloseAccountInstruction } from "@solana/spl-token";
-import { PublicKey, Transaction } from "@solana/web3.js";
-import { useCallback, useEffect, useRef, useState } from "react";
 import { notify } from "@/components/notification";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
+import { chunk } from "@/lib/utils";
+import type { ParsedTokenAccount } from "@/state/queries/use-owner-assets";
+import { Dialog } from "@headlessui/react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ACCOUNTS_PER_TRANSACTION,
+  closeAccountInstruction,
+  useCloseAccountsStore,
+} from "./wizard-context";
 
 export const SignStep = () => {
   const promptShown = useRef(false);
-  const { connection } = useConnection();
-  const { publicKey, sendTransaction } = useWallet();
+  const { client } = useKitClient();
   const [isConfirming, setIsConfirming] = useState(false);
   const accountsToClose = useCloseAccountsStore(
     (store) => store.simulatedAccounts,
@@ -19,53 +21,27 @@ export const SignStep = () => {
   const goToStepThree = useCloseAccountsStore((store) => store.goToStepThree);
 
   const handleSendTransaction = useCallback(async () => {
-    if (!publicKey || !sendTransaction) return;
-    const chunks = chunk(accountsToClose, 4);
-
+    if (!client) return;
     const closedAccounts: ParsedTokenAccount[] = [];
 
+    setIsConfirming(true);
     try {
-      for (const chunk of chunks) {
-        const tx = makeTransaction(chunk, publicKey);
-
-        const { context, value } = await retryWithBackoff(() =>
-          connection.getLatestBlockhashAndContext("confirmed"),
+      // One transaction per chunk, in order; each needs a wallet approval.
+      for (const batch of chunk(accountsToClose, ACCOUNTS_PER_TRANSACTION)) {
+        const result = await client.sendTransaction(
+          batch.map((acc) => closeAccountInstruction(acc, client.payer)),
         );
-        const signature = await sendTransaction(tx, connection, {
-          minContextSlot: context.slot,
-          maxRetries: 0,
-          preflightCommitment: "confirmed",
-          skipPreflight: true,
-        });
-        if (!isConfirming) {
-          setIsConfirming(true);
-        }
-
-        console.log(signature);
-
-        const result = await connection.confirmTransaction(
-          {
-            signature,
-            blockhash: value.blockhash,
-            lastValidBlockHeight: value.lastValidBlockHeight,
-          },
-          "confirmed",
-        );
-
-        if (result.value.err) throw Error(JSON.stringify(result.value.err));
-
         notify({
           type: "success",
           title: "Transaction confirmed",
-          txid: signature,
+          txid: result.context.signature,
         });
-
-        closedAccounts.push(...chunk);
+        closedAccounts.push(...batch);
       }
 
       goToStepThree(closedAccounts, null);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
+      const errorMessage = transactionErrorMessage(err);
       notify({
         type: "error",
         title: "Transaction error",
@@ -75,21 +51,13 @@ export const SignStep = () => {
     } finally {
       setIsConfirming(false);
     }
-  }, [
-    accountsToClose,
-    connection,
-    isConfirming,
-    publicKey,
-    sendTransaction,
-    goToStepThree,
-  ]);
+  }, [accountsToClose, client, goToStepThree]);
 
   useEffect(() => {
-    if (!promptShown.current) {
-      promptShown.current = true;
-      void handleSendTransaction();
-    }
-  }, [publicKey, handleSendTransaction]);
+    if (!client || promptShown.current) return;
+    promptShown.current = true;
+    void handleSendTransaction();
+  }, [client, handleSendTransaction]);
 
   return (
     <>
@@ -133,21 +101,4 @@ const Loader = () => {
       </span>
     </span>
   );
-};
-
-// Utility functions
-const toPubkey = (address: string) => new PublicKey(address);
-
-const makeTransaction = (accounts: ParsedTokenAccount[], wallet: PublicKey) => {
-  const instructions = accounts.map((acc) =>
-    createCloseAccountInstruction(
-      toPubkey(acc.token_account),
-      wallet,
-      wallet,
-      [],
-      toPubkey(acc.token_program),
-    ),
-  );
-
-  return new Transaction().add(...instructions);
 };

@@ -1,10 +1,14 @@
+import { notify } from "@/components";
+import { RotateCwIcon } from "@/components/icons/rotate-cw";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
+import { compress, normalizeTokenAmount } from "@/lib/solana";
 import { useAssetData } from "@/state/queries/use-asset-data";
 import {
   useDelegatedAssets,
   type ParsedDelegatedTokenAccount,
 } from "@/state/queries/use-delegated-assets";
-import { compress, normalizeTokenAmount } from "@/lib/solana";
-import { Button, Checkbox, CopyButton, cn } from "@blastctrl/ui";
+import { Button, Checkbox, CopyButton, SpinnerIcon, cn } from "@blastctrl/ui";
 import {
   Table,
   TableBody,
@@ -13,13 +17,14 @@ import {
   TableHeader,
   TableRow,
 } from "@blastctrl/ui/table";
+import { getRevokeInstruction } from "@solana-program/token";
+import { useConnector } from "@solana/connector/react";
+import {
+  address,
+  flattenTransactionPlanResult,
+  parallelInstructionPlan,
+} from "@solana/kit";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { retryWithBackoff } from "@/lib/utils";
-import { createRevokeInstruction } from "@solana/spl-token";
-import { PublicKey, Transaction } from "@solana/web3.js";
-import { notify } from "@/components";
-import { RotateCwIcon } from "@/components/icons/rotate-cw";
 
 type CheckboxState = "indeterminate" | "checked" | "empty";
 
@@ -64,7 +69,10 @@ export const AccountList = ({
           {selectedAccounts.length} accounts selected
         </div>
         <RefreshAccountListButton />
-        <RevokeDelegationsButton selectedAccounts={selectedAccounts} />
+        <RevokeDelegationsButton
+          selectedAccounts={selectedAccounts}
+          onRevoked={() => setSelectedAccounts([])}
+        />
       </div>
 
       <Table
@@ -239,10 +247,8 @@ const TokenMetadataCell = ({ mint }: { mint: string }) => {
 };
 
 function RefreshAccountListButton() {
-  const { publicKey } = useWallet();
-  const { refetch, isRefetching } = useDelegatedAssets(
-    publicKey?.toString() ?? "",
-  );
+  const { account } = useConnector();
+  const { refetch, isRefetching } = useDelegatedAssets(account ?? "");
 
   const [isButtonDisabled, setIsButtonDisabled] = useState(false);
   const handleRateLimitedRefresh = useCallback(() => {
@@ -272,67 +278,74 @@ function RefreshAccountListButton() {
 
 function RevokeDelegationsButton({
   selectedAccounts,
+  onRevoked,
 }: {
   selectedAccounts: ParsedDelegatedTokenAccount[];
+  onRevoked: () => void;
 }) {
-  const { connection } = useConnection();
-  const { publicKey, sendTransaction } = useWallet();
+  const { client } = useKitClient();
+  const { account } = useConnector();
+  const { refetch } = useDelegatedAssets(account ?? "");
+  const [isConfirming, setIsConfirming] = useState(false);
 
   const handleRevokeDelegations = async () => {
-    if (!publicKey || !sendTransaction) return;
-    const { value } = await retryWithBackoff(() =>
-      connection.getLatestBlockhashAndContext({ commitment: "confirmed" }),
-    );
+    if (!client || selectedAccounts.length === 0) return;
 
-    const tx = new Transaction({ feePayer: publicKey, ...value }).add(
-      ...selectedAccounts.map((account) =>
-        createRevokeInstruction(
-          new PublicKey(account.token_account),
-          publicKey,
-          [],
-          new PublicKey(account.token_program),
-        ),
+    const instructions = selectedAccounts.map((acc) =>
+      getRevokeInstruction(
+        { source: address(acc.token_account), owner: client.payer },
+        { programAddress: address(acc.token_program) },
       ),
     );
 
-    if (
-      tx.serialize({ requireAllSignatures: false, verifySignatures: false })
-        .length > 1232
-    ) {
+    setIsConfirming(true);
+    try {
+      // Revokes are independent, so the planner packs as many as fit into one
+      // transaction and sends any overflow as further transactions.
+      const result = await client.sendTransactions(
+        parallelInstructionPlan(instructions),
+      );
+      const signatures = flattenTransactionPlanResult(result)
+        .filter((r) => r.status === "successful")
+        .map((r) => r.context.signature);
+
+      signatures.forEach((signature, index) => {
+        notify({
+          type: "success",
+          title:
+            signatures.length > 1
+              ? `Transaction ${index + 1} of ${signatures.length} confirmed`
+              : "Transaction confirmed",
+          txid: signature,
+        });
+      });
+      onRevoked();
+      void refetch();
+    } catch (error) {
       notify({
         type: "error",
-        title: "Transaction size limit error",
-        description:
-          "The transaction has exceeded the size limit. Try including fewer accounts.",
+        title: "Transaction error",
+        description: transactionErrorMessage(error),
       });
-      return;
+    } finally {
+      setIsConfirming(false);
     }
-
-    const signature = await sendTransaction(tx, connection, {
-      preflightCommitment: "confirmed",
-      skipPreflight: true,
-      maxRetries: 0,
-    });
-    await connection.confirmTransaction({
-      blockhash: value.blockhash,
-      lastValidBlockHeight: value.lastValidBlockHeight,
-      signature,
-    });
-
-    notify({
-      type: "success",
-      title: "Transaction confirmed",
-      txid: signature,
-    });
   };
 
   return (
     <Button
       color="indigo"
       onClick={handleRevokeDelegations}
-      disabled={selectedAccounts.length === 0}
+      disabled={!client || isConfirming || selectedAccounts.length === 0}
     >
-      Revoke Delegations ({selectedAccounts.length})
+      {isConfirming ? (
+        <>
+          <SpinnerIcon className="mr-2 -ml-1 size-5 animate-spin" />
+          Confirming
+        </>
+      ) : (
+        `Revoke Delegations (${selectedAccounts.length})`
+      )}
     </Button>
   );
 }
