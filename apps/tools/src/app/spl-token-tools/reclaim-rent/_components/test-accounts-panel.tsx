@@ -1,9 +1,14 @@
 import { notify } from "@/components/notification";
-import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
+import {
+  kitBatchSender,
+  sendBatches,
+  type BatchResult,
+} from "@/connector/send-batches";
+import { useKitClient } from "@/connector/use-kit-client";
 import { solBalanceKey } from "@/state/queries/use-sol-balance";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { XMarkIcon } from "@heroicons/react/20/solid";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { useCluster } from "@solana/connector/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
@@ -12,10 +17,8 @@ import {
   formatSol,
   minimumBalance,
 } from "./rent";
-import { buildTestAccountTransactions, demoMintsFor } from "./test-accounts";
-import { useRentRate } from "./use-rent-rate";
-
-const SEND_OPTIONS = { preflightCommitment: "confirmed" } as const;
+import { buildTestAccountInstructions, demoMintsFor } from "./test-accounts";
+import { useRentRate } from "@/state/queries/use-rent";
 
 const message = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
@@ -28,10 +31,9 @@ const message = (err: unknown) =>
  * load.
  */
 export function TestAccountsPanel() {
-  const { connection } = useConnection();
-  const { publicKey, signAllTransactions, sendTransaction } = useWallet();
+  const { client } = useKitClient();
+  const { type: cluster } = useCluster();
   const queryClient = useQueryClient();
-  const network = useNetworkConfigurationStore((state) => state.network);
   const { lamportsPerByte } = useRentRate();
   const [hidden, setHidden] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -39,12 +41,12 @@ export function TestAccountsPanel() {
   const excess =
     minimumBalance(TOKEN_ACCOUNT_SIZE, ORIGINAL_LAMPORTS_PER_BYTE) -
     minimumBalance(TOKEN_ACCOUNT_SIZE, lamportsPerByte);
-  const mints = demoMintsFor(network);
+  const mints = demoMintsFor(cluster);
 
   if (hidden) return null;
 
   const create = async () => {
-    if (!publicKey) {
+    if (!client) {
       notify({ type: "error", title: "Connect a wallet first" });
       return;
     }
@@ -59,66 +61,47 @@ export function TestAccountsPanel() {
     }
     setBusy(true);
     try {
-      const lifetime = await connection.getLatestBlockhash("confirmed");
-      const txs = buildTestAccountTransactions(
+      const groups = await buildTestAccountInstructions(
         mints,
-        publicKey,
-        lifetime,
+        client.payer,
         excess,
       );
-      const confirm = async (signature: string) => {
-        const { value } = await connection.confirmTransaction(
-          { signature, ...lifetime },
-          "confirmed",
-        );
-        if (value.err) throw Error(JSON.stringify(value.err));
-        return signature;
-      };
+      const batches = groups.map((instructions, index) => ({
+        index,
+        instructions,
+      }));
+      // One wallet prompt where the wallet allows it; a wallet that asks per
+      // transaction stops at the first refusal, which lands in the catch.
+      const results: BatchResult[] = [];
+      await sendBatches(
+        batches,
+        {
+          sender: kitBatchSender(client),
+          build: (batch) => batch.instructions,
+        },
+        { onBatchResult: (result) => results.push(result) },
+      );
 
-      const outcomes: PromiseSettledResult<string>[] = [];
-      if (signAllTransactions) {
-        const signed = await signAllTransactions(txs);
-        outcomes.push(
-          ...(await Promise.allSettled(
-            signed.map((tx) =>
-              connection
-                .sendRawTransaction(tx.serialize(), SEND_OPTIONS)
-                .then(confirm),
-            ),
-          )),
-        );
-      } else {
-        // These wallets ask once per transaction; stop at the first refusal.
-        for (const tx of txs) {
-          const [outcome] = await Promise.allSettled([
-            sendTransaction(tx, connection, SEND_OPTIONS).then(confirm),
-          ]);
-          outcomes.push(outcome!);
-          if (outcome!.status === "rejected") break;
-        }
-      }
-
-      outcomes.forEach((outcome, i) => {
-        if (outcome.status === "rejected") {
+      results.forEach((result) => {
+        if (result.status === "failed") {
           notify({
             type: "error",
-            title: `Test transaction ${i + 1} of ${txs.length} failed`,
-            description: message(outcome.reason),
+            title: `Test transaction ${result.index + 1} of ${batches.length} failed`,
+            description: result.error,
           });
         }
       });
-      const confirmed = outcomes.flatMap((outcome, i) =>
-        outcome.status === "fulfilled"
-          ? [
-              {
-                signature: outcome.value,
-                accounts: txs[i]!.instructions.length / 2,
-              },
-            ]
-          : [],
-      );
+      const confirmed = results
+        .filter(
+          (r): r is Extract<BatchResult, { status: "confirmed" }> =>
+            r.status === "confirmed",
+        )
+        .sort((a, b) => a.index - b.index);
       if (confirmed.length > 0) {
-        const accounts = confirmed.reduce((n, c) => n + c.accounts, 0);
+        const accounts = confirmed.reduce(
+          (n, c) => n + groups[c.index]!.length / 2,
+          0,
+        );
         notify({
           type: "success",
           title: "Test accounts ready",
@@ -135,7 +118,7 @@ export function TestAccountsPanel() {
     } finally {
       setBusy(false);
       void queryClient.invalidateQueries({
-        queryKey: solBalanceKey(publicKey.toString()),
+        queryKey: solBalanceKey(client.payer.address),
       });
     }
   };

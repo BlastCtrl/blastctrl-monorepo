@@ -4,30 +4,28 @@ import type {
   ReclaimableAccount,
 } from "@/app/spl-token-tools/reclaim-rent/_components/types";
 import { keepOpenReason } from "@/app/spl-token-tools/reclaim-rent/_components/types";
-import { compress } from "@/lib/solana/common";
-import { chunk } from "@/lib/utils";
-import {
-  TOKEN_2022_PROGRAM_ID,
-  TOKEN_PROGRAM_ID,
-  unpackMint,
-} from "@solana/spl-token";
-import { useConnection } from "@solana/wallet-adapter-react";
-import type { AccountInfo, Connection } from "@solana/web3.js";
-import { PublicKey } from "@solana/web3.js";
 import { useAppRpc, type AppRpc } from "@/connector/app-rpc";
+import { compress } from "@/lib/solana/common";
+import {
+  isMintAccountData,
+  TOKEN_2022_PROGRAM_ADDRESS,
+} from "@/lib/solana/token-2022";
+import { chunk } from "@/lib/utils";
+import { decodeMint, TOKEN_PROGRAM_ADDRESS } from "@solana-program/token";
+import {
+  address,
+  fetchEncodedAccount,
+  fetchEncodedAccounts,
+  unwrapOption,
+  type Address,
+  type EncodedAccount,
+} from "@solana/kit";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { DasAsset } from "./types";
 import { assetDataQueryKey, fetchAssets } from "./use-asset-data";
 
 const reclaimableAccountsKey = (owner: string, network: string) =>
   ["reclaimable-accounts", owner, network] as const;
-
-type ParsedTokenAccountInfo = ParsedTokenState & {
-  mint: string;
-  owner: string;
-  isNative: boolean;
-  tokenAmount: { amount: string; uiAmountString: string };
-};
 
 /**
  * Token accounts (both token programs) of a wallet, plus the mints of those
@@ -36,9 +34,10 @@ type ParsedTokenAccountInfo = ParsedTokenState & {
  *
  * Mints are found among the wallet's own tokens because there is no cheap
  * way to search the chain by mint authority. Others can be added by address.
+ * Reads through the cluster's RPC, so any address can be scanned without a
+ * wallet; the scan runs on `refetch()` only.
  */
 export function useReclaimableAccounts(owner: string) {
-  const { connection } = useConnection();
   const queryClient = useQueryClient();
   const { rpc, dasAvailable, network } = useAppRpc();
 
@@ -47,9 +46,10 @@ export function useReclaimableAccounts(owner: string) {
     enabled: false,
     queryFn: async () => {
       if (!owner) throw Error("No address provided");
+      if (!rpc) throw Error("RPC not available");
 
-      const tokenAccounts = await fetchTokenAccounts(connection, owner);
-      const mints = await fetchControlledMints(connection, owner, [
+      const tokenAccounts = await fetchTokenAccounts(rpc, address(owner));
+      const mints = await fetchControlledMints(rpc, owner, [
         ...new Set(tokenAccounts.map((a) => a.mint)),
       ]);
       const accounts = [...tokenAccounts, ...mints];
@@ -74,26 +74,24 @@ export function useReclaimableAccounts(owner: string) {
 
 /** Checks a single mint address for the paste box on the Mints tab. */
 export async function lookupMint(
-  connection: Connection,
-  dasRpc: AppRpc | null,
-  address: string,
+  rpc: AppRpc,
+  dasAvailable: boolean,
+  mint: string,
   owner: string,
 ): Promise<MintLookup> {
-  const info = await connection.getAccountInfo(new PublicKey(address));
-  if (!info) return { status: "not-found" };
+  const account = await fetchEncodedAccount(rpc, address(mint));
+  if (!account.exists) return { status: "not-found" };
 
-  const result = classifyMint(address, info, owner);
+  const result = classifyMint(account, owner);
   if (result.status === "not-a-mint") return result;
 
-  const assets = await fetchAssets(dasRpc, [address]);
-  const asset = assets.get(address);
+  const assets = await fetchAssets(dasAvailable ? rpc : null, [mint]);
+  const asset = assets.get(mint);
   if (result.status !== "ok") {
-    return { ...result, name: displayName(address, asset) };
+    return { ...result, name: displayName(mint, asset) };
   }
 
-  const minimum = await connection.getMinimumBalanceForRentExemption(
-    info.data.length,
-  );
+  const minimum = await minimumBalance(rpc, account.data.length);
   return {
     status: "ok",
     account: withAssetInfo({ ...result.account, minimum }, asset),
@@ -102,80 +100,91 @@ export async function lookupMint(
 
 type Unnamed = Omit<ReclaimableAccount, "name" | "symbol" | "image">;
 
-async function fetchTokenAccounts(connection: Connection, owner: string) {
-  const ownerKey = new PublicKey(owner);
+async function fetchTokenAccounts(rpc: AppRpc, owner: Address) {
   const programs = [
-    { id: TOKEN_PROGRAM_ID, program: "token" as const },
-    { id: TOKEN_2022_PROGRAM_ID, program: "token-2022" as const },
+    { id: TOKEN_PROGRAM_ADDRESS, program: "token" as const },
+    { id: TOKEN_2022_PROGRAM_ADDRESS, program: "token-2022" as const },
   ];
 
   const results = await Promise.all(
     programs.map(async ({ id, program }) => {
-      const { value } = await connection.getParsedTokenAccountsByOwner(
-        ownerKey,
-        { programId: id },
-      );
+      const { value } = await rpc
+        .getTokenAccountsByOwner(
+          owner,
+          { programId: id },
+          { encoding: "jsonParsed" },
+        )
+        .send();
       return value.map(({ pubkey, account }) => {
-        const info = account.data.parsed.info as ParsedTokenAccountInfo;
+        const info = account.data.parsed.info;
         return {
-          id: pubkey.toBase58(),
+          id: pubkey as string,
           kind: "token-account" as const,
-          address: pubkey.toBase58(),
-          mint: info.mint,
+          address: pubkey as string,
+          mint: info.mint as string,
           program,
           tokenBalance: info.tokenAmount.uiAmountString,
           isEmpty: info.tokenAmount.amount === "0",
-          dataLength: account.data.space,
-          lamports: account.lamports,
+          dataLength: Number(account.data.space),
+          lamports: Number(account.lamports),
           blockedReason: info.isNative
             ? "Wrapped SOL accounts aren't supported"
             : undefined,
-          keepOpenReason: keepOpenReason(info, owner),
+          keepOpenReason: keepOpenReason(
+            {
+              state: info.state,
+              closeAuthority: info.closeAuthority,
+              extensions: info.extensions as ParsedTokenState["extensions"],
+            },
+            owner,
+          ),
         };
       });
     }),
   );
 
-  return withMinimums(connection, results.flat());
+  return withMinimums(rpc, results.flat());
 }
 
 async function fetchControlledMints(
-  connection: Connection,
+  rpc: AppRpc,
   owner: string,
   mints: string[],
 ) {
-  const infos = (
+  const accounts = (
     await Promise.all(
       chunk(mints, 100).map((batch) =>
-        connection.getMultipleAccountsInfo(batch.map((m) => new PublicKey(m))),
+        fetchEncodedAccounts(
+          rpc,
+          batch.map((m) => address(m)),
+        ),
       ),
     )
   ).flat();
 
   const controlled: Omit<Unnamed, "minimum">[] = [];
-  infos.forEach((info, i) => {
-    if (!info) return;
-    const result = classifyMint(mints[i]!, info, owner);
+  for (const account of accounts) {
+    if (!account.exists) continue;
+    const result = classifyMint(account, owner);
     if (result.status === "ok") controlled.push(result.account);
-  });
+  }
 
-  return withMinimums(connection, controlled);
+  return withMinimums(rpc, controlled);
 }
+
+const minimumBalance = async (rpc: AppRpc, size: number) =>
+  Number(await rpc.getMinimumBalanceForRentExemption(BigInt(size)).send());
 
 /** One rent lookup per distinct account size covers everything. */
 async function withMinimums<T extends { dataLength: number }>(
-  connection: Connection,
+  rpc: AppRpc,
   accounts: T[],
 ) {
   const sizes = [...new Set(accounts.map((a) => a.dataLength))];
   const minimums = new Map(
     await Promise.all(
       sizes.map(
-        async (size) =>
-          [
-            size,
-            await connection.getMinimumBalanceForRentExemption(size),
-          ] as const,
+        async (size) => [size, await minimumBalance(rpc, size)] as const,
       ),
     ),
   );
@@ -188,53 +197,47 @@ async function withMinimums<T extends { dataLength: number }>(
  * token program mint, e.g. a token account or a wallet.
  */
 function classifyMint(
-  address: string,
-  info: AccountInfo<Buffer>,
+  account: EncodedAccount,
   owner: string,
 ):
   | { status: "ok"; account: Omit<Unnamed, "minimum"> }
   | { status: "other-authority"; name: string; authority: string }
   | { status: "no-authority"; name: string }
   | { status: "not-a-mint" } {
-  const program = info.owner.equals(TOKEN_PROGRAM_ID)
-    ? ("token" as const)
-    : info.owner.equals(TOKEN_2022_PROGRAM_ID)
-      ? ("token-2022" as const)
-      : null;
-  if (!program) return { status: "not-a-mint" };
+  const program =
+    account.programAddress === TOKEN_PROGRAM_ADDRESS
+      ? ("token" as const)
+      : account.programAddress === TOKEN_2022_PROGRAM_ADDRESS
+        ? ("token-2022" as const)
+        : null;
+  if (!program || !isMintAccountData(account.data)) {
+    return { status: "not-a-mint" };
+  }
 
-  let authority: PublicKey | null;
+  let authority: Address | null;
   try {
-    authority = unpackMint(
-      new PublicKey(address),
-      info,
-      info.owner,
-    ).mintAuthority;
+    authority = unwrapOption(decodeMint(account).data.mintAuthority);
   } catch {
     return { status: "not-a-mint" };
   }
 
   if (!authority) return { status: "no-authority", name: "" };
-  if (authority.toBase58() !== owner) {
-    return {
-      status: "other-authority",
-      name: "",
-      authority: authority.toBase58(),
-    };
+  if (authority !== owner) {
+    return { status: "other-authority", name: "", authority };
   }
 
   return {
     status: "ok",
     account: {
-      id: `mint-${address}`,
+      id: `mint-${account.address}`,
       kind: "mint",
-      address,
-      mint: address,
+      address: account.address,
+      mint: account.address,
       program,
       tokenBalance: "",
       isEmpty: false,
-      dataLength: info.data.length,
-      lamports: info.lamports,
+      dataLength: account.data.length,
+      lamports: Number(account.lamports),
     },
   };
 }

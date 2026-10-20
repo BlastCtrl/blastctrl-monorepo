@@ -1,43 +1,68 @@
-import { WITHDRAW_EXCESS_LAMPORTS_INSTRUCTION } from "@/lib/solana/withdraw-excess-lamports";
-import type { Connection } from "@solana/web3.js";
+import { TOKEN_2022_PROGRAM_ADDRESS } from "@/lib/solana/token-2022";
 import {
-  ComputeBudgetProgram,
-  Keypair,
-  PACKET_DATA_SIZE,
-  SystemProgram,
-  Transaction,
-} from "@solana/web3.js";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseServiceFee } from "./fee";
+  getTransferSolInstructionDataDecoder,
+  SYSTEM_PROGRAM_ADDRESS,
+} from "@solana-program/system";
+import { TOKEN_PROGRAM_ADDRESS } from "@solana-program/token";
+import {
+  AccountRole,
+  address,
+  appendTransactionMessageInstructions,
+  compileTransaction,
+  compileTransactionMessage,
+  createNoopSigner,
+  createTransactionMessage,
+  fillTransactionMessageProvisoryResourceLimits,
+  getAddressDecoder,
+  getTransactionSize,
+  getTransactionSizeLimit,
+  pipe,
+  setTransactionMessageFeePayerSigner,
+  setTransactionMessageLifetimeUsingBlockhash,
+  type Address,
+  type Blockhash,
+  type Instruction,
+} from "@solana/kit";
+import { describe, expect, it } from "vitest";
+import type { ServiceFee } from "./fee";
 import { ACCOUNTS_PER_TRANSACTION } from "./rent";
+import { buildReclaimInstructions } from "./reclaim-instructions";
 import type { ReclaimableAccount } from "./types";
-import type { BatchResult } from "./use-reclaim-excess";
-import {
-  WalletRefusedError,
-  buildReclaimTransaction,
-  isWalletRefusal,
-  sendBatches,
-} from "./use-reclaim-excess";
 
-/** The Token programs' `CloseAccount`. */
+/** The Token programs' `CloseAccount` and `WithdrawExcessLamports`. */
 const CLOSE_ACCOUNT_INSTRUCTION = 9;
+const WITHDRAW_EXCESS_LAMPORTS_INSTRUCTION = 38;
 
-const wallet = Keypair.generate().publicKey;
-const fee = parseServiceFee(Keypair.generate().publicKey.toBase58(), "500")!;
+const wallet = createNoopSigner(
+  address("BWia4unXYeEZAeZeTQFQ2sKoeQQmeGhGmVQ7z4GZJJnx"),
+);
+const fee: ServiceFee = {
+  recipient: address("So11111111111111111111111111111111111111112"),
+  basisPoints: 500,
+};
 const lifetime = {
-  blockhash: "11111111111111111111111111111111",
-  lastValidBlockHeight: 1,
+  blockhash: "11111111111111111111111111111111" as Blockhash,
+  lastValidBlockHeight: 1n,
+};
+
+/** Distinct, deterministic addresses: 32 bytes spelling out a counter. */
+let counter = 0;
+const freshAddress = (): Address => {
+  const bytes = new Uint8Array(32);
+  bytes[0] = ++counter & 0xff;
+  bytes[1] = counter >> 8;
+  return getAddressDecoder().decode(bytes);
 };
 
 const tokenAccount = (
   over: Partial<ReclaimableAccount> = {},
 ): ReclaimableAccount => {
-  const address = Keypair.generate().publicKey.toBase58();
+  const account = freshAddress();
   return {
-    id: address,
+    id: account,
     kind: "token-account",
-    address,
-    mint: Keypair.generate().publicKey.toBase58(),
+    address: account,
+    mint: freshAddress(),
     symbol: "TST",
     name: "Test",
     program: "token",
@@ -51,19 +76,31 @@ const tokenAccount = (
 };
 
 const opcodes = (accounts: ReclaimableAccount[], closeEmpty: boolean) =>
-  buildReclaimTransaction(
-    accounts,
-    wallet,
-    lifetime,
-    null,
-    closeEmpty,
-  ).instructions.map((ix) => ix.data[0]);
+  buildReclaimInstructions(accounts, wallet, null, closeEmpty).map(
+    (ix) => ix.data![0],
+  );
+
+/**
+ * The message as the kit client plans it: fee payer, the instructions and
+ * the compute-limit placeholder the estimate later overwrites in place.
+ */
+const message = (instructions: Instruction[]) =>
+  pipe(
+    createTransactionMessage({ version: 0 }),
+    (m) => setTransactionMessageFeePayerSigner(wallet, m),
+    (m) => setTransactionMessageLifetimeUsingBlockhash(lifetime, m),
+    (m) => appendTransactionMessageInstructions(instructions, m),
+    fillTransactionMessageProvisoryResourceLimits,
+  );
 
 /** Bytes on the wire, with the one signature slot the wallet fills in. */
-const wireSize = (tx: ReturnType<typeof buildReclaimTransaction>) =>
-  tx.serialize({ requireAllSignatures: false, verifySignatures: false }).length;
+const wireSize = (instructions: Instruction[]) =>
+  getTransactionSize(compileTransaction(message(instructions)));
 
-describe("buildReclaimTransaction, closing empty accounts", () => {
+/** What fits in one packet for a version 0 transaction. */
+const PACKET_SIZE = getTransactionSizeLimit(compileTransaction(message([])));
+
+describe("buildReclaimInstructions, closing empty accounts", () => {
   it("closes empty token accounts and withdraws from the rest", () => {
     const accounts = [
       tokenAccount(),
@@ -102,56 +139,66 @@ describe("buildReclaimTransaction, closing empty accounts", () => {
     expect(opcodes([atMinimum], true)).toEqual([CLOSE_ACCOUNT_INSTRUCTION]);
   });
 
-  it("sends a closed account's whole deposit to the wallet", () => {
-    const [close] = buildReclaimTransaction(
+  it("addresses each token program by the account's program", () => {
+    const [token, token2022] = buildReclaimInstructions(
+      [tokenAccount(), tokenAccount({ program: "token-2022" })],
+      wallet,
+      null,
+      false,
+    );
+    expect(token?.programAddress).toBe(TOKEN_PROGRAM_ADDRESS);
+    expect(token2022?.programAddress).toBe(TOKEN_2022_PROGRAM_ADDRESS);
+  });
+
+  it("sends a closed account's whole deposit to the wallet, which signs", () => {
+    const [close] = buildReclaimInstructions(
       [tokenAccount({ program: "token-2022" })],
       wallet,
-      lifetime,
       null,
       true,
-    ).instructions;
-    expect(close!.keys.map((k) => k.pubkey.equals(wallet))).toEqual([
+    );
+    expect(close!.accounts!.map((a) => a.address === wallet.address)).toEqual([
       false,
       true,
       true,
     ]);
-    expect(close!.keys[2]!.isSigner).toBe(true);
+    expect(close!.accounts![2]).toMatchObject({
+      role: AccountRole.READONLY_SIGNER,
+      signer: wallet,
+    });
   });
 
   it("takes the fee from the excess only, even of a closed account", () => {
-    const tx = buildReclaimTransaction(
+    const instructions = buildReclaimInstructions(
       [tokenAccount(), tokenAccount({ isEmpty: false, tokenBalance: "5" })],
       wallet,
-      lifetime,
       fee,
       true,
     );
-    const transfer = tx.instructions[2]!;
-    expect(transfer.programId.equals(SystemProgram.programId)).toBe(true);
+    const transfer = instructions[2]!;
+    expect(transfer.programAddress).toBe(SYSTEM_PROGRAM_ADDRESS);
     // 5% of 550,840 + 550,840 lamports of excess. The closed account
     // returns all 2,039,280, but its 1,488,440 minimum carries no fee.
-    expect(Number(transfer.data.readBigUInt64LE(4))).toBe(55_084);
+    expect(
+      getTransferSolInstructionDataDecoder().decode(transfer.data!).amount,
+    ).toBe(55_084n);
   });
 
   it("charges nothing for closing an account with no excess", () => {
     const atMinimum = tokenAccount({ lamports: 1_488_440 });
-    const tx = buildReclaimTransaction(
-      [atMinimum],
-      wallet,
-      lifetime,
-      fee,
-      true,
-    );
-    expect(tx.instructions.map((ix) => ix.data[0])).toEqual([
-      CLOSE_ACCOUNT_INSTRUCTION,
-    ]);
+    expect(
+      buildReclaimInstructions([atMinimum], wallet, fee, true).map(
+        (ix) => ix.data![0],
+      ),
+    ).toEqual([CLOSE_ACCOUNT_INSTRUCTION]);
   });
 });
 
 /**
- * A legacy transaction has to fit in one packet (1232 bytes). A full batch
- * is the worst case: every account distinct, both token programs, and the
- * fee transfer bringing in the System program and the fee recipient.
+ * A transaction has to fit in one packet (1232 bytes). A full batch is the
+ * worst case: every account distinct, both token programs, the fee transfer
+ * bringing in the System program and the fee recipient, and the compute
+ * limit the kit client adds.
  */
 describe("batch size", () => {
   const fullBatch = (empty: (i: number) => boolean) =>
@@ -163,7 +210,7 @@ describe("batch size", () => {
       }),
     );
   const build = (accounts: ReclaimableAccount[], closeEmpty: boolean) =>
-    buildReclaimTransaction(accounts, wallet, lifetime, fee, closeEmpty);
+    buildReclaimInstructions(accounts, wallet, fee, closeEmpty);
 
   const allEmpty = fullBatch(() => true);
   const withdrawals = build(allEmpty, false);
@@ -174,10 +221,13 @@ describe("batch size", () => {
   );
 
   it("builds the worst case it means to", () => {
-    for (const tx of [withdrawals, closes, mixed]) {
-      expect(tx.instructions).toHaveLength(ACCOUNTS_PER_TRANSACTION + 1);
-      expect(tx.compileMessage().accountKeys).toHaveLength(
-        ACCOUNTS_PER_TRANSACTION + 5,
+    for (const instructions of [withdrawals, closes, mixed]) {
+      expect(instructions).toHaveLength(ACCOUNTS_PER_TRANSACTION + 1);
+      const compiled = compileTransactionMessage(message(instructions));
+      // The wallet, the accounts, both token programs, the System program,
+      // the fee recipient and the Compute Budget program.
+      expect(compiled.staticAccounts).toHaveLength(
+        ACCOUNTS_PER_TRANSACTION + 6,
       );
     }
   });
@@ -188,175 +238,18 @@ describe("batch size", () => {
   });
 
   it("fits in a packet", () => {
-    expect(wireSize(withdrawals)).toBeLessThanOrEqual(PACKET_DATA_SIZE);
+    expect(wireSize(withdrawals)).toBeLessThanOrEqual(PACKET_SIZE);
   });
 
-  // Wallets like Phantom add a compute unit limit and price when the
-  // transaction doesn't set them.
-  it("leaves room for a wallet to add priority fee instructions", () => {
-    const tx = build(allEmpty, true).add(
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
-      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
-    );
-    expect(wireSize(tx)).toBeLessThanOrEqual(PACKET_DATA_SIZE);
-  });
-});
-
-describe("isWalletRefusal", () => {
-  it("knows a refusal by its code or its message", () => {
-    expect(isWalletRefusal(Error("User rejected the request."))).toBe(true);
-    expect(isWalletRefusal(Error("Approval Denied"))).toBe(true);
-    expect(isWalletRefusal(Error("User declined the request"))).toBe(true);
-    // The adapter wraps the wallet's error and keeps it as `error`.
-    const wrapped = Object.assign(Error("Unexpected error"), {
-      error: { code: 4001 },
-    });
-    expect(isWalletRefusal(wrapped)).toBe(true);
-    expect(isWalletRefusal(Error("Transaction simulation failed"))).toBe(false);
-    expect(isWalletRefusal(null)).toBe(false);
-  });
-});
-
-describe("sendBatches with a wallet that asks per transaction", () => {
-  const batches = Array.from({ length: 5 }, (_, index) => ({
-    index,
-    accounts: [],
-  }));
-  const connection = {
-    getLatestBlockhash: async () => lifetime,
-    confirmTransaction: async () => ({
-      context: { slot: 1 },
-      value: { err: null },
-    }),
-  } as unknown as Connection;
-
-  /** A wallet whose `n`th prompt (from 1) throws `error`. */
-  const run = async (n: number, error: Error) => {
-    let prompts = 0;
-    const results: BatchResult[] = [];
-    const sendTransaction = async () => {
-      prompts++;
-      if (prompts === n) throw error;
-      return `signature-${prompts}`;
+  // Wallets like Phantom add a compute unit price when the transaction
+  // doesn't set one (the client sets the limit).
+  it("leaves room for a wallet to add a priority fee instruction", () => {
+    const setComputeUnitPrice: Instruction = {
+      programAddress: address("ComputeBudget111111111111111111111111111111"),
+      data: new Uint8Array([3, 16, 39, 0, 0, 0, 0, 0, 0]),
     };
-    const outcome = await sendBatches(
-      batches,
-      {
-        connection,
-        wallet: { signAllTransactions: undefined, sendTransaction },
-        build: () => new Transaction(),
-      },
-      { onBatchResult: (result) => results.push(result) },
-    ).catch((err: unknown) => err);
-    return { outcome, prompts, results };
-  };
-
-  it("stops at a refusal and says how far it got", async () => {
-    const { outcome, prompts, results } = await run(
-      3,
-      Error("User rejected the request."),
-    );
-    expect(outcome).toBeInstanceOf(WalletRefusedError);
-    expect(outcome).toMatchObject({ sent: 2, of: 5 });
-    expect(prompts).toBe(3);
-    expect(results.map((r) => r.status)).toEqual(["confirmed", "confirmed"]);
-  });
-
-  it("fails only the batch for any other error, and carries on", async () => {
-    const { outcome, prompts, results } = await run(
-      2,
-      Error("Transaction simulation failed"),
-    );
-    expect(outcome).toBeUndefined();
-    expect(prompts).toBe(5);
-    expect(results.map((r) => r.status)).toEqual([
-      "confirmed",
-      "failed",
-      "confirmed",
-      "confirmed",
-      "confirmed",
-    ]);
-  });
-
-  describe("when the RPC stops giving out blockhashes", () => {
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
-    /** The `n`th blockhash (from 1) and every one after it fail. */
-    const runFailingFrom = async (n: number) => {
-      vi.useFakeTimers();
-      let handedOut = 0;
-      let prompts = 0;
-      const results: BatchResult[] = [];
-      const pending = sendBatches(
-        batches,
-        {
-          connection: {
-            ...connection,
-            getLatestBlockhash: async () => {
-              if (handedOut === n - 1) throw Error("fetch failed");
-              handedOut++;
-              return lifetime;
-            },
-          } as unknown as Connection,
-          wallet: {
-            signAllTransactions: undefined,
-            sendTransaction: async () => `signature-${++prompts}`,
-          },
-          build: () => new Transaction(),
-        },
-        { onBatchResult: (result) => results.push(result) },
-      ).catch((err: unknown) => err);
-      // Let the retries' backoff run out.
-      await vi.runAllTimersAsync();
-      return { outcome: await pending, prompts, results };
-    };
-
-    it("fails the rest once some have gone out, instead of saying nothing was sent", async () => {
-      const { outcome, prompts, results } = await runFailingFrom(3);
-      expect(outcome).toBeUndefined();
-      expect(prompts).toBe(2);
-      expect(results.map((r) => r.status)).toEqual([
-        "confirmed",
-        "confirmed",
-        "failed",
-        "failed",
-        "failed",
-      ]);
-    });
-
-    it("throws when nothing has gone out yet", async () => {
-      const { outcome, prompts, results } = await runFailingFrom(1);
-      expect(outcome).toBeInstanceOf(Error);
-      expect(outcome).not.toBeInstanceOf(WalletRefusedError);
-      expect(prompts).toBe(0);
-      expect(results).toEqual([]);
-    });
-  });
-});
-
-describe("sendBatches with a wallet that signs everything at once", () => {
-  it("sends nothing when the wallet refuses", async () => {
-    let sent = 0;
-    const outcome = await sendBatches(
-      [{ index: 0, accounts: [] }],
-      {
-        connection: {
-          getLatestBlockhash: async () => lifetime,
-          sendRawTransaction: async () => `signature-${++sent}`,
-        } as unknown as Connection,
-        wallet: {
-          signAllTransactions: async () => {
-            throw Error("User rejected the request.");
-          },
-          sendTransaction: async () => "unused",
-        },
-        build: () => new Transaction(),
-      },
-      { onBatchResult: () => {} },
-    ).catch((err: unknown) => err);
-    expect(outcome).toMatchObject({ sent: 0, of: 1 });
-    expect(sent).toBe(0);
+    expect(
+      wireSize([...build(allEmpty, true), setComputeUnitPrice]),
+    ).toBeLessThanOrEqual(PACKET_SIZE);
   });
 });

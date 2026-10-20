@@ -1,6 +1,6 @@
 "use client";
 
-import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
+import { useCluster } from "@solana/connector/react";
 import { Suspense, use } from "react";
 import { browser } from "react-dom";
 import { ReclaimRent } from "./_components/reclaim-rent";
@@ -19,7 +19,7 @@ export default function ReclaimRentPage() {
 }
 
 function TestAccounts() {
-  use(browser("The network is persisted in localStorage"));
-  const network = useNetworkConfigurationStore((state) => state.network);
-  return showsTestAccountsPanel(network) && <TestAccountsPanel />;
+  use(browser("The active cluster is client-side state"));
+  const { type } = useCluster();
+  return showsTestAccountsPanel(type) && <TestAccountsPanel />;
 }

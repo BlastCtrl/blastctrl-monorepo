@@ -11,7 +11,7 @@ import {
   ReclaimPill,
 } from "@/app/spl-token-tools/reclaim-rent/_components/results/bits";
 import { Stage } from "@/app/spl-token-tools/reclaim-rent/_components/results/stage";
-import { useRentRate } from "@/app/spl-token-tools/reclaim-rent/_components/use-rent-rate";
+import { useRentRate } from "@/state/queries/use-rent";
 import { isPublicKey } from "@/lib/solana/common";
 import { cn } from "@blastctrl/ui";
 import { AnimatePresence, motion } from "motion/react";

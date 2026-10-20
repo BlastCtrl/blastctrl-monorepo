@@ -23,16 +23,15 @@ import {
   feeBase,
   reclaimLamports,
 } from "@/app/spl-token-tools/reclaim-rent/_components/types";
-import {
-  WalletRefusedError,
-  useReclaimExcess,
-} from "@/app/spl-token-tools/reclaim-rent/_components/use-reclaim-excess";
+import { useReclaimExcess } from "@/app/spl-token-tools/reclaim-rent/_components/use-reclaim-excess";
 import { notify } from "@/components/notification";
+import { useAppRpc } from "@/connector/app-rpc";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { WalletRefusedError } from "@/connector/send-batches";
 import { chunk } from "@/lib/utils";
 import { useReclaimableAccounts } from "@/state/queries/use-reclaimable-accounts";
 import { solBalanceKey } from "@/state/queries/use-sol-balance";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useConnector } from "@solana/connector/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useReducedMotion } from "motion/react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
@@ -83,11 +82,11 @@ function reclaimable(data: ReclaimableAccount[]) {
  * takes connecting it.
  */
 export function OneClickReclaim() {
-  const { connection } = useConnection();
-  const { connected, publicKey } = useWallet();
-  const { setVisible } = useWalletModal();
+  const { isConnected: connected, account } = useConnector();
+  const { setOpen } = useConnectorDialog();
+  const { network } = useAppRpc();
   const queryClient = useQueryClient();
-  const wallet = publicKey?.toBase58() ?? "";
+  const wallet = account ?? "";
   /** An address someone pasted to check without connecting. */
   const [pasted, setPasted] = useState<string | null>(null);
   const [entry, setEntry] = useState<Entry>("wallet");
@@ -124,7 +123,7 @@ export function OneClickReclaim() {
 
   // Results belong to one address on one network: start over when either
   // changes.
-  const scope = `${owner} ${connection.rpcEndpoint}`;
+  const scope = `${owner} ${network}`;
   const [stateScope, setStateScope] = useState(scope);
   // For a scan to check, after its wait, that it still has the same scope.
   const latestScope = useRef(scope);
@@ -308,7 +307,7 @@ export function OneClickReclaim() {
     setPasted(null);
     setEntry("wallet");
     scanNext.current = { notice: false };
-    setVisible(true);
+    setOpen(true);
   };
 
   /** A pasted address: check it once it's the block's. */
@@ -330,7 +329,7 @@ export function OneClickReclaim() {
   /** The pill on a pasted address's results: reclaiming takes its wallet. */
   const connectToReclaim = () => {
     scanNext.current = { notice: true };
-    setVisible(true);
+    setOpen(true);
   };
 
   const props: RewardProps = {

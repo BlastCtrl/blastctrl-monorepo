@@ -1,4 +1,5 @@
 import { createEnv } from "@t3-oss/env-core";
+import { isAddress, type Address } from "@solana/kit";
 import { z } from "zod";
 
 export const env = createEnv({
@@ -12,8 +13,10 @@ export const env = createEnv({
     // fee as a share of the reclaimed excess, in basis points (500 = 5%).
     // Leave both unset (or the rate at 0) for no fee.
     NEXT_PUBLIC_RECLAIM_RENT_FEE_RECIPIENT: z
-      .string()
-      .regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "must be a Solana address")
+      .custom<Address>(
+        (value) => typeof value === "string" && isAddress(value),
+        "must be a Solana address",
+      )
       .optional(),
     NEXT_PUBLIC_RECLAIM_RENT_FEE_BPS: z.coerce
       .number()

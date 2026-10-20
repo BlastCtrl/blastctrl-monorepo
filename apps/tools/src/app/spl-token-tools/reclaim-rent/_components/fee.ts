@@ -1,10 +1,12 @@
-import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { env } from "@/env/client";
+import { getTransferSolInstruction } from "@solana-program/system";
+import type { Address, TransactionSigner } from "@solana/kit";
 import { FEE_PER_TRANSACTION } from "./rent";
 import type { ReclaimableAccount } from "./types";
 import { feeBase, reclaimLamports } from "./types";
 
 export type ServiceFee = {
-  recipient: PublicKey;
+  recipient: Address;
   /**
    * Share of the reclaimed excess, in basis points (500 = 5%). Closed
    * accounts return their whole deposit, but only their excess counts.
@@ -12,26 +14,15 @@ export type ServiceFee = {
   basisPoints: number;
 };
 
-/**
- * Reads the fee from its two environment variables. Either one missing, or a
- * rate of zero, means the tool is free.
- */
-export function parseServiceFee(
-  recipient: string | undefined,
-  basisPoints: string | undefined,
-): ServiceFee | null {
-  const bps = Number(basisPoints);
-  if (!recipient || !Number.isInteger(bps) || bps <= 0 || bps > 10_000) {
-    return null;
-  }
-  return { recipient: new PublicKey(recipient), basisPoints: bps };
-}
-
-// Both are inlined at build time, so they have to be spelled out in full.
-export const SERVICE_FEE = parseServiceFee(
-  process.env.NEXT_PUBLIC_RECLAIM_RENT_FEE_RECIPIENT,
-  process.env.NEXT_PUBLIC_RECLAIM_RENT_FEE_BPS,
-);
+/** Off unless both variables are set and the rate is above zero. */
+export const SERVICE_FEE: ServiceFee | null =
+  env.NEXT_PUBLIC_RECLAIM_RENT_FEE_RECIPIENT &&
+  env.NEXT_PUBLIC_RECLAIM_RENT_FEE_BPS
+    ? {
+        recipient: env.NEXT_PUBLIC_RECLAIM_RENT_FEE_RECIPIENT,
+        basisPoints: env.NEXT_PUBLIC_RECLAIM_RENT_FEE_BPS,
+      }
+    : null;
 
 /** The fee on this much reclaimed excess, rounded down to whole lamports. */
 export function serviceFeeLamports(
@@ -60,15 +51,15 @@ export function formatFeeRate(fee: ServiceFee) {
  * pay it. Returns nothing when the fee rounds down to zero.
  */
 export function createServiceFeeInstruction(
-  wallet: PublicKey,
+  wallet: TransactionSigner,
   excessLamports: number,
   fee: ServiceFee,
 ) {
   const lamports = serviceFeeLamports(excessLamports, fee);
   if (lamports === 0) return null;
-  return SystemProgram.transfer({
-    fromPubkey: wallet,
-    toPubkey: fee.recipient,
-    lamports,
+  return getTransferSolInstruction({
+    source: wallet,
+    destination: fee.recipient,
+    amount: lamports,
   });
 }

@@ -15,34 +15,34 @@ Versions this was written against: `@solana/connector` 0.3.0,
 
 Done (use these as reference implementations):
 
-| Area                                                                                                                                                                           | Files                                                                                                                                                             |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Wallet UI (button, menu, connect dialog incl. WalletConnect)                                                                                                                   | `apps/tools/src/connector/`                                                                                                                                       |
-| Kit client hook                                                                                                                                                                | `apps/tools/src/connector/use-kit-client.ts`                                                                                                                      |
-| Shared error helper                                                                                                                                                            | `apps/tools/src/connector/transaction-error.ts`                                                                                                                   |
-| Stake tools (create UI + CSV, set-lockup, authorize, merge, split, MEV rewards)                                                                                                | `apps/tools/src/app/solana-stake-tools/**`                                                                                                                        |
-| SPL token tools: close-empty, revoke-delegations, recover-nested, token-hoover, distributor (Solace airdrops, incl. `packages/solace-sdk`), create-token                       | `apps/tools/src/app/spl-token-tools/{close-empty,revoke-delegations,recover-nested,token-hoover,distributor,create-token}/**`                                     |
-| Permanent storage file upload (Turbo SDK via `@solana/connector/compat`)                                                                                                       | `apps/tools/src/app/permanent-storage-tools/file-upload/**`, `lib/turbo.ts`                                                                                       |
-| DAS-extended RPC + token-account scans                                                                                                                                         | `src/connector/app-rpc.ts`, `src/state/queries/{use-asset-data,use-owner-assets,use-delegated-assets,use-reclaimable-accounts,use-owner-nfts,use-jup-tokens}.ts`  |
-| Shared reads on Kit RPC                                                                                                                                                        | `src/state/queries/use-stake-account.ts`, `use-user-stake-accounts.ts`, `use-epoch.ts`, `use-rent.ts`                                                             |
-| Metaplex via builder-only Umi (create-token is the reference)                                                                                                                  | `src/lib/solana/metaplex-{umi,token-metadata}.ts`                                                                                                                 |
-| NFT tools: mint (Token Metadata `createV1` + `mintV1`), mint-core (Core `createV1`), update (`updateV1` after reading the metadata account); Arweave uploads of media and JSON | `src/app/solana-nft-tools/{mint,mint-core,update}/**`, `src/lib/solana/metaplex-{token-metadata,core,json-metadata}.ts`, `src/lib/hooks/use-arweave-uploader.tsx` |
-| Shared helpers: unsigned simulation, compute headroom, Token-2022 parsing, mint/SOL-balance/token-account queries                                                              | `src/connector/{simulate,resource-limits}.ts`, `src/lib/solana/token-2022.ts`, `src/state/queries/{use-mint,use-sol-balance,use-token-account-existence}.ts`      |
-| Explorer links by connector cluster                                                                                                                                            | `src/state/use-query-context.ts`                                                                                                                                  |
+| Area                                                                                                                                                                               | Files                                                                                                                                                             |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Wallet UI (button, menu, connect dialog incl. WalletConnect)                                                                                                                       | `apps/tools/src/connector/`                                                                                                                                       |
+| Kit client hook                                                                                                                                                                    | `apps/tools/src/connector/use-kit-client.ts`                                                                                                                      |
+| Shared error helper                                                                                                                                                                | `apps/tools/src/connector/transaction-error.ts`                                                                                                                   |
+| Stake tools (create UI + CSV, set-lockup, authorize, merge, split, MEV rewards)                                                                                                    | `apps/tools/src/app/solana-stake-tools/**`                                                                                                                        |
+| SPL token tools: close-empty, revoke-delegations, recover-nested, token-hoover, distributor (Solace airdrops, incl. `packages/solace-sdk`), create-token                           | `apps/tools/src/app/spl-token-tools/{close-empty,revoke-delegations,recover-nested,token-hoover,distributor,create-token}/**`                                     |
+| Permanent storage file upload (Turbo SDK via `@solana/connector/compat`)                                                                                                           | `apps/tools/src/app/permanent-storage-tools/file-upload/**`, `lib/turbo.ts`                                                                                       |
+| DAS-extended RPC + token-account scans                                                                                                                                             | `src/connector/app-rpc.ts`, `src/state/queries/{use-asset-data,use-owner-assets,use-delegated-assets,use-reclaimable-accounts,use-owner-nfts,use-jup-tokens}.ts`  |
+| Shared reads on Kit RPC                                                                                                                                                            | `src/state/queries/use-stake-account.ts`, `use-user-stake-accounts.ts`, `use-epoch.ts`, `use-rent.ts`                                                             |
+| Metaplex via builder-only Umi (create-token is the reference)                                                                                                                      | `src/lib/solana/metaplex-{umi,token-metadata}.ts`                                                                                                                 |
+| NFT tools: mint (Token Metadata `createV1` + `mintV1`), mint-core (Core `createV1`), update (`updateV1` after reading the metadata account); Arweave uploads of media and JSON     | `src/app/solana-nft-tools/{mint,mint-core,update}/**`, `src/lib/solana/metaplex-{token-metadata,core,json-metadata}.ts`, `src/lib/hooks/use-arweave-uploader.tsx` |
+| Reclaim-rent and reclaim-sol: token-account and mint scan on the kit RPC, close / withdraw-excess / fee instructions from the program clients, batches signed in one wallet prompt | `src/app/spl-token-tools/reclaim-rent/**`, `src/app/reclaim-sol/**`, `src/connector/send-batches.ts`, `src/state/queries/use-reclaimable-accounts.ts`             |
+| Shared helpers: unsigned simulation, compute headroom, Token-2022 parsing, mint/SOL-balance/token-account queries                                                                  | `src/connector/{simulate,resource-limits}.ts`, `src/lib/solana/token-2022.ts`, `src/state/queries/{use-mint,use-sol-balance,use-token-account-existence}.ts`      |
+| Explorer links by connector cluster                                                                                                                                                | `src/state/use-query-context.ts`                                                                                                                                  |
 
 Still on the adapter (as of 2026-10-20): the NFT collections and
-transfer-authority tools, reclaim-rent, gasless swaps, reclaim-sol,
-`src/app/layout.tsx` (still imports the adapter stylesheet),
-`src/state/context/SolanaProvider.tsx`, `src/state/use-wallet-connection.ts`,
-the `use-*` queries that take a web3 `Connection`,
-`lib/solana/{send,send-batches,endpoints,collections,common}` (`common.ts`
-still has web3 PDA helpers), `lib/hooks/use-umi.ts` (Umi with the
-wallet-adapter identity; see the Umi section), and the old
-`components/layout/{desktop,mobile}-wallet.tsx` (unreferenced; delete when
-nothing else needs them). The two API routes under `src/app/api/tx/` build
-transactions server-side with a real-RPC Umi and are a separate concern.
-`grep -rl "@solana/wallet-adapter" apps/tools/src` is the live list; `tsc` is
-clean.
+transfer-authority tools, gasless swaps, `src/app/layout.tsx` (still imports
+the adapter stylesheet), `src/state/context/SolanaProvider.tsx`,
+`src/state/use-wallet-connection.ts`, `src/state/queries/use-token-balance.ts`
+(gasless swaps), `lib/solana/{send,send-batches,endpoints,collections,common}`
+(`send-batches.ts` is transfer-authority's now; `common.ts` still has web3 PDA
+helpers), `lib/hooks/use-umi.ts` (Umi with the wallet-adapter identity; see
+the Umi section), and the old `components/layout/{desktop,mobile}-wallet.tsx`
+(unreferenced; delete when nothing else needs them). The two API routes under
+`src/app/api/tx/` build transactions server-side with a real-RPC Umi and are a
+separate concern. `grep -rl "@solana/wallet-adapter" apps/tools/src` is the
+live list; `tsc` is clean.
 
 Breaking other, not-yet-migrated tools while changing a shared query or
 helper is accepted; they get fixed when their turn comes. Keep `tsc` clean
@@ -136,6 +136,27 @@ If the receiving side requires a transaction version, pin it instead of relying
 on the planner's default: `useKitClient({ transactionConfig: { version: 0 } })`
 with the config as a module constant (the hook memoizes on it), and check
 `message.version` before compiling. The Solace backend requires version 0.
+
+### Several independent transactions: `sendBatches`
+
+`src/connector/send-batches.ts` sends one transaction per batch with a single
+wallet prompt and reports each batch on its own (`onStage`, `onBatchResult`);
+the reclaim tools and their test-accounts panel use it. `kitBatchSender(client)`
+is the chain side: `planTransaction`, one shared blockhash,
+`estimateAndSetResourceLimitsWithBuffer`, `compileTransaction`,
+`client.payer.modifyAndSignTransactions([...])` for the prompt, then
+`sendAndConfirmTransactionFactory` per batch. The connector's kit signer
+(`@solana/wallet-account-signer`) hands the whole array to the wallet's
+`solana:signTransaction` feature in one call; a signer that throws
+`SOLANA_ERROR__SIGNER__WALLET_MULTISIGN_UNIMPLEMENTED` instead (as
+`@solana/react`'s does) is asked per batch, with a fresh blockhash each time.
+A batch whose simulation fails is reported failed before the prompt and the
+rest still go out. A refusal throws `WalletRefusedError(sent, of)`;
+`isWalletRefusal` recognises code 4001, the connector's `USER_REJECTED` and
+the usual messages, through the cause chain. Anything else thrown means
+nothing was sent. The legacy `lib/solana/send-batches.ts` has the same shape
+over web3 and stays until transfer-authority migrates. The sender is an
+interface, so `send-batches.test.ts` drives the whole flow with a fake one.
 
 ### Metaplex programs through Umi
 
@@ -293,6 +314,16 @@ a `KeyPairSigner` (via `createKeyPairSignerFromBytes`). A `KeyPairSigner` also e
   The distributor sends it to the backend as `tokenProgram` at creation and
   reads it back from the airdrop for start and retry, and refuses mints with
   the transfer-fee or transfer-hook extension before anything is signed.
+- `@solana-program/token` 0.18 has `getWithdrawExcessLamportsInstruction`
+  (Token-2022 and p-token both use index 38), so the hand-built instruction
+  is gone. `decodeMint` reads 82 bytes from anything, so tell mints from
+  token accounts first with `isMintAccountData` in `lib/solana/token-2022.ts`
+  (82 bytes, or the mint account type after the token-account padding).
+- `getTokenAccountsByOwner` with `encoding: "jsonParsed"` is typed
+  (`TokenAccountInfoWithJsonData`); `lamports` and `space` arrive as
+  `bigint`, and `extensions` as `unknown[]`. The reclaim scan keeps
+  `jsonParsed` because the Token-2022 extension state it needs (withheld
+  fees, confidential transfers) is painful to parse by hand.
 - Narrow cluster types with `getClusterType(cluster)` from
   `@solana/connector/headless`. `chainIdToClusterType` expects genesis-hash
   chain ids (`solana:5eykt4…`), not cluster ids, and returns null for the

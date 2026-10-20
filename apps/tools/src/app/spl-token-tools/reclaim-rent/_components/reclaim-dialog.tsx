@@ -1,4 +1,5 @@
 import { notify } from "@/components/notification";
+import { WalletRefusedError } from "@/connector/send-batches";
 import { compress } from "@/lib/solana/common";
 import { Button, CopyButton, SpinnerIcon, cn } from "@blastctrl/ui";
 import {
@@ -8,7 +9,7 @@ import {
   DialogTitle,
 } from "@headlessui/react";
 import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/20/solid";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnector } from "@solana/connector/react";
 import { useState } from "react";
 import { SERVICE_FEE, serviceFeeLamports } from "./fee";
 import {
@@ -19,8 +20,8 @@ import {
 } from "./rent";
 import type { ReclaimableAccount } from "./types";
 import { closes, excessLamports, feeBase, reclaimLamports } from "./types";
-import { WalletRefusedError, useReclaimExcess } from "./use-reclaim-excess";
-import { useRentRate } from "./use-rent-rate";
+import { useReclaimExcess } from "./use-reclaim-excess";
+import { useRentRate } from "@/state/queries/use-rent";
 
 type Batch = {
   accounts: ReclaimableAccount[];
@@ -82,7 +83,7 @@ export function ReclaimDialog({
   onSettled,
   onClose,
 }: Props) {
-  const { publicKey } = useWallet();
+  const { account } = useConnector();
   const stepsLeft = remainingSteps(useRentRate().lamportsPerByte);
   const [phase, setPhase] = useState<Phase>("review");
   const [batches, setBatches] = useState(() => toBatches(accounts, closeEmpty));
@@ -216,7 +217,7 @@ export function ReclaimDialog({
                 accounts={accounts}
                 closeEmpty={closeEmpty}
                 batches={batches}
-                wallet={publicKey?.toBase58() ?? ""}
+                wallet={account ?? ""}
               />
             ) : (
               <BatchList batches={batches} />

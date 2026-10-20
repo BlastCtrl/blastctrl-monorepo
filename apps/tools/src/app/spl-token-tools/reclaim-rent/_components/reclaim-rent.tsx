@@ -1,11 +1,13 @@
 import { notify } from "@/components/notification";
+import { useAppRpc } from "@/connector/app-rpc";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { WalletRefusedError } from "@/connector/send-batches";
 import { chunk } from "@/lib/utils";
 import { useReclaimableAccounts } from "@/state/queries/use-reclaimable-accounts";
 import { solBalanceKey } from "@/state/queries/use-sol-balance";
 import { Button, Switch, cn } from "@blastctrl/ui";
 import { Description, Field, Label } from "@headlessui/react";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useConnector } from "@solana/connector/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
@@ -39,8 +41,8 @@ import type {
 } from "./results/types";
 import type { ReclaimableAccount } from "./types";
 import { closes, excessLamports, feeBase, reclaimLamports } from "./types";
-import { WalletRefusedError, useReclaimExcess } from "./use-reclaim-excess";
-import { useRentRate } from "./use-rent-rate";
+import { useReclaimExcess } from "./use-reclaim-excess";
+import { useRentRate } from "@/state/queries/use-rent";
 
 /**
  * A scan always takes at least this long, so the stage has unrolled and
@@ -67,8 +69,8 @@ const wait = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
 /**
  * The whole tool: the intro, the stage with the results block, and the
- * drawer below it. It talks to the chain only through the wallet adapter's
- * connection and wallet, which the demo page swaps for mock ones.
+ * drawer below it. It talks to the chain only through the connector's RPC
+ * and wallet.
  */
 export function ReclaimRent({
   forceReducedMotion = false,
@@ -76,15 +78,14 @@ export function ReclaimRent({
   /** Skip every animation even when the system allows them (the demo). */
   forceReducedMotion?: boolean;
 }) {
-  const { connection } = useConnection();
-  const { connected, publicKey } = useWallet();
-  const { setVisible } = useWalletModal();
+  const { account } = useConnector();
+  const { setOpen } = useConnectorDialog();
+  const { network } = useAppRpc();
   const queryClient = useQueryClient();
   const { lamportsPerByte } = useRentRate();
   const stepsLeft = remainingSteps(lamportsPerByte);
-  const { data, error, refetch } = useReclaimableAccounts(
-    publicKey?.toBase58() ?? "",
-  );
+  const owner = account ?? "";
+  const { data, error, refetch } = useReclaimableAccounts(owner);
   const reduced = !!useReducedMotion() || forceReducedMotion;
 
   const [phase, setPhase] = useState<Phase>("idle");
@@ -124,8 +125,7 @@ export function ReclaimRent({
   // Selection and results belong to one wallet on one network. Start over
   // when either changes: a wallet's token accounts have the same addresses
   // on every cluster, so a reclaimed set from mainnet must not leak to devnet.
-  const owner = publicKey?.toBase58() ?? "";
-  const scope = `${owner} ${connection.rpcEndpoint}`;
+  const scope = `${owner} ${network}`;
   const [stateScope, setStateScope] = useState(scope);
   // For a scan to check, after its wait, that it still has the same scope.
   const latestScope = useRef(scope);
@@ -254,9 +254,7 @@ export function ReclaimRent({
 
   const afterReclaim = () => {
     void refetch();
-    void queryClient.invalidateQueries({
-      queryKey: solBalanceKey(publicKey?.toString() ?? null),
-    });
+    void queryClient.invalidateQueries({ queryKey: solBalanceKey(account) });
   };
 
   const markBatch = (index: number, status: BatchStatus) =>
@@ -309,8 +307,8 @@ export function ReclaimRent({
   };
 
   const scan = async () => {
-    if (!connected) {
-      setVisible(true);
+    if (!account) {
+      setOpen(true);
       return;
     }
     const startedIn = scope;
@@ -477,7 +475,7 @@ export function ReclaimRent({
               inert={phase !== "idle"}
             >
               <Button color="indigo" onClick={() => void scan()}>
-                {connected ? "Check my accounts" : "Connect your wallet"}
+                {account ? "Check my accounts" : "Connect your wallet"}
               </Button>
               {error && phase === "idle" && (
                 <p role="alert" className="mt-3 text-sm text-red-700">

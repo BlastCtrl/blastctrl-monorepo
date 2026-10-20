@@ -20,9 +20,23 @@ export const MINT_EXTENSION = {
   TransferHook: 14,
 } as const;
 
+const MINT_SIZE = 82;
 const TOKEN_ACCOUNT_SIZE = 165;
 const ACCOUNT_TYPE_MINT = 1;
 const TLV_START = TOKEN_ACCOUNT_SIZE + 1;
+
+/**
+ * Whether token program account data is a mint: the 82-byte base on its own,
+ * or Token-2022's form padded past the token-account size with the mint
+ * account type before its extensions. A token account is 165 bytes, or
+ * carries the token account type there instead.
+ */
+export function isMintAccountData(data: ReadonlyUint8Array): boolean {
+  return (
+    data.length === MINT_SIZE ||
+    (data.length >= TLV_START && data[TOKEN_ACCOUNT_SIZE] === ACCOUNT_TYPE_MINT)
+  );
+}
 
 /**
  * Extension type ids present on a mint account's data. Token-2022 pads the
