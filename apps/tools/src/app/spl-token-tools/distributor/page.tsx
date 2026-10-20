@@ -2,7 +2,14 @@
 
 import { notify } from "@/components/notification";
 import { useConnectorDialog } from "@/connector/connector-dialog";
-import type { GetAirdrop200, ListAirdrops200Item } from "@blastctrl/solace-sdk";
+import {
+  getAuthChallenge,
+  refreshAuthToken,
+  SolaceApiError,
+  verifyAuthChallenge,
+  type GetAirdrop200,
+  type ListAirdrops200Item,
+} from "@blastctrl/solace-sdk";
 import { Button } from "@blastctrl/ui";
 import { Input } from "@headlessui/react";
 import { ArrowTurnDownRightIcon, TrashIcon } from "@heroicons/react/16/solid";
@@ -24,9 +31,9 @@ import {
 } from "react";
 import { flushSync } from "react-dom";
 import { Box } from "./box";
-import { formatDate, SolaceError, useFadeIn } from "./common";
+import { formatDate, useFadeIn } from "./common";
 import { MintAddressLink } from "./mint-address-link";
-import { useSolace, useSolaceAuth } from "./solace-provider";
+import { useSolaceAuth } from "./solace-provider";
 import { useDeleteAirdrop, useGetAirdrops, useSetLabel } from "./state";
 
 export default function Overview() {
@@ -36,26 +43,24 @@ export default function Overview() {
   // The connector's byte-level signer is the one place that exposes the
   // wallet's raw `signMessage`, which the sign-in challenge is verified with.
   const { signer } = useTransactionSigner();
-  const solace = useSolace();
   const { authToken, setAuthToken } = useSolaceAuth();
 
   // Reads the latest token and account when the timer fires.
   const refreshAccessToken = useEffectEvent(async () => {
     if (!authToken?.refreshToken || !account) return;
-    const response = await solace.api.refreshAuthToken({
-      address: account,
-      refreshToken: authToken.refreshToken,
-    });
-
-    if (response.status !== 200) {
+    try {
+      setAuthToken(
+        await refreshAuthToken({
+          address: account,
+          refreshToken: authToken.refreshToken,
+        }),
+      );
+    } catch (error) {
       console.error(
         "Auth refresh failed: %s",
-        SolaceError.fromResponse(response).message,
+        error instanceof Error ? error.message : String(error),
       );
-      return;
     }
-
-    setAuthToken(response.data);
   });
 
   const clearAuthToken = useCallback(() => {
@@ -88,25 +93,24 @@ export default function Overview() {
         throw new Error("The connected wallet cannot sign messages");
       }
 
-      const challenge = await solace.api.getAuthChallenge({ address: account });
-      if (challenge.status !== 200) throw SolaceError.fromResponse(challenge);
-
+      const challenge = await getAuthChallenge({ address: account });
       const signature = await signer.signMessage(
-        new TextEncoder().encode(challenge.data.message),
+        new TextEncoder().encode(challenge.message),
       );
-      const authResp = await solace.api.verifyAuthChallenge({
-        address: account,
-        signature: getBase58Decoder().decode(signature),
-      });
-      if (authResp.status !== 200) throw SolaceError.fromResponse(authResp);
-
-      setAuthToken(authResp.data);
+      setAuthToken(
+        await verifyAuthChallenge({
+          address: account,
+          signature: getBase58Decoder().decode(signature),
+        }),
+      );
     } catch (error) {
       console.log(error);
       const [title, message] =
-        error instanceof Error
-          ? [error.name, error.message]
-          : [undefined, "Unknown error happened, check console"];
+        error instanceof SolaceApiError
+          ? [error.error, error.message]
+          : error instanceof Error
+            ? [error.name, error.message]
+            : [undefined, "Unknown error happened, check console"];
       notify({ type: "error", title, description: message });
     }
   };
@@ -212,20 +216,21 @@ const SolaceAirdropDashboard = ({
         {isError && (
           <div className="space-y-2 rounded-sm bg-red-50 p-3 text-center text-red-700">
             Failed to load airdrops.
-            {error.error === "FST_AUTHENTICATION_ERROR" && (
-              <>
-                <div>Authentication error, sign out and try again.</div>
-                <Button
-                  className="block"
-                  onClick={() => {
-                    clearAuthToken();
-                    void disconnectWallet();
-                  }}
-                >
-                  Sign out
-                </Button>
-              </>
-            )}
+            {error instanceof SolaceApiError &&
+              error.error === "FST_AUTHENTICATION_ERROR" && (
+                <>
+                  <div>Authentication error, sign out and try again.</div>
+                  <Button
+                    className="block"
+                    onClick={() => {
+                      clearAuthToken();
+                      void disconnectWallet();
+                    }}
+                  >
+                    Sign out
+                  </Button>
+                </>
+              )}
           </div>
         )}
 

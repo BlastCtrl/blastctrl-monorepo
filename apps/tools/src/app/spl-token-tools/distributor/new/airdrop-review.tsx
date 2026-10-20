@@ -3,7 +3,10 @@ import { InfoTooltip } from "@/components/info-tooltip";
 import { useConnectorDialog } from "@/connector/connector-dialog";
 import { lamportsToSol } from "@/lib/solana/common";
 import { useTokenAccountExistence } from "@/state/queries/use-token-account-existence";
-import { CreateTokenAirdropBodyTokenProgram } from "@blastctrl/solace-sdk";
+import {
+  CreateTokenAirdropBodyTokenProgram,
+  SolaceApiError,
+} from "@blastctrl/solace-sdk";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { useConnector } from "@solana/connector/react";
 import { decimalFixedPoint, type Address } from "@solana/kit";
@@ -474,7 +477,9 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
       )}
       {error && (
         <div className="mt-2 text-center text-xs text-red-600">
-          {error.error}: {error.message}
+          {error instanceof SolaceApiError
+            ? `${error.error}: ${error.message}`
+            : error.message}
         </div>
       )}
     </div>

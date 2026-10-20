@@ -13,7 +13,11 @@ const nextConfig = {
   //   loader: "cloudinary",
   //   path: "https://res.cloudinary.com/doz0obwb0/image/fetch/",
   // },
-  transpilePackages: ["@blastctrl/ui", "@blastctrl/octane-core"],
+  transpilePackages: [
+    "@blastctrl/ui",
+    "@blastctrl/octane-core",
+    "@blastctrl/solace-sdk",
+  ],
   images: {
     remotePatterns: [
       {

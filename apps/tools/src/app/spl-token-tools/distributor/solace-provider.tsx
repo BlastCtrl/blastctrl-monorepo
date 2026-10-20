@@ -1,7 +1,6 @@
 "use client";
 
 import { useLocalStorageState } from "@/lib/hooks/use-local-storage";
-import build, { type SolaceSDK } from "@blastctrl/solace-sdk";
 import { useConnector } from "@solana/connector/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -14,34 +13,28 @@ export type AuthToken = {
 };
 
 const AUTH_TOKEN_KEY = "authToken";
-/** Proxied to the backend by `next.config.js`, so requests stay same-origin. */
-const BASE_URL = "/blast-api";
 
-type SolaceContextValue = {
-  sdk: SolaceSDK;
+type SolaceAuthContextValue = {
   authToken: AuthToken | null;
   setAuthToken: React.Dispatch<React.SetStateAction<AuthToken | null>>;
+  /** Spread into the options of any SDK call that needs the bearer token. */
+  requestInit: RequestInit;
 };
 
-const SolaceContext = React.createContext<SolaceContextValue | null>(null);
+const SolaceAuthContext = React.createContext<SolaceAuthContextValue | null>(
+  null,
+);
 
-function useSolaceContext() {
-  const context = React.useContext(SolaceContext);
+/**
+ * The sign-in token (persisted in local storage), its setter, and the request
+ * options that carry it to the Blast API.
+ */
+export function useSolaceAuth(): SolaceAuthContextValue {
+  const context = React.useContext(SolaceAuthContext);
   if (!context) {
-    throw new Error("useSolace must be used within a SolaceProvider");
+    throw new Error("useSolaceAuth must be used within a SolaceProvider");
   }
   return context;
-}
-
-/** The SDK instance bound to the current sign-in token. */
-export function useSolace(): SolaceSDK {
-  return useSolaceContext().sdk;
-}
-
-/** The sign-in token (persisted in local storage) and its setter. */
-export function useSolaceAuth() {
-  const { authToken, setAuthToken } = useSolaceContext();
-  return { authToken, setAuthToken };
 }
 
 export function SolaceProvider({ children }: { children: React.ReactNode }) {
@@ -53,11 +46,9 @@ export function SolaceProvider({ children }: { children: React.ReactNode }) {
     null,
   );
 
-  // The instance is bound to the token, so a new token means a new instance.
   const token = authToken?.token ?? null;
-  const sdk = React.useMemo(
-    () =>
-      build(BASE_URL, token ? { authorization: `Bearer ${token}` } : undefined),
+  const requestInit = React.useMemo<RequestInit>(
+    () => (token ? { headers: { authorization: `Bearer ${token}` } } : {}),
     [token],
   );
 
@@ -97,11 +88,13 @@ export function SolaceProvider({ children }: { children: React.ReactNode }) {
   }, [account, authToken, queryClient, push]);
 
   const value = React.useMemo(
-    () => ({ sdk, authToken, setAuthToken }),
-    [sdk, authToken, setAuthToken],
+    () => ({ authToken, setAuthToken, requestInit }),
+    [authToken, setAuthToken, requestInit],
   );
 
   return (
-    <SolaceContext.Provider value={value}>{children}</SolaceContext.Provider>
+    <SolaceAuthContext.Provider value={value}>
+      {children}
+    </SolaceAuthContext.Provider>
   );
 }

@@ -10,18 +10,13 @@ import type {
   CreateAirdropBody,
   CreateTokenAirdrop201,
   CreateTokenAirdropBody,
-  Def0,
   GetAirdrop200,
   GetAuthChallenge200,
-  GetAuthChallenge400,
   GetAuthChallengeParams,
   GetHealth200,
   GetSolanaRpcConfigHealth200,
-  GetSolanaRpcConfigHealth503,
   ListAirdrops200Item,
   RefreshAuthToken200,
-  RefreshAuthToken400,
-  RefreshAuthToken401,
   RefreshAuthTokenBody,
   RetryAirdropTransaction200,
   RetryAirdropTransactionBody,
@@ -30,31 +25,10 @@ import type {
   StartAirdrop200,
   StartAirdropBodyItem,
   VerifyAuthChallenge200,
-  VerifyAuthChallenge400,
-  VerifyAuthChallenge401,
   VerifyAuthChallengeBody
 } from './solace-sdk.schemas';
 
 import { customFetch } from '../custom-fetch';
-
-export type getAuthChallengeResponse200 = {
-  data: GetAuthChallenge200
-  status: 200
-}
-
-export type getAuthChallengeResponse400 = {
-  data: GetAuthChallenge400
-  status: 400
-}
-
-export type getAuthChallengeResponseSuccess = (getAuthChallengeResponse200) & {
-  headers: Headers;
-};
-export type getAuthChallengeResponseError = (getAuthChallengeResponse400) & {
-  headers: Headers;
-};
-
-export type getAuthChallengeResponse = (getAuthChallengeResponseSuccess | getAuthChallengeResponseError)
 
 export const getGetAuthChallengeUrl = (params: GetAuthChallengeParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -68,15 +42,15 @@ export const getGetAuthChallengeUrl = (params: GetAuthChallengeParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/auth/challenge?${stringifiedParams}` : `/auth/challenge`
+  return stringifiedParams.length > 0 ? `/blast-api/auth/challenge?${stringifiedParams}` : `/blast-api/auth/challenge`
 }
 
 /**
  * @summary Get a wallet signing challenge
  */
-export const getAuthChallenge = async (params: GetAuthChallengeParams, options?: Parameters<typeof customFetch>[1]): Promise<getAuthChallengeResponse> => {
+export const getAuthChallenge = async (params: GetAuthChallengeParams, options?: Parameters<typeof customFetch>[1]): Promise<GetAuthChallenge200> => {
 
-  return customFetch<getAuthChallengeResponse>(getGetAuthChallengeUrl(params),
+  return customFetch<GetAuthChallenge200>(getGetAuthChallengeUrl(params),
   {
     ...options,
     method: 'GET'
@@ -87,42 +61,18 @@ export const getAuthChallenge = async (params: GetAuthChallengeParams, options?:
 
 
 
-export type verifyAuthChallengeResponse200 = {
-  data: VerifyAuthChallenge200
-  status: 200
-}
-
-export type verifyAuthChallengeResponse400 = {
-  data: VerifyAuthChallenge400
-  status: 400
-}
-
-export type verifyAuthChallengeResponse401 = {
-  data: VerifyAuthChallenge401
-  status: 401
-}
-
-export type verifyAuthChallengeResponseSuccess = (verifyAuthChallengeResponse200) & {
-  headers: Headers;
-};
-export type verifyAuthChallengeResponseError = (verifyAuthChallengeResponse400 | verifyAuthChallengeResponse401) & {
-  headers: Headers;
-};
-
-export type verifyAuthChallengeResponse = (verifyAuthChallengeResponseSuccess | verifyAuthChallengeResponseError)
-
 export const getVerifyAuthChallengeUrl = () => {
 
 
 
 
-  return `/auth/verify`
+  return `/blast-api/auth/verify`
 }
 
 /**
  * @summary Verify a signed challenge and issue tokens
  */
-export const verifyAuthChallenge = async (verifyAuthChallengeBody: VerifyAuthChallengeBody, options?: Parameters<typeof customFetch>[1]): Promise<verifyAuthChallengeResponse> => {
+export const verifyAuthChallenge = async (verifyAuthChallengeBody: VerifyAuthChallengeBody, options?: Parameters<typeof customFetch>[1]): Promise<VerifyAuthChallenge200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -138,7 +88,7 @@ export const verifyAuthChallenge = async (verifyAuthChallengeBody: VerifyAuthCha
     }
     return headers;
   };
-return customFetch<verifyAuthChallengeResponse>(getVerifyAuthChallengeUrl(),
+return customFetch<VerifyAuthChallenge200>(getVerifyAuthChallengeUrl(),
   {
     ...options,
     method: 'POST',
@@ -149,42 +99,18 @@ return customFetch<verifyAuthChallengeResponse>(getVerifyAuthChallengeUrl(),
 
 
 
-export type refreshAuthTokenResponse200 = {
-  data: RefreshAuthToken200
-  status: 200
-}
-
-export type refreshAuthTokenResponse400 = {
-  data: RefreshAuthToken400
-  status: 400
-}
-
-export type refreshAuthTokenResponse401 = {
-  data: RefreshAuthToken401
-  status: 401
-}
-
-export type refreshAuthTokenResponseSuccess = (refreshAuthTokenResponse200) & {
-  headers: Headers;
-};
-export type refreshAuthTokenResponseError = (refreshAuthTokenResponse400 | refreshAuthTokenResponse401) & {
-  headers: Headers;
-};
-
-export type refreshAuthTokenResponse = (refreshAuthTokenResponseSuccess | refreshAuthTokenResponseError)
-
 export const getRefreshAuthTokenUrl = () => {
 
 
 
 
-  return `/auth/refresh`
+  return `/blast-api/auth/refresh`
 }
 
 /**
  * @summary Refresh authentication tokens
  */
-export const refreshAuthToken = async (refreshAuthTokenBody: RefreshAuthTokenBody, options?: Parameters<typeof customFetch>[1]): Promise<refreshAuthTokenResponse> => {
+export const refreshAuthToken = async (refreshAuthTokenBody: RefreshAuthTokenBody, options?: Parameters<typeof customFetch>[1]): Promise<RefreshAuthToken200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -200,7 +126,7 @@ export const refreshAuthToken = async (refreshAuthTokenBody: RefreshAuthTokenBod
     }
     return headers;
   };
-return customFetch<refreshAuthTokenResponse>(getRefreshAuthTokenUrl(),
+return customFetch<RefreshAuthToken200>(getRefreshAuthTokenUrl(),
   {
     ...options,
     method: 'POST',
@@ -211,47 +137,18 @@ return customFetch<refreshAuthTokenResponse>(getRefreshAuthTokenUrl(),
 
 
 
-export type createAirdropResponse201 = {
-  data: CreateAirdrop201
-  status: 201
-}
-
-export type createAirdropResponse400 = {
-  data: Def0
-  status: 400
-}
-
-export type createAirdropResponse401 = {
-  data: Def0
-  status: 401
-}
-
-export type createAirdropResponse500 = {
-  data: Def0
-  status: 500
-}
-
-export type createAirdropResponseSuccess = (createAirdropResponse201) & {
-  headers: Headers;
-};
-export type createAirdropResponseError = (createAirdropResponse400 | createAirdropResponse401 | createAirdropResponse500) & {
-  headers: Headers;
-};
-
-export type createAirdropResponse = (createAirdropResponseSuccess | createAirdropResponseError)
-
 export const getCreateAirdropUrl = () => {
 
 
 
 
-  return `/airdrops`
+  return `/blast-api/airdrops`
 }
 
 /**
  * @summary Create a SOL airdrop
  */
-export const createAirdrop = async (createAirdropBody: CreateAirdropBody, options?: Parameters<typeof customFetch>[1]): Promise<createAirdropResponse> => {
+export const createAirdrop = async (createAirdropBody: CreateAirdropBody, options?: Parameters<typeof customFetch>[1]): Promise<CreateAirdrop201> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -267,7 +164,7 @@ export const createAirdrop = async (createAirdropBody: CreateAirdropBody, option
     }
     return headers;
   };
-return customFetch<createAirdropResponse>(getCreateAirdropUrl(),
+return customFetch<CreateAirdrop201>(getCreateAirdropUrl(),
   {
     ...options,
     method: 'POST',
@@ -278,39 +175,20 @@ return customFetch<createAirdropResponse>(getCreateAirdropUrl(),
 
 
 
-export type listAirdropsResponse200 = {
-  data: ListAirdrops200Item[]
-  status: 200
-}
-
-export type listAirdropsResponse401 = {
-  data: Def0
-  status: 401
-}
-
-export type listAirdropsResponseSuccess = (listAirdropsResponse200) & {
-  headers: Headers;
-};
-export type listAirdropsResponseError = (listAirdropsResponse401) & {
-  headers: Headers;
-};
-
-export type listAirdropsResponse = (listAirdropsResponseSuccess | listAirdropsResponseError)
-
 export const getListAirdropsUrl = () => {
 
 
 
 
-  return `/airdrops`
+  return `/blast-api/airdrops`
 }
 
 /**
  * @summary List your airdrops
  */
-export const listAirdrops = async ( options?: Parameters<typeof customFetch>[1]): Promise<listAirdropsResponse> => {
+export const listAirdrops = async ( options?: Parameters<typeof customFetch>[1]): Promise<ListAirdrops200Item[]> => {
 
-  return customFetch<listAirdropsResponse>(getListAirdropsUrl(),
+  return customFetch<ListAirdrops200Item[]>(getListAirdropsUrl(),
   {
     ...options,
     method: 'GET'
@@ -321,47 +199,18 @@ export const listAirdrops = async ( options?: Parameters<typeof customFetch>[1])
 
 
 
-export type createTokenAirdropResponse201 = {
-  data: CreateTokenAirdrop201
-  status: 201
-}
-
-export type createTokenAirdropResponse400 = {
-  data: Def0
-  status: 400
-}
-
-export type createTokenAirdropResponse401 = {
-  data: Def0
-  status: 401
-}
-
-export type createTokenAirdropResponse500 = {
-  data: Def0
-  status: 500
-}
-
-export type createTokenAirdropResponseSuccess = (createTokenAirdropResponse201) & {
-  headers: Headers;
-};
-export type createTokenAirdropResponseError = (createTokenAirdropResponse400 | createTokenAirdropResponse401 | createTokenAirdropResponse500) & {
-  headers: Headers;
-};
-
-export type createTokenAirdropResponse = (createTokenAirdropResponseSuccess | createTokenAirdropResponseError)
-
 export const getCreateTokenAirdropUrl = () => {
 
 
 
 
-  return `/airdrops/token`
+  return `/blast-api/airdrops/token`
 }
 
 /**
  * @summary Create an SPL token airdrop
  */
-export const createTokenAirdrop = async (createTokenAirdropBody: CreateTokenAirdropBody, options?: Parameters<typeof customFetch>[1]): Promise<createTokenAirdropResponse> => {
+export const createTokenAirdrop = async (createTokenAirdropBody: CreateTokenAirdropBody, options?: Parameters<typeof customFetch>[1]): Promise<CreateTokenAirdrop201> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -377,7 +226,7 @@ export const createTokenAirdrop = async (createTokenAirdropBody: CreateTokenAird
     }
     return headers;
   };
-return customFetch<createTokenAirdropResponse>(getCreateTokenAirdropUrl(),
+return customFetch<CreateTokenAirdrop201>(getCreateTokenAirdropUrl(),
   {
     ...options,
     method: 'POST',
@@ -388,49 +237,20 @@ return customFetch<createTokenAirdropResponse>(getCreateTokenAirdropUrl(),
 
 
 
-export type deleteAirdropResponse204 = {
-  data: unknown
-  status: 204
-}
-
-export type deleteAirdropResponse400 = {
-  data: Def0
-  status: 400
-}
-
-export type deleteAirdropResponse401 = {
-  data: Def0
-  status: 401
-}
-
-export type deleteAirdropResponse404 = {
-  data: Def0
-  status: 404
-}
-
-export type deleteAirdropResponseSuccess = (deleteAirdropResponse204) & {
-  headers: Headers;
-};
-export type deleteAirdropResponseError = (deleteAirdropResponse400 | deleteAirdropResponse401 | deleteAirdropResponse404) & {
-  headers: Headers;
-};
-
-export type deleteAirdropResponse = (deleteAirdropResponseSuccess | deleteAirdropResponseError)
-
 export const getDeleteAirdropUrl = (id: string,) => {
 
 
 
 
-  return `/airdrops/${id}`
+  return `/blast-api/airdrops/${id}`
 }
 
 /**
  * @summary Delete an unstarted airdrop
  */
-export const deleteAirdrop = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<deleteAirdropResponse> => {
+export const deleteAirdrop = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<unknown> => {
 
-  return customFetch<deleteAirdropResponse>(getDeleteAirdropUrl(id),
+  return customFetch<unknown>(getDeleteAirdropUrl(id),
   {
     ...options,
     method: 'DELETE'
@@ -441,44 +261,20 @@ export const deleteAirdrop = async (id: string, options?: Parameters<typeof cust
 
 
 
-export type getAirdropResponse200 = {
-  data: GetAirdrop200
-  status: 200
-}
-
-export type getAirdropResponse401 = {
-  data: Def0
-  status: 401
-}
-
-export type getAirdropResponse404 = {
-  data: Def0
-  status: 404
-}
-
-export type getAirdropResponseSuccess = (getAirdropResponse200) & {
-  headers: Headers;
-};
-export type getAirdropResponseError = (getAirdropResponse401 | getAirdropResponse404) & {
-  headers: Headers;
-};
-
-export type getAirdropResponse = (getAirdropResponseSuccess | getAirdropResponseError)
-
 export const getGetAirdropUrl = (id: string,) => {
 
 
 
 
-  return `/airdrops/${id}`
+  return `/blast-api/airdrops/${id}`
 }
 
 /**
  * @summary Get airdrop details
  */
-export const getAirdrop = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<getAirdropResponse> => {
+export const getAirdrop = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<GetAirdrop200> => {
 
-  return customFetch<getAirdropResponse>(getGetAirdropUrl(id),
+  return customFetch<GetAirdrop200>(getGetAirdropUrl(id),
   {
     ...options,
     method: 'GET'
@@ -489,53 +285,19 @@ export const getAirdrop = async (id: string, options?: Parameters<typeof customF
 
 
 
-export type startAirdropResponse200 = {
-  data: StartAirdrop200
-  status: 200
-}
-
-export type startAirdropResponse400 = {
-  data: Def0
-  status: 400
-}
-
-export type startAirdropResponse401 = {
-  data: Def0
-  status: 401
-}
-
-export type startAirdropResponse404 = {
-  data: Def0
-  status: 404
-}
-
-export type startAirdropResponse500 = {
-  data: Def0
-  status: 500
-}
-
-export type startAirdropResponseSuccess = (startAirdropResponse200) & {
-  headers: Headers;
-};
-export type startAirdropResponseError = (startAirdropResponse400 | startAirdropResponse401 | startAirdropResponse404 | startAirdropResponse500) & {
-  headers: Headers;
-};
-
-export type startAirdropResponse = (startAirdropResponseSuccess | startAirdropResponseError)
-
 export const getStartAirdropUrl = (id: string,) => {
 
 
 
 
-  return `/airdrops/${id}/start`
+  return `/blast-api/airdrops/${id}/start`
 }
 
 /**
  * @summary Submit signed transactions for an airdrop
  */
 export const startAirdrop = async (id: string,
-    startAirdropBodyItem: StartAirdropBodyItem[], options?: Parameters<typeof customFetch>[1]): Promise<startAirdropResponse> => {
+    startAirdropBodyItem: StartAirdropBodyItem[], options?: Parameters<typeof customFetch>[1]): Promise<StartAirdrop200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -551,7 +313,7 @@ export const startAirdrop = async (id: string,
     }
     return headers;
   };
-return customFetch<startAirdropResponse>(getStartAirdropUrl(id),
+return customFetch<StartAirdrop200>(getStartAirdropUrl(id),
   {
     ...options,
     method: 'POST',
@@ -562,42 +324,13 @@ return customFetch<startAirdropResponse>(getStartAirdropUrl(id),
 
 
 
-export type retryAirdropTransactionResponse200 = {
-  data: RetryAirdropTransaction200
-  status: 200
-}
-
-export type retryAirdropTransactionResponse400 = {
-  data: Def0
-  status: 400
-}
-
-export type retryAirdropTransactionResponse401 = {
-  data: Def0
-  status: 401
-}
-
-export type retryAirdropTransactionResponse404 = {
-  data: Def0
-  status: 404
-}
-
-export type retryAirdropTransactionResponseSuccess = (retryAirdropTransactionResponse200) & {
-  headers: Headers;
-};
-export type retryAirdropTransactionResponseError = (retryAirdropTransactionResponse400 | retryAirdropTransactionResponse401 | retryAirdropTransactionResponse404) & {
-  headers: Headers;
-};
-
-export type retryAirdropTransactionResponse = (retryAirdropTransactionResponseSuccess | retryAirdropTransactionResponseError)
-
 export const getRetryAirdropTransactionUrl = (airdropId: string,
     batchId: string,) => {
 
 
 
 
-  return `/airdrops/${airdropId}/retry-batch/${batchId}`
+  return `/blast-api/airdrops/${airdropId}/retry-batch/${batchId}`
 }
 
 /**
@@ -605,7 +338,7 @@ export const getRetryAirdropTransactionUrl = (airdropId: string,
  */
 export const retryAirdropTransaction = async (airdropId: string,
     batchId: string,
-    retryAirdropTransactionBody: RetryAirdropTransactionBody, options?: Parameters<typeof customFetch>[1]): Promise<retryAirdropTransactionResponse> => {
+    retryAirdropTransactionBody: RetryAirdropTransactionBody, options?: Parameters<typeof customFetch>[1]): Promise<RetryAirdropTransaction200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -621,7 +354,7 @@ export const retryAirdropTransaction = async (airdropId: string,
     }
     return headers;
   };
-return customFetch<retryAirdropTransactionResponse>(getRetryAirdropTransactionUrl(airdropId,batchId),
+return customFetch<RetryAirdropTransaction200>(getRetryAirdropTransactionUrl(airdropId,batchId),
   {
     ...options,
     method: 'POST',
@@ -632,48 +365,19 @@ return customFetch<retryAirdropTransactionResponse>(getRetryAirdropTransactionUr
 
 
 
-export type setAirdropLabelResponse200 = {
-  data: SetAirdropLabel200
-  status: 200
-}
-
-export type setAirdropLabelResponse400 = {
-  data: Def0
-  status: 400
-}
-
-export type setAirdropLabelResponse401 = {
-  data: Def0
-  status: 401
-}
-
-export type setAirdropLabelResponse404 = {
-  data: Def0
-  status: 404
-}
-
-export type setAirdropLabelResponseSuccess = (setAirdropLabelResponse200) & {
-  headers: Headers;
-};
-export type setAirdropLabelResponseError = (setAirdropLabelResponse400 | setAirdropLabelResponse401 | setAirdropLabelResponse404) & {
-  headers: Headers;
-};
-
-export type setAirdropLabelResponse = (setAirdropLabelResponseSuccess | setAirdropLabelResponseError)
-
 export const getSetAirdropLabelUrl = (airdropId: string,) => {
 
 
 
 
-  return `/airdrops/${airdropId}/set-label`
+  return `/blast-api/airdrops/${airdropId}/set-label`
 }
 
 /**
  * @summary Set an airdrop label
  */
 export const setAirdropLabel = async (airdropId: string,
-    setAirdropLabelBody: SetAirdropLabelBody, options?: Parameters<typeof customFetch>[1]): Promise<setAirdropLabelResponse> => {
+    setAirdropLabelBody: SetAirdropLabelBody, options?: Parameters<typeof customFetch>[1]): Promise<SetAirdropLabel200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -689,7 +393,7 @@ export const setAirdropLabel = async (airdropId: string,
     }
     return headers;
   };
-return customFetch<setAirdropLabelResponse>(getSetAirdropLabelUrl(airdropId),
+return customFetch<SetAirdropLabel200>(getSetAirdropLabelUrl(airdropId),
   {
     ...options,
     method: 'POST',
@@ -700,32 +404,20 @@ return customFetch<setAirdropLabelResponse>(getSetAirdropLabelUrl(airdropId),
 
 
 
-export type getHealthResponse200 = {
-  data: GetHealth200
-  status: 200
-}
-
-export type getHealthResponseSuccess = (getHealthResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getHealthResponse = (getHealthResponseSuccess)
-
 export const getGetHealthUrl = () => {
 
 
 
 
-  return `/health`
+  return `/blast-api/health`
 }
 
 /**
  * @summary Check service health
  */
-export const getHealth = async ( options?: Parameters<typeof customFetch>[1]): Promise<getHealthResponse> => {
+export const getHealth = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetHealth200> => {
 
-  return customFetch<getHealthResponse>(getGetHealthUrl(),
+  return customFetch<GetHealth200>(getGetHealthUrl(),
   {
     ...options,
     method: 'GET'
@@ -736,40 +428,21 @@ export const getHealth = async ( options?: Parameters<typeof customFetch>[1]): P
 
 
 
-export type getSolanaRpcConfigHealthResponse200 = {
-  data: GetSolanaRpcConfigHealth200
-  status: 200
-}
-
-export type getSolanaRpcConfigHealthResponse503 = {
-  data: GetSolanaRpcConfigHealth503
-  status: 503
-}
-
-export type getSolanaRpcConfigHealthResponseSuccess = (getSolanaRpcConfigHealthResponse200) & {
-  headers: Headers;
-};
-export type getSolanaRpcConfigHealthResponseError = (getSolanaRpcConfigHealthResponse503) & {
-  headers: Headers;
-};
-
-export type getSolanaRpcConfigHealthResponse = (getSolanaRpcConfigHealthResponseSuccess | getSolanaRpcConfigHealthResponseError)
-
 export const getGetSolanaRpcConfigHealthUrl = () => {
 
 
 
 
-  return `/health/solana-rpc`
+  return `/blast-api/health/solana-rpc`
 }
 
 /**
  * Checks whether SOLANA_RPC_URL is explicitly set to an HTTP(S) URL. Does not contact the provider or return the URL.
  * @summary Check Solana RPC URL configuration
  */
-export const getSolanaRpcConfigHealth = async ( options?: Parameters<typeof customFetch>[1]): Promise<getSolanaRpcConfigHealthResponse> => {
+export const getSolanaRpcConfigHealth = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetSolanaRpcConfigHealth200> => {
 
-  return customFetch<getSolanaRpcConfigHealthResponse>(getGetSolanaRpcConfigHealthUrl(),
+  return customFetch<GetSolanaRpcConfigHealth200>(getGetSolanaRpcConfigHealthUrl(),
   {
     ...options,
     method: 'GET'
