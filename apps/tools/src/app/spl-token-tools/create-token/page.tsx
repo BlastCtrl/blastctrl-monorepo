@@ -11,18 +11,15 @@ import { useConnectorDialog } from "@/connector/connector-dialog";
 import { simulateUnsigned } from "@/connector/simulate";
 import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient } from "@/connector/use-kit-client";
+import { useArweaveUploader } from "@/lib/hooks/use-arweave-uploader";
 import { compress } from "@/lib/solana/common";
 import {
   createMetadataInstructions,
   updateMetadataInstructions,
 } from "@/lib/solana/metaplex-token-metadata";
-import { TurboStorage } from "@/lib/turbo";
 import { cn } from "@blastctrl/ui";
 import { ChevronUpDownIcon } from "@heroicons/react/20/solid";
-import { createWalletAdapterCompat } from "@solana/connector/compat";
-import { useConnector, useTransactionSigner } from "@solana/connector/react";
 import { address, isAddress } from "@solana/kit";
-import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { UploadFile } from "./_components/upload-file";
@@ -39,35 +36,9 @@ type TokenData = {
 const actions = ["Add", "Update"] as const;
 type Actions = (typeof actions)[number];
 
-/** Shown when an Arweave upload fails; the funds, if any were spent, are recoverable. */
-const uploadErrorDescription = (err: unknown) => (
-  <div className="break-normal">
-    <p>
-      There has been an error while uploading with the message:{" "}
-      <span className="font-medium break-all text-yellow-300">
-        {err instanceof Error ? err.message : String(err)}
-      </span>
-      .
-    </p>
-    <p className="mt-2">
-      You can recover any lost funds on the{" "}
-      <Link
-        href="/permanent-storage-tools/file-upload"
-        className="font-medium text-blue-300"
-      >
-        /permanent-storage-tools
-      </Link>{" "}
-      page.
-    </p>
-  </div>
-);
-
 export default function CreateToken() {
-  const { disconnectWallet } = useConnector();
   const { client } = useKitClient();
-  // Turbo speaks the legacy wallet-adapter dialect; bridge the connector's
-  // byte signer through the compat layer, as the file-upload tool does.
-  const { signer } = useTransactionSigner();
+  const upload = useArweaveUploader();
   const { setOpen } = useConnectorDialog();
   const [isConfirming, setIsConfirming] = useState(false);
   const [selectedAction, setSelectedAction] = useState<Actions>(actions[0]);
@@ -79,7 +50,7 @@ export default function CreateToken() {
   } = useForm<TokenData>({});
 
   const onSubmit = async (data: TokenData) => {
-    if (!client || !signer) {
+    if (!client || !upload) {
       setOpen(true);
       return;
     }
@@ -115,36 +86,10 @@ export default function CreateToken() {
         return;
       }
 
-      const turbo = TurboStorage.make(
-        createWalletAdapterCompat(signer, { disconnect: disconnectWallet }),
-      );
-      const upload = (
-        file: File,
-        loading: string,
-        success: string,
-        title: string,
-      ) =>
-        notifyPromise(
-          turbo.uploadFile(file).then((r) => `https://arweave.net/${r.id}`),
-          {
-            loading: { description: loading },
-            success: { description: success },
-            error: (err) => ({
-              title,
-              description: uploadErrorDescription(err),
-            }),
-          },
-        );
-
-      // The toasts report upload failures; stop quietly after one.
+      // The uploader's toasts report failures; stop quietly after one.
       let imageUri: string | undefined;
       if (data.image) {
-        imageUri = await upload(
-          data.image,
-          "Uploading image to Arweave...",
-          "Image upload complete",
-          "Image Upload Error",
-        ).catch(() => undefined);
+        imageUri = await upload(data.image, "image").catch(() => undefined);
         if (!imageUri) return;
       }
 
@@ -159,9 +104,7 @@ export default function CreateToken() {
         new File([JSON.stringify(json)], "metadata.json", {
           type: "application/json",
         }),
-        "Uploading metadata file to Arweave...",
-        "JSON upload complete",
-        "JSON upload error",
+        "metadata",
       ).catch(() => undefined);
       if (!metadataUri) return;
 

@@ -33,8 +33,9 @@ export const uploadErrorDescription = (err: unknown) => (
 
 /**
  * Uploads files to Arweave through Turbo, paid in SOL by the connected wallet,
- * reporting each upload in a toast. Null until a wallet is connected. Upload
- * failures are reported by the toast and rejected; callers can stop quietly.
+ * reporting each upload in a toast. Null until a wallet is connected. Every
+ * failure, including a wallet that can't sign messages, is reported by the
+ * toast and rejected; callers can stop quietly.
  */
 export function useArweaveUploader(): FileUploader | null {
   const { disconnectWallet } = useConnector();
@@ -44,15 +45,19 @@ export function useArweaveUploader(): FileUploader | null {
 
   return useMemo(() => {
     if (!signer) return null;
-    // Created on first use: `make` throws for wallets that can't sign messages.
+    // One client per wallet, created on first use and dropped with this
+    // closure when the wallet changes or the page unmounts.
     let turbo: TurboStorage | undefined;
 
-    return async (file, label) => {
-      turbo ??= TurboStorage.make(
-        createWalletAdapterCompat(signer, { disconnect: disconnectWallet }),
-      );
-      return notifyPromise(
-        turbo.uploadFile(file).then(({ id }) => `https://arweave.net/${id}`),
+    return (file, label) =>
+      notifyPromise(
+        (async () => {
+          turbo ??= TurboStorage.make(
+            createWalletAdapterCompat(signer, { disconnect: disconnectWallet }),
+          );
+          const { id } = await turbo.uploadFile(file);
+          return `https://arweave.net/${id}`;
+        })(),
         {
           loading: { description: `Uploading ${label} to Arweave...` },
           success: { description: `Uploaded the ${label} to Arweave` },
@@ -62,6 +67,5 @@ export function useArweaveUploader(): FileUploader | null {
           }),
         },
       );
-    };
   }, [signer, disconnectWallet]);
 }

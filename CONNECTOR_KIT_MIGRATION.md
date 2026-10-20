@@ -174,9 +174,12 @@ Things to know about the builder-only Umi:
 
 Arweave uploads (media files first, then the Metaplex JSON) go through
 `useArweaveUploader()` (`lib/hooks/use-arweave-uploader.tsx`: Turbo over the
-connector compat bridge, one toast per file, null until a wallet is
-connected) and `uploadNftMetadata(input, upload)`
-(`lib/solana/metaplex-json-metadata.ts`, pure and unit-tested).
+connector compat bridge, one client per wallet created on first upload, one
+toast per file, null until a wallet is connected) and
+`uploadNftMetadata(input, upload)` (`lib/solana/metaplex-json-metadata.ts`,
+pure and unit-tested). create-token uses the same uploader with its own JSON;
+only file-upload still holds a `TurboStorage` directly, for its balance and
+price queries. The SDK is bundled only into the routes that import these.
 
 ### `useKitClient()` – the way to send transactions
 
