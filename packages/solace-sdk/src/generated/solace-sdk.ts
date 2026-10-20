@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Blast API
  * Create and manage Solana SOL and SPL token airdrops.
- * OpenAPI spec version: 1.0.3
+ * OpenAPI spec version: 1.1.0
  */
 import type {
   CreateAirdrop201,
@@ -16,6 +16,8 @@ import type {
   GetAuthChallenge400,
   GetAuthChallengeParams,
   GetHealth200,
+  GetSolanaRpcConfigHealth200,
+  GetSolanaRpcConfigHealth503,
   ListAirdrops200Item,
   RefreshAuthToken200,
   RefreshAuthToken400,
@@ -724,6 +726,50 @@ export const getGetHealthUrl = () => {
 export const getHealth = async ( options?: Parameters<typeof customFetch>[1]): Promise<getHealthResponse> => {
 
   return customFetch<getHealthResponse>(getGetHealthUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export type getSolanaRpcConfigHealthResponse200 = {
+  data: GetSolanaRpcConfigHealth200
+  status: 200
+}
+
+export type getSolanaRpcConfigHealthResponse503 = {
+  data: GetSolanaRpcConfigHealth503
+  status: 503
+}
+
+export type getSolanaRpcConfigHealthResponseSuccess = (getSolanaRpcConfigHealthResponse200) & {
+  headers: Headers;
+};
+export type getSolanaRpcConfigHealthResponseError = (getSolanaRpcConfigHealthResponse503) & {
+  headers: Headers;
+};
+
+export type getSolanaRpcConfigHealthResponse = (getSolanaRpcConfigHealthResponseSuccess | getSolanaRpcConfigHealthResponseError)
+
+export const getGetSolanaRpcConfigHealthUrl = () => {
+
+
+
+
+  return `/health/solana-rpc`
+}
+
+/**
+ * Checks whether SOLANA_RPC_URL is explicitly set to an HTTP(S) URL. Does not contact the provider or return the URL.
+ * @summary Check Solana RPC URL configuration
+ */
+export const getSolanaRpcConfigHealth = async ( options?: Parameters<typeof customFetch>[1]): Promise<getSolanaRpcConfigHealthResponse> => {
+
+  return customFetch<getSolanaRpcConfigHealthResponse>(getGetSolanaRpcConfigHealthUrl(),
   {
     ...options,
     method: 'GET'
