@@ -1,18 +1,22 @@
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { useAppRpc } from "@/connector/app-rpc";
+import { lamportsToSol } from "@/lib/solana/common";
+import { useConnector } from "@solana/connector/react";
 import { useQuery } from "@tanstack/react-query";
 
+/** The connected wallet's confirmed balance, in SOL. */
 export function useSolBalance() {
-  const { connection } = useConnection();
-  const { publicKey } = useWallet();
+  const { account } = useConnector();
+  const { rpc, network } = useAppRpc();
 
   return useQuery({
-    queryKey: ["sol-balance", publicKey?.toString()],
+    queryKey: ["sol-balance", account, network],
+    enabled: !!account && !!rpc,
     queryFn: async () => {
-      if (!publicKey) return 0;
-      const lamports = await connection.getBalance(publicKey, "confirmed");
-      return lamports / LAMPORTS_PER_SOL;
+      if (!account || !rpc) return 0;
+      const { value } = await rpc
+        .getBalance(account, { commitment: "confirmed" })
+        .send();
+      return lamportsToSol(value);
     },
-    enabled: !!publicKey,
   });
 }

@@ -19,18 +19,18 @@ Done (use these as reference implementations):
 | Kit client hook                                                                 | `apps/tools/src/connector/use-kit-client.ts`                                                                                                                     |
 | Shared error helper                                                             | `apps/tools/src/connector/transaction-error.ts`                                                                                                                  |
 | Stake tools (create UI + CSV, set-lockup, authorize, merge, split, MEV rewards) | `apps/tools/src/app/solana-stake-tools/**`                                                                                                                       |
-| SPL token tools: close-empty, revoke-delegations                                | `apps/tools/src/app/spl-token-tools/{close-empty,revoke-delegations}/**`                                                                                         |
+| SPL token tools: close-empty, revoke-delegations, recover-nested, token-hoover  | `apps/tools/src/app/spl-token-tools/{close-empty,revoke-delegations,recover-nested,token-hoover}/**`                                                             |
 | Permanent storage file upload (Turbo SDK via `@solana/connector/compat`)        | `apps/tools/src/app/permanent-storage-tools/file-upload/**`, `lib/turbo.ts`                                                                                      |
 | DAS-extended RPC + token-account scans                                          | `src/connector/app-rpc.ts`, `src/state/queries/{use-asset-data,use-owner-assets,use-delegated-assets,use-reclaimable-accounts,use-owner-nfts,use-jup-tokens}.ts` |
 | Shared reads on Kit RPC                                                         | `src/state/queries/use-stake-account.ts`, `use-user-stake-accounts.ts`, `use-epoch.ts`, `use-rent.ts`                                                            |
 | Explorer links by connector cluster                                             | `src/state/use-query-context.ts`                                                                                                                                 |
 
 Still on the adapter (as of 2026-10-20): NFT tools, the other SPL token tools
-(create-token, distributor, reclaim-rent, recover-nested, token-hoover),
+(create-token, distributor, reclaim-rent),
 gasless swaps, reclaim-sol, `src/app/layout.tsx`
 (still imports the adapter stylesheet), `src/state/context/SolanaProvider.tsx`,
 `src/state/use-wallet-connection.ts`, the `use-*` queries that take a web3
-`Connection`, `lib/solana/{send,send-batches,endpoints,token,collections}`,
+`Connection`, `lib/solana/{send,send-batches,endpoints,collections}`,
 `lib/hooks/use-umi.ts`, `lib/turbo.ts`, and the old
 `components/layout/{desktop,mobile}-wallet.tsx` (unreferenced; delete when
 nothing else needs them). `grep -rl "@solana/wallet-adapter" apps/tools/src`
@@ -187,8 +187,9 @@ Because the keypair signer is attached to the instruction, `sendTransaction`
 signs with it automatically (wallet first, keypair second). No
 `signWithWalletFirst` dance.
 
-Keypair files: `createKeyPairSignerFromBytes(Uint8Array)` – see
-`lib/solana/parse-keypair.ts`. A `KeyPairSigner` also exposes `.keyPair`
+Keypair input: `parseJsonKeypair(file)` and `parseSecretKey(string)` in
+`lib/solana/parse-keypair.ts` turn a CLI JSON array or a base58 secret key into
+a `KeyPairSigner` (via `createKeyPairSignerFromBytes`). A `KeyPairSigner` also exposes `.keyPair`
 (`CryptoKeyPair`) for `partiallySignTransaction`.
 
 ### Reads
@@ -275,8 +276,8 @@ Keypair files: `createKeyPairSignerFromBytes(Uint8Array)` – see
    `useCluster().type`; the old network store is dead.
 
 9. **The connector's `getConnector(id)` returns the raw Wallet Standard
-   wallet** at runtime despite the `WalletConnector` typing; access
-   `features["standard:disconnect"]` etc. through a structural cast.
+    wallet** at runtime despite the `WalletConnector` typing; access
+    `features["standard:disconnect"]` etc. through a structural cast.
 
 10. **`parseBase64RpcAccount` / `decode…` throw on garbage;** wrap per-account
     in a scan and skip, instead of failing the whole list.

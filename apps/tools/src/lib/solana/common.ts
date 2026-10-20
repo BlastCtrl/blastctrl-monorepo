@@ -1,6 +1,5 @@
 import type { PublicKey as UmiPublicKey } from "@metaplex-foundation/umi";
 import { publicKey } from "@metaplex-foundation/umi";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import base58 from "bs58";
 
@@ -49,19 +48,6 @@ export function isPublicKey(putativeAddress: string) {
 
   const bytes = base58.decodeUnsafe(putativeAddress);
   return 32 === bytes?.byteLength;
-}
-
-export function isATA({
-  address,
-  owner,
-  mint,
-}: {
-  address: PublicKey;
-  owner: PublicKey;
-  mint: PublicKey;
-}) {
-  const ata = getAssociatedTokenAddressSync(mint, owner, true);
-  return ata.equals(address);
 }
 
 export function compress(str: string, chars: number) {

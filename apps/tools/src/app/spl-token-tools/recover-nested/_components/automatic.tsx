@@ -1,12 +1,17 @@
-import { isATA } from "@/lib/solana/common";
+import { notify } from "@/components";
+import { useAppRpc } from "@/connector/app-rpc";
+import { useConnectorDialog } from "@/connector/connector-dialog";
 import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
-import type { Account } from "@solana/spl-token";
-import { TOKEN_PROGRAM_ID, unpackAccount } from "@solana/spl-token";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useConnector } from "@solana/connector/react";
 import { useCallback, useState } from "react";
+import {
+  fetchTokenAccountsByOwner,
+  filterAssociatedTokenAccounts,
+  findNestedAta,
+  type NestedPair,
+  type TokenAccount,
+} from "../_utils";
 import { NestedList } from "./nested-list";
-import { findNestedAta } from "../_utils";
 
 //////////////////////////////
 // 0: not active
@@ -17,57 +22,56 @@ import { findNestedAta } from "../_utils";
 export type LoadingSteps = 0 | 1 | 2 | 3;
 
 export const AutomaticRecover = () => {
-  const { connection } = useConnection();
-  const { publicKey } = useWallet();
-  const { setVisible } = useWalletModal();
+  const { account } = useConnector();
+  const { rpc } = useAppRpc();
+  const { setOpen } = useConnectorDialog();
   const [step, setStep] = useState<LoadingSteps>(0);
   const [progress, setProgress] = useState<number>(0);
 
-  const [walletAccounts, setWalletAccounts] = useState<Account[] | null>(null);
-  const [nestedPairs, setNestedPairs] = useState<
-    Awaited<ReturnType<typeof findNestedAta>>
-  >([]);
+  const [walletAccounts, setWalletAccounts] = useState<TokenAccount[] | null>(
+    null,
+  );
+  const [nestedPairs, setNestedPairs] = useState<NestedPair[]>([]);
 
   const width = `${Math.max(1, (step - 1) * 50 + progress * 50).toFixed(0)}%`;
   const isSearching = step === 1 || step === 2;
 
   const query = useCallback(async () => {
-    if (!publicKey) {
-      setVisible(true);
+    if (!account || !rpc) {
+      setOpen(true);
       return;
     }
 
     // Reset
-    setStep(0);
     setWalletAccounts(null);
     setProgress(0);
-
     setStep(1);
-    const walletATAs = (
-      await connection.getTokenAccountsByOwner(
-        publicKey,
-        { programId: TOKEN_PROGRAM_ID },
-        { commitment: "confirmed" },
-      )
-    ).value
-      .map(({ pubkey, account }) => unpackAccount(pubkey, account))
-      .filter(({ address, mint }) =>
-        isATA({ address, mint, owner: publicKey }),
+
+    try {
+      const walletATAs = await filterAssociatedTokenAccounts(
+        await fetchTokenAccountsByOwner(rpc, account),
+        account,
       );
+      setWalletAccounts(walletATAs);
+      setStep(2);
+      // Step 1: We're done loading the wallet ATAs
 
-    setWalletAccounts(walletATAs);
-    setStep(2);
-    // Step 1: We're done loading the wallet ATAs
-
-    const nested = await findNestedAta({
-      connection,
-      walletAccounts: walletATAs,
-      onProgress: (idx) => setProgress(idx / walletATAs.length),
-    });
-    setNestedPairs(nested);
-
-    setStep(3);
-  }, [publicKey, connection, setVisible]);
+      const nested = await findNestedAta({
+        rpc,
+        walletAccounts: walletATAs,
+        onProgress: (idx) => setProgress(idx / walletATAs.length),
+      });
+      setNestedPairs(nested);
+      setStep(3);
+    } catch (error) {
+      setStep(0);
+      notify({
+        type: "error",
+        title: "Error searching for nested accounts",
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }, [account, rpc, setOpen]);
 
   return (
     <>
@@ -79,11 +83,7 @@ export const AutomaticRecover = () => {
         </p>
       </div>
       <div className="flex justify-center py-4">
-        <Button
-          color="indigo"
-          disabled={step === 1 || step === 2}
-          onClick={query}
-        >
+        <Button color="indigo" disabled={isSearching} onClick={query}>
           {isSearching && (
             <SpinnerIcon className="mr-2 -ml-1 h-5 w-5 animate-spin" />
           )}

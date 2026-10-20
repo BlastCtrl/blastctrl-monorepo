@@ -1,14 +1,14 @@
 "use client";
 
 import { notify } from "@/components";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { parseSecretKey } from "@/lib/solana/parse-keypair";
 import { useOwnerAssets } from "@/state/queries/use-owner-assets";
 import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { Keypair } from "@solana/web3.js";
-import { useState } from "react";
+import { useConnector } from "@solana/connector/react";
+import type { KeyPairSigner } from "@solana/kit";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import bs58 from "bs58";
 import { TokenList } from "./_components/token-list";
 
 type FormValues = {
@@ -16,12 +16,18 @@ type FormValues = {
 };
 
 export default function RemoveTokens() {
-  const { connected } = useWallet();
-  const { setVisible } = useWalletModal();
-  const [targetWallet, setTargetWallet] = useState<Keypair | null>(null);
+  const { isConnected } = useConnector();
+  const { setOpen } = useConnectorDialog();
+  const [sourceWallet, setSourceWallet] = useState<KeyPairSigner | null>(null);
   const { data, isFetching, refetch } = useOwnerAssets(
-    targetWallet?.publicKey.toString() ?? "",
+    sourceWallet?.address ?? "",
   );
+
+  // The query is keyed by the source wallet, so load it once that is known;
+  // calling refetch() right after setSourceWallet would still hit the old key.
+  useEffect(() => {
+    if (sourceWallet) void refetch();
+  }, [sourceWallet, refetch]);
 
   const {
     register,
@@ -33,78 +39,30 @@ export default function RemoveTokens() {
     },
   });
 
-  const parsePrivateKey = (input: string): Uint8Array | null => {
-    const trimmed = input.trim();
-
-    // Try to parse as byte array first (e.g., [202,64,201,...])
-    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (
-          Array.isArray(parsed) &&
-          parsed.every((n) => typeof n === "number" && n >= 0 && n <= 255)
-        ) {
-          return Uint8Array.from(parsed);
-        }
-      } catch {
-        // Fall through to error
-      }
-    }
-
-    // Try to parse as base58
-    try {
-      return bs58.decode(trimmed);
-    } catch {
-      // Fall through to error
-    }
-
-    return null;
-  };
-
   const onSubmit = async (formData: FormValues) => {
-    if (!connected) {
-      setVisible(true);
+    if (!isConnected) {
+      setOpen(true);
       return;
     }
 
-    const secretKey = parsePrivateKey(formData.privateKey);
-
-    if (!secretKey) {
+    const parsed = await parseSecretKey(formData.privateKey);
+    if (!parsed.success) {
       notify({
         type: "error",
         title: "Invalid private key",
-        description:
-          "Please enter a valid base58 encoded private key or byte array (e.g., [202,64,201,...])",
+        description: parsed.error,
       });
       return;
     }
-
-    try {
-      const keypair = Keypair.fromSecretKey(secretKey);
-
-      setTargetWallet(keypair);
-      await refetch();
-
-      // Fetch the tokens for this wallet
-    } catch {
-      notify({
-        type: "error",
-        title: "Invalid private key",
-        description: "The provided key could not be used to create a keypair",
-      });
-    }
-  };
-
-  const handleConnectWallet = () => {
-    setVisible(true);
+    setSourceWallet(parsed.signer);
   };
 
   const handleGoBack = () => {
-    setTargetWallet(null);
+    setSourceWallet(null);
   };
 
   const buttonText = () => {
-    if (!connected) return "Connect your wallet";
+    if (!isConnected) return "Connect your wallet";
     if (isFetching)
       return (
         <>
@@ -155,7 +113,6 @@ export default function RemoveTokens() {
                 </label>
                 <input
                   id="privateKey"
-                  // type="password"
                   autoComplete="off"
                   className={cn(
                     "block w-full rounded-md border border-gray-300 px-3 py-2 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
@@ -176,11 +133,11 @@ export default function RemoveTokens() {
             </div>
 
             <div className="flex flex-col items-center justify-center gap-2 pt-8 pb-2">
-              {!connected ? (
+              {!isConnected ? (
                 <Button
                   color="indigo"
                   type="button"
-                  onClick={handleConnectWallet}
+                  onClick={() => setOpen(true)}
                 >
                   Connect your wallet
                 </Button>
@@ -194,7 +151,7 @@ export default function RemoveTokens() {
         </>
       )}
 
-      {data && targetWallet && (
+      {data && sourceWallet && (
         <>
           <div className="mb-4 -ml-3 flex items-center justify-between">
             <Button plain onClick={handleGoBack}>
@@ -203,7 +160,7 @@ export default function RemoveTokens() {
           </div>
           <TokenList
             tokenAccounts={data.filter((a) => a.balance > 0n)}
-            sourceWallet={targetWallet}
+            sourceWallet={sourceWallet}
           />
         </>
       )}
