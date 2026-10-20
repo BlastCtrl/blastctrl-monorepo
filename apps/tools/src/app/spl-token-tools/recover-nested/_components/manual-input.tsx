@@ -5,7 +5,6 @@ import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient } from "@/connector/use-kit-client";
 import {
   compress,
-  lamportsToSol,
   lamportsToSolString,
   normalizeTokenAmount,
 } from "@/lib/solana/common";
@@ -27,6 +26,8 @@ import {
   isAddress,
   type Address,
   type MaybeAccount,
+  lamports,
+  lamportsToSol,
 } from "@solana/kit";
 import { Fragment, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -35,6 +36,10 @@ import {
   recoverNestedInstructions,
   type TokenAccount,
 } from "../_utils";
+import {
+  decimalFixedPointToNumber,
+  decimalFixedPointToString,
+} from "@solana/fixed-points";
 
 type FormValues = {
   parentAta: string;
@@ -226,6 +231,9 @@ export const ManualInput = () => {
     ? preview.nested.lamports - TRANSACTION_FEE - preview.destinationRent
     : 0n;
   const solChangeAbs = solChange < 0n ? -solChange : solChange;
+  const solChangeSol =
+    (solChange < 0n ? -1 : 1) *
+    decimalFixedPointToNumber(lamportsToSol(lamports(solChangeAbs)));
 
   return (
     <>
@@ -435,8 +443,7 @@ export const ManualInput = () => {
                                             </span>
                                           </td>
                                           <td className="py-2 pr-3 pl-4 text-sm whitespace-nowrap text-gray-500 sm:pl-6">
-                                            {(balance ?? 0) +
-                                              lamportsToSol(solChange)}
+                                            {(balance ?? 0) + solChangeSol}
                                           </td>
                                         </tr>
                                         <tr>
@@ -484,8 +491,10 @@ export const ManualInput = () => {
                                           <td>
                                             <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
                                               -
-                                              {lamportsToSol(
-                                                preview.nested.lamports,
+                                              {decimalFixedPointToString(
+                                                lamportsToSol(
+                                                  preview.nested.lamports,
+                                                ),
                                               )}
                                             </span>
                                           </td>

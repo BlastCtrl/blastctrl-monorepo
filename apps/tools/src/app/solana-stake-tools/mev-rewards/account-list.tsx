@@ -4,11 +4,7 @@ import { notify } from "@/components/notification";
 import { useConnectorDialog } from "@/connector/connector-dialog";
 import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient } from "@/connector/use-kit-client";
-import {
-  compress,
-  lamportsToSol,
-  lamportsToSolString,
-} from "@/lib/solana/common";
+import { compress, lamportsToSolString } from "@/lib/solana/common";
 import type { StakeAccountType } from "@/state/queries/use-user-stake-accounts";
 import { useUserStakeAccounts } from "@/state/queries/use-user-stake-accounts";
 import { useValidatorData } from "@/state/queries/use-validator-data";
@@ -37,10 +33,12 @@ import {
   isAddress,
   parallelInstructionPlan,
   type Address,
+  lamportsToSol,
 } from "@solana/kit";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Box } from "./box";
+import { decimalFixedPointToString } from "@solana/fixed-points";
 
 export function AccountList() {
   const { account } = useConnector();
@@ -180,7 +178,11 @@ function AccountListForm({
                         {lamportsToSolString(unclaimedLamports)} SOL
                       </div>
                       <div className="text-sm text-wrap text-zinc-500">
-                        Total in account: {lamportsToSol(account.lamports)} SOL
+                        Total in account:{" "}
+                        {decimalFixedPointToString(
+                          lamportsToSol(account.lamports),
+                        )}{" "}
+                        SOL
                       </div>
                     </div>
                   </TableCell>

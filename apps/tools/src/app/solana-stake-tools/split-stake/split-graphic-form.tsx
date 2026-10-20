@@ -4,7 +4,7 @@ import { notify } from "@/components/notification";
 import { useConnectorDialog } from "@/connector/connector-dialog";
 import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient } from "@/connector/use-kit-client";
-import { lamportsToSol, lamportsToSolString } from "@/lib/solana/common";
+import { lamportsToSolString } from "@/lib/solana/common";
 import { STAKE_ACCOUNT_SIZE } from "@/lib/solana/stake-account";
 import { useRentQuery } from "@/state/queries/use-rent";
 import { useUserStakeAccounts } from "@/state/queries/use-user-stake-accounts";
@@ -21,11 +21,17 @@ import {
   STAKE_PROGRAM_ADDRESS,
 } from "@solana-program/stake";
 import { getCreateAccountInstruction } from "@solana-program/system";
-import { generateKeyPairSigner, lamports, type Address } from "@solana/kit";
+import {
+  generateKeyPairSigner,
+  lamports,
+  type Address,
+  lamportsToSol,
+} from "@solana/kit";
 import type { SyntheticEvent } from "react";
 import { useState } from "react";
 import { Box } from "./box";
 import { PickerDialog } from "./picker-dialog";
+import { decimalFixedPointToNumber } from "@solana/fixed-points";
 
 export function SplitGraphicForm({ owner }: { owner: Address }) {
   const { data, isLoading, error } = useUserStakeAccounts(owner);
@@ -104,7 +110,9 @@ function SplitFormInner({
   // Slider math works in plain numbers; a stake account's balance is well
   // below 2^53 lamports.
   const totalLamports = Number(selectedAccount.lamports);
-  const totalSol = lamportsToSol(totalLamports);
+  const totalSol = decimalFixedPointToNumber(
+    lamportsToSol(selectedAccount.lamports),
+  );
 
   const [inputs, setInputs] = useState(() => {
     const original = totalLamports * 0.5;

@@ -7,7 +7,6 @@ import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useGaslessSwap } from "@/lib/hooks/use-gasless-swap";
 import type { SwapTransaction } from "@/lib/octane";
-import { lamportsToSol } from "@/lib/solana/common";
 import { formatNumber, numberFormatter } from "@/lib/utils";
 import { useJupQuery } from "@/state/queries/use-jup-quote";
 import { useTokenBalance } from "@/state/queries/use-token-balance";
@@ -21,6 +20,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import BonkSmall from "../../../public/bonk_small.png";
 import { FormLeft } from "./_components/form-left";
+import { lamports, lamportsToSol } from "@solana/kit";
+import { decimalFixedPointToNumber } from "@solana/fixed-points";
 
 type FormData = {
   swapAmount: number;
@@ -234,8 +235,10 @@ export default function BonkSwap() {
                 <span className="font-medium text-gray-600">
                   {quoteQuery.data
                     ? formatNumber.format(
-                        lamportsToSol(
-                          parseFloat(quoteQuery.data?.outAmount || ""),
+                        decimalFixedPointToNumber(
+                          lamportsToSol(
+                            lamports(BigInt(quoteQuery.data.outAmount)),
+                          ),
                         ),
                         5,
                       )

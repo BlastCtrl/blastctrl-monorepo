@@ -1,5 +1,5 @@
 import { compress } from "@/lib/solana";
-import { lamportsToSol, lamportsToSolString } from "@/lib/solana/common";
+import { lamportsToSolString } from "@/lib/solana/common";
 import { useCurrentEpoch } from "@/state/queries/use-epoch";
 import { useUserStakeAccounts } from "@/state/queries/use-user-stake-accounts";
 import type { StakeAccountType } from "@/state/queries/use-user-stake-accounts";
@@ -11,6 +11,8 @@ import type { Address } from "@solana/kit";
 import { useState } from "react";
 import { Box } from "./box";
 import { useMergeStakesMutation } from "./merge-mutation";
+import { lamportsToSol } from "@solana/kit";
+import { decimalFixedPointToString } from "@solana/fixed-points";
 
 export function StakeMergeForm({ owner }: { owner: Address }) {
   const epochQuery = useCurrentEpoch();
@@ -70,7 +72,7 @@ export function StakeMergeForm({ owner }: { owner: Address }) {
     >
       <span className="justify-self-start">{compress(stake.address, 4)}</span>
       <span className="justify-self-end text-right">
-        {lamportsToSol(stake.lamports)} SOL
+        {decimalFixedPointToString(lamportsToSol(stake.lamports))} SOL
       </span>
       <div className="justify-self-start">
         <ValidatorInfo account={stake} />

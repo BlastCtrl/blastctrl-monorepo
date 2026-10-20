@@ -41,11 +41,11 @@ old wallet menus and `lib/solana/endpoints.ts` are deleted, and
 `src/app/layout.tsx` no longer imports the adapter stylesheet. What still
 imports web3.js: `lib/solana/squads-multisig.ts` (on purpose, see its
 section), `lib/solana/common.ts` (`LAMPORTS_PER_SOL`), `common-tokens.ts` and
-`types/amount.ts`. The `@solana/wallet-adapter-*` packages have no importer
-and can be dropped from `apps/tools/package.json`; `@solana/web3.js` stays
-for the Squads SDK and `@solana/spl-token` for what still imports it.
-`grep -rl "@solana/wallet-adapter\|@solana/web3.js" apps/tools/src` is the
-live list; `tsc` is clean.
+`types/amount.ts`. The `@solana/wallet-adapter-*` packages, `@solana/spl-token`,
+`bs58` and the other dependencies nothing imported are dropped from
+`apps/tools/package.json`; `@solana/web3.js` stays for the Squads SDK and
+`bn.js` for `types/amount.ts` until Turbo's amounts move to `bigint`.
+`grep -rl "@solana/web3.js" apps/tools/src` is the live list; `tsc` is clean.
 
 Breaking other, not-yet-migrated tools while changing a shared query or
 helper is accepted; they get fixed when their turn comes. Keep `tsc` clean

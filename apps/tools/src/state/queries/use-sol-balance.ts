@@ -1,7 +1,8 @@
 import { useAppRpc } from "@/connector/app-rpc";
-import { lamportsToSol } from "@/lib/solana/common";
 import { useConnector } from "@solana/connector/react";
 import { useQuery } from "@tanstack/react-query";
+import { lamportsToSol } from "@solana/kit";
+import { decimalFixedPointToNumber } from "@solana/fixed-points";
 
 export const solBalanceKey = (account: string | null, network?: string) =>
   network === undefined
@@ -20,7 +21,7 @@ export function useSolBalance() {
       const { value } = await rpc
         .getBalance(account, { commitment: "confirmed" })
         .send({ abortSignal: signal });
-      return lamportsToSol(value);
+      return decimalFixedPointToNumber(lamportsToSol(value));
     },
   });
 }

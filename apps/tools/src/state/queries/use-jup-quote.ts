@@ -58,7 +58,7 @@ export function useJupQuery({
       const reduced = outAmount - outAmount * (PLATFORM_FEE_BPS / 10000);
       return {
         ...data,
-        outAmount: reduced.toString(),
+        outAmount: Math.floor(reduced).toString(),
       };
     },
     enabled: !!inputMint && !!outputMint && !!amount,

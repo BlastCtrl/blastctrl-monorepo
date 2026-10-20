@@ -4,13 +4,11 @@ import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient } from "@/connector/use-kit-client";
 import { compress } from "@/lib/solana";
 import { normalizeTokenAmount } from "@/lib/solana/common";
-import { findTokenByMint } from "@/lib/solana/common-tokens";
 import { SpinnerIcon } from "@blastctrl/ui";
 import { Tooltip } from "@blastctrl/ui/tooltip";
 import { ChevronRightIcon, WalletIcon } from "@heroicons/react/20/solid";
 import { QuestionMarkCircleIcon } from "@heroicons/react/24/solid";
 import { fetchMint } from "@solana-program/token";
-import Image from "next/image";
 import type { Dispatch, SetStateAction } from "react";
 import { useState } from "react";
 import {
@@ -72,9 +70,6 @@ export const NestedInfo = ({
   const { setOpen } = useConnectorDialog();
   const [confirming, setConfirming] = useState(false);
 
-  const parentTokenInfo = findTokenByMint(parent.data.mint);
-  const nestedTokenInfo = findTokenByMint(nested.data.mint);
-
   const handleRecover = async () => {
     if (!client) {
       setOpen(true);
@@ -83,9 +78,7 @@ export const NestedInfo = ({
 
     setConfirming(true);
     try {
-      const decimals =
-        nestedTokenInfo?.decimals ??
-        (await fetchMint(client.rpc, nested.data.mint)).data.decimals;
+      const { decimals } = (await fetchMint(client.rpc, nested.data.mint)).data;
 
       const result = await client.sendTransaction(
         await recoverNestedInstructions(client.payer, parent, nested),
@@ -123,44 +116,26 @@ export const NestedInfo = ({
       <div className="px-4 py-5 sm:p-6">
         <div className="grid gap-y-4 xs:grid-cols-2">
           {([parent, nested] as TokenAccount[]).map((account, idx) => {
-            const tokenInfo = idx === 0 ? parentTokenInfo : nestedTokenInfo;
-
             return (
               <div key={idx} className="flex">
                 <div className="mt-2 mr-4 shrink-0 self-start">
-                  {tokenInfo ? (
-                    <Image
-                      src={tokenInfo.image}
-                      className="size-10 rounded-full"
-                      alt="Token logo"
-                      height={40}
-                      width={40}
-                    />
-                  ) : (
-                    <QuestionMarkCircleIcon className="h-10 w-10 rounded-full text-blue-400" />
-                  )}
+                  <QuestionMarkCircleIcon className="h-10 w-10 rounded-full text-blue-400" />
                 </div>
                 <div>
                   <h4 className="text-sm font-bold tracking-wider text-gray-700 uppercase">
                     {idx === 0 ? "Parent" : "Nested"}
                   </h4>
-                  {tokenInfo ? (
-                    <p className="text-sm text-gray-700">{tokenInfo.ticker}</p>
-                  ) : (
-                    <p className="font-mono leading-5 font-medium tracking-tighter text-gray-700">
-                      {compress(account.data.mint, 6)}
-                    </p>
-                  )}
+                  <p className="font-mono leading-5 font-medium tracking-tighter text-gray-700">
+                    {compress(account.data.mint, 6)}
+                  </p>
                   <p className="font-mono leading-5 font-medium tracking-tighter text-gray-500">
                     {compress(account.address, 6)}
                   </p>
                   <div className="mt-2 inline-flex w-full items-center justify-end">
                     <WalletIcon className="mr-1 h-3 w-3 text-gray-500" />
                     <span className="font-mono text-gray-900 underline">
-                      {normalizeTokenAmount(
-                        account.data.amount.toString(),
-                        tokenInfo?.decimals ?? 0,
-                      ).toLocaleString()}
+                      {/* Raw units: the mint's decimals aren't looked up yet. */}
+                      {account.data.amount.toLocaleString()}
                     </span>
                   </div>
                 </div>

@@ -1,7 +1,6 @@
 import { notify } from "@/components";
 import { InfoTooltip } from "@/components/info-tooltip";
 import { useConnectorDialog } from "@/connector/connector-dialog";
-import { lamportsToSol } from "@/lib/solana/common";
 import { useTokenAccountExistence } from "@/state/queries/use-token-account-existence";
 import {
   CreateTokenAirdropBodyTokenProgram,
@@ -9,13 +8,19 @@ import {
 } from "@blastctrl/solace-sdk";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { useConnector } from "@solana/connector/react";
-import { decimalFixedPoint, type Address } from "@solana/kit";
+import {
+  decimalFixedPoint,
+  type Address,
+  lamports,
+  lamportsToSol,
+} from "@solana/kit";
 import { useRouter } from "next/navigation";
 import React from "react";
 import { Box } from "../box";
 import { BATCH_SIZE, TOKEN_BATCH_SIZE } from "../common";
 import { MintAddressLink } from "../mint-address-link";
 import { useCreateAirdrop, useCreateTokenAirdrop } from "../state";
+import { decimalFixedPointToNumber } from "@solana/fixed-points";
 
 type Recipient = {
   address: string;
@@ -46,7 +51,9 @@ const isSupportedTokenProgram = (
 /** Base fee of one single-signature transaction, in SOL. */
 const COST_PER_BATCH = 0.000005;
 /** Rent of a token account; paid by the sender for recipients that have none. */
-const TOKEN_ACCOUNT_CREATION_COST_SOL = lamportsToSol(2_039_280n);
+const TOKEN_ACCOUNT_CREATION_COST_SOL = decimalFixedPointToNumber(
+  lamportsToSol(lamports(2_039_280n)),
+);
 
 /**
  * Exact decimal-string to base-unit conversion (no float arithmetic). Digits

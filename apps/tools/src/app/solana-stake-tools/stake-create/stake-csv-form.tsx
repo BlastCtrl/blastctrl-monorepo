@@ -4,7 +4,7 @@ import { notify } from "@/components/notification";
 import { useConnectorDialog } from "@/connector/connector-dialog";
 import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient } from "@/connector/use-kit-client";
-import { compress, lamportsToSol } from "@/lib/solana/common";
+import { compress, lamportsToSolString } from "@/lib/solana/common";
 import {
   useCreateStakeTransactionActions,
   useCreateStakeTransactionState,
@@ -17,9 +17,9 @@ import { useRef, useState } from "react";
 import {
   EXAMPLE_CSV,
   MAX_ROWS,
-  MIN_STAKE_LAMPORTS,
   parseStakeCsv,
   type ParsedData,
+  MIN_STAKE_SOL,
 } from "./csv-rows";
 import {
   BATCH_SIZE,
@@ -228,8 +228,8 @@ export function StakeCSVForm() {
             <div className="w-40 font-mono text-blue-600">stake_amount</div>
             <div className="flex-1">
               <span className="font-medium">Required.</span> Amount in lamports
-              to delegate, at least {lamportsToSol(MIN_STAKE_LAMPORTS)} SOL. The
-              rent-exempt reserve is added on top of it.
+              to delegate, at least {MIN_STAKE_SOL} SOL. The rent-exempt reserve
+              is added on top of it.
             </div>
           </div>
           <div className="flex">
@@ -431,7 +431,7 @@ export function StakeCSVForm() {
                 <div className="flex items-center space-x-4">
                   <span className="font-mono text-gray-500">#{tx.index}</span>
                   <span className="text-gray-900">
-                    {lamportsToSol(tx.amount).toLocaleString()} SOL
+                    {lamportsToSolString(tx.amount)} SOL
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">

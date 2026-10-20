@@ -3,7 +3,6 @@ import { useConnectorDialog } from "@/connector/connector-dialog";
 import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient } from "@/connector/use-kit-client";
 import { useDebounce } from "@/lib/hooks/use-debounce";
-import { lamportsToSol } from "@/lib/solana/common";
 import { parseJsonKeypair } from "@/lib/solana/parse-keypair";
 import { STAKE_ACCOUNT_SIZE } from "@/lib/solana/stake-account";
 import { useRentQuery } from "@/state/queries/use-rent";
@@ -29,9 +28,14 @@ import {
   sol,
   solToLamports,
   type KeyPairSigner,
+  lamportsToSol,
 } from "@solana/kit";
 import { type FormEvent, useState } from "react";
 import { Box } from "./box";
+import {
+  decimalFixedPointToNumber,
+  decimalFixedPointToString,
+} from "@solana/fixed-points";
 
 type Field = string;
 type Message = string;
@@ -67,15 +71,21 @@ export function SplitManualForm() {
       setFormErrors({ balance: "New stake amount is required." });
       return;
     }
-    if (lamportsToSol(rentExemption) >= Number(newAccountBalance)) {
+    if (
+      decimalFixedPointToNumber(lamportsToSol(rentExemption)) >=
+      Number(newAccountBalance)
+    ) {
       setFormErrors({
         balance: `New stake amount must be higher than the minimum rent (${rentExemption} lamports).`,
       });
       return;
     }
-    if (Number(newAccountBalance) >= lamportsToSol(data.lamports)) {
+    if (
+      Number(newAccountBalance) >=
+      decimalFixedPointToNumber(lamportsToSol(data.lamports))
+    ) {
       setFormErrors({
-        balance: `New amount is higher than the original stake balance (${lamportsToSol(data.lamports)});`,
+        balance: `New amount is higher than the original stake balance (${decimalFixedPointToString(lamportsToSol(data.lamports))});`,
       });
       return;
     }
@@ -240,7 +250,8 @@ function FormInner({
         </Label>
         {!!data && (
           <Description className="text-zinc-500">
-            Original account balance: {lamportsToSol(data.lamports)}
+            Original account balance:{" "}
+            {decimalFixedPointToString(lamportsToSol(data.lamports))}
           </Description>
         )}
         <StyledInput

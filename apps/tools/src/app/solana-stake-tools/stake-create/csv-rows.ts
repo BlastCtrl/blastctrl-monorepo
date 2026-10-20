@@ -1,6 +1,9 @@
-import { lamportsToSol } from "@/lib/solana/common";
-import { isAddress } from "@solana/kit";
+import { isAddress, lamports, lamportsToSol } from "@solana/kit";
 import Papa from "papaparse";
+import {
+  decimalFixedPointToNumber,
+  decimalFixedPointToString,
+} from "@solana/fixed-points";
 
 export interface CSVRow {
   stake_amount: string;
@@ -26,6 +29,10 @@ export interface ParsedData {
 export const MAX_ROWS = 50;
 /** Minimum delegation under SIMD-0490 (Stake v5), in lamports. */
 export const MIN_STAKE_LAMPORTS = 1_000_000_000;
+/** The same, as SOL for messages. */
+export const MIN_STAKE_SOL = decimalFixedPointToString(
+  lamportsToSol(lamports(BigInt(MIN_STAKE_LAMPORTS))),
+);
 
 export const EXAMPLE_CSV = `stake_amount,withdraw_authority,stake_authority,validator,unlock_date,lockup_custodian
 1000000000,,,GREEDkpTvpKzcGvBu9qd36yk6BfjTWPShB67gLWuixMv,,
@@ -42,10 +49,7 @@ export const validateRow = (row: CSVRow, index: number): ValidationError[] => {
   } else if (!/^\d+$/.test(row.stake_amount)) {
     at("stake_amount", "Stake amount must be a whole number of lamports");
   } else if (Number(row.stake_amount) < MIN_STAKE_LAMPORTS) {
-    at(
-      "stake_amount",
-      `Minimum stake is ${lamportsToSol(MIN_STAKE_LAMPORTS)} SOL (SIMD-0490)`,
-    );
+    at("stake_amount", `Minimum stake is ${MIN_STAKE_SOL} SOL (SIMD-0490)`);
   }
 
   if (row.withdraw_authority && !isAddress(row.withdraw_authority)) {
@@ -92,7 +96,13 @@ const validateRows = (rows: CSVRow[]): ParsedData => {
     if (Number.isInteger(amount) && amount > 0) totalLamports += amount;
   });
 
-  return { rows, totalSol: lamportsToSol(totalLamports), errors };
+  return {
+    rows,
+    totalSol: decimalFixedPointToNumber(
+      lamportsToSol(lamports(BigInt(totalLamports))),
+    ),
+    errors,
+  };
 };
 
 /** Parses and validates a stake-accounts CSV. Never rejects; parse failures become a file error. */

@@ -1,8 +1,4 @@
-import {
-  compress,
-  lamportsToSol,
-  lamportsToSolString,
-} from "@/lib/solana/common";
+import { compress, lamportsToSolString } from "@/lib/solana/common";
 import type { StakeAccountType } from "@/state/queries/use-user-stake-accounts";
 import { useValidatorData } from "@/state/queries/use-validator-data";
 import {
@@ -17,6 +13,8 @@ import {
 } from "@heroicons/react/16/solid";
 import type { Address } from "@solana/kit";
 import { useState } from "react";
+import { lamportsToSol } from "@solana/kit";
+import { decimalFixedPointToString } from "@solana/fixed-points";
 
 type PickerDialogProps = {
   owner: Address;
@@ -95,7 +93,12 @@ export function PickerDialog({
                           </span>
                         )}
                       </div>
-                      <span>{lamportsToSol(stake.lamports)} SOL</span>
+                      <span>
+                        {decimalFixedPointToString(
+                          lamportsToSol(stake.lamports),
+                        )}{" "}
+                        SOL
+                      </span>
                     </div>
                     <ValidatorInfo account={stake} />
                   </CloseButton>

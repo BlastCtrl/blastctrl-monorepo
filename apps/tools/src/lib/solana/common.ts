@@ -1,4 +1,5 @@
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { formatDecimalFixedPoint } from "@solana/fixed-points";
+import { lamports, lamportsToSol } from "@solana/kit";
 
 export function compress(str: string, chars: number) {
   return str.slice(0, chars) + "..." + str.slice(-chars);
@@ -17,30 +18,25 @@ export function normalizeTokenAmount(
   return rawTokens / Math.pow(10, decimals);
 }
 
-export function lamportsToSol(lamports: number | bigint): number {
-  if (typeof lamports === "number") {
-    return lamports / LAMPORTS_PER_SOL;
-  }
-
-  let signMultiplier = 1;
-  if (lamports < 0) {
-    signMultiplier = -1;
-  }
-
-  const absLamports = lamports < 0 ? -lamports : lamports;
-  const lamportsString = absLamports.toString(10).padStart(10, "0");
-  const splitIndex = lamportsString.length - 9;
-  const solString =
-    lamportsString.slice(0, splitIndex) +
-    "." +
-    lamportsString.slice(splitIndex);
-  return signMultiplier * parseFloat(solString);
-}
-
+/**
+ * `value` lamports as SOL for display, with thousands separators and up to
+ * `maximumFractionDigits` decimals ("1,234.5"). Kit's `Sol` is unsigned, so
+ * a negative amount is formatted by its magnitude and given its sign back.
+ */
 export function lamportsToSolString(
-  lamports: number | bigint,
+  value: number | bigint,
   maximumFractionDigits = 9,
 ): string {
-  const sol = lamportsToSol(lamports);
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits }).format(sol);
+  const negative = value < 0;
+  const magnitude =
+    typeof value === "bigint"
+      ? negative
+        ? -value
+        : value
+      : BigInt(Math.trunc(Math.abs(value)));
+  const formatted = formatDecimalFixedPoint(
+    new Intl.NumberFormat("en-US", { maximumFractionDigits }),
+    lamportsToSol(lamports(magnitude)),
+  );
+  return negative ? `-${formatted}` : formatted;
 }

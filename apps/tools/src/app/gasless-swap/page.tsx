@@ -8,7 +8,6 @@ import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useGaslessSwap } from "@/lib/hooks/use-gasless-swap";
 import type { JupiterQuote, SwapTransaction } from "@/lib/octane";
-import { lamportsToSol } from "@/lib/solana/common";
 import { formatNumber, numberFormatter } from "@/lib/utils";
 import { useJupQuery } from "@/state/queries/use-jup-quote";
 import { jupTokensQuery } from "@/state/queries/use-jup-tokens";
@@ -24,6 +23,8 @@ import { useForm } from "react-hook-form";
 import { Popover, PopoverButton, PopoverPanel } from "./_components/popover";
 import { TokenQuote } from "./_components/token-quote";
 import { TokenSelectPanel } from "./_components/token-select-panel";
+import { lamports, lamportsToSol } from "@solana/kit";
+import { decimalFixedPointToNumber } from "@solana/fixed-points";
 
 type FormData = {
   swapAmount: number;
@@ -105,7 +106,9 @@ export default function GaslessSwap() {
     try {
       const signature = await send(signed);
       const amountOut = formatNumber.format(
-        lamportsToSol(Number(quote.outAmount)),
+        decimalFixedPointToNumber(
+          lamportsToSol(lamports(BigInt(quote.outAmount))),
+        ),
         5,
       );
       notify(
@@ -259,8 +262,10 @@ export default function GaslessSwap() {
               <span className="font-medium text-gray-600">
                 {quoteQuery.data
                   ? formatNumber.format(
-                      lamportsToSol(
-                        parseFloat(quoteQuery.data?.outAmount || ""),
+                      decimalFixedPointToNumber(
+                        lamportsToSol(
+                          lamports(BigInt(quoteQuery.data.outAmount)),
+                        ),
                       ),
                       5,
                     )
