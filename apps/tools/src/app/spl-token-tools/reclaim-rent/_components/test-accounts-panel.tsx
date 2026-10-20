@@ -1,5 +1,6 @@
 import { notify } from "@/components/notification";
 import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
+import { solBalanceKey } from "@/state/queries/use-sol-balance";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { XMarkIcon } from "@heroicons/react/20/solid";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
@@ -134,7 +135,7 @@ export function TestAccountsPanel() {
     } finally {
       setBusy(false);
       void queryClient.invalidateQueries({
-        queryKey: ["sol-balance", publicKey.toString()],
+        queryKey: solBalanceKey(publicKey.toString()),
       });
     }
   };

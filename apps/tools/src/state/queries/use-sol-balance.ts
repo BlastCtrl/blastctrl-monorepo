@@ -3,19 +3,23 @@ import { lamportsToSol } from "@/lib/solana/common";
 import { useConnector } from "@solana/connector/react";
 import { useQuery } from "@tanstack/react-query";
 
-/** The connected wallet's confirmed balance, in SOL. */
+export const solBalanceKey = (account: string | null, network?: string) =>
+  network === undefined
+    ? (["sol-balance", account] as const)
+    : (["sol-balance", account, network] as const);
+
 export function useSolBalance() {
   const { account } = useConnector();
   const { rpc, network } = useAppRpc();
 
   return useQuery({
-    queryKey: ["sol-balance", account, network],
+    queryKey: solBalanceKey(account, network),
     enabled: !!account && !!rpc,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!account || !rpc) return 0;
       const { value } = await rpc
         .getBalance(account, { commitment: "confirmed" })
-        .send();
+        .send({ abortSignal: signal });
       return lamportsToSol(value);
     },
   });

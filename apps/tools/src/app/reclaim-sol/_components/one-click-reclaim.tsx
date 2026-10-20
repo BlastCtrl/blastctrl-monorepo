@@ -30,6 +30,7 @@ import {
 import { notify } from "@/components/notification";
 import { chunk } from "@/lib/utils";
 import { useReclaimableAccounts } from "@/state/queries/use-reclaimable-accounts";
+import { solBalanceKey } from "@/state/queries/use-sol-balance";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -213,7 +214,7 @@ export function OneClickReclaim() {
     },
     // For the balance in the toolbox's top bar, if they go on to a tool.
     onSettled: () =>
-      void queryClient.invalidateQueries({ queryKey: ["sol-balance", owner] }),
+      void queryClient.invalidateQueries({ queryKey: solBalanceKey(owner) }),
   });
 
   /** The pill: send everything that's left, right away. */

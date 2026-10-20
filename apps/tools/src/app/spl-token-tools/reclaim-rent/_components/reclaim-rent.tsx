@@ -1,6 +1,7 @@
 import { notify } from "@/components/notification";
 import { chunk } from "@/lib/utils";
 import { useReclaimableAccounts } from "@/state/queries/use-reclaimable-accounts";
+import { solBalanceKey } from "@/state/queries/use-sol-balance";
 import { Button, Switch, cn } from "@blastctrl/ui";
 import { Description, Field, Label } from "@headlessui/react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
@@ -254,7 +255,7 @@ export function ReclaimRent({
   const afterReclaim = () => {
     void refetch();
     void queryClient.invalidateQueries({
-      queryKey: ["sol-balance", publicKey?.toString()],
+      queryKey: solBalanceKey(publicKey?.toString() ?? null),
     });
   };
 

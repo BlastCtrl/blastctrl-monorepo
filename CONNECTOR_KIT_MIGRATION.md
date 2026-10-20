@@ -272,14 +272,20 @@ a `KeyPairSigner` (via `createKeyPairSignerFromBytes`). A `KeyPairSigner` also e
    rejects a _missing_ key; add `.optional()` first. Use `error:` not
    `message:`.
 
-8. **Explorer links:** `useQueryContext().fmtUrlWithCluster` now reads
+8. **SOL balance:** `useSolBalance()` reads the connected wallet's balance
+   through the app RPC and consumes TanStack's abort signal. After a
+   transaction that moves SOL, invalidate with
+   `queryClient.invalidateQueries({ queryKey: solBalanceKey(owner) })`; the
+   two-argument form is the exact key for one cluster.
+
+9. **Explorer links:** `useQueryContext().fmtUrlWithCluster` now reads
    `useCluster().type`; the old network store is dead.
 
-9. **The connector's `getConnector(id)` returns the raw Wallet Standard
+10. **The connector's `getConnector(id)` returns the raw Wallet Standard
     wallet** at runtime despite the `WalletConnector` typing; access
     `features["standard:disconnect"]` etc. through a structural cast.
 
-10. **`parseBase64RpcAccount` / `decode…` throw on garbage;** wrap per-account
+11. **`parseBase64RpcAccount` / `decode…` throw on garbage;** wrap per-account
     in a scan and skip, instead of failing the whole list.
 
 ## Checklist for migrating a tool
