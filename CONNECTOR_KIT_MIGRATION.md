@@ -1,19 +1,21 @@
-# Migrating `apps/tools` to ConnectorKit + Solana Kit
+# `apps/tools` on ConnectorKit + Solana Kit
 
-Notes for whoever (human or agent) continues moving tools off
-`@solana/wallet-adapter` + `@solana/web3.js` onto `@solana/connector`
-(ConnectorKit) + `@solana/kit`. Everything here was learned while migrating
-the stake tools; read it before touching the remaining tools.
+How the tools app talks to Solana: `@solana/connector` (ConnectorKit) for the
+wallet and cluster, `@solana/kit` and the `@solana-program/*` clients for
+everything on chain. The app was migrated here from `@solana/wallet-adapter`
+and `@solana/web3.js` in October 2026; this is what was learned on the way,
+kept for whoever (human or agent) adds or changes a tool. Read it first.
 
 Versions this was written against: `@solana/connector` 0.3.0,
-`@solana/kit` 8.5.0, `@solana/kit-plugin-rpc` / `kit-plugin-signer` 0.19.0,
+`@solana/kit` 8.5.0 (with `@solana/fixed-points` 8.5.0),
+`@solana/kit-plugin-rpc` / `kit-plugin-signer` 0.19.0,
 `@solana-program/stake` 0.11.0, `@solana-program/system` 0.16.0,
-`@solana-program/token` 0.18.0; Metaplex `umi` 1.6.0, `mpl-token-metadata` 3.4.0,
-`mpl-core` 1.10.0.
+`@solana-program/token` 0.18.0; Metaplex `umi` 1.6.0, `mpl-token-metadata`
+3.4.0, `mpl-core` 1.10.0; `@sqds/multisig` 2.1.4.
 
-## Status
+## Where things live
 
-Done (use these as reference implementations):
+Reference implementations, by area:
 
 | Area                                                                                                                                                                                                                               | Files                                                                                                                                                                             |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -35,25 +37,24 @@ Done (use these as reference implementations):
 | Shared helpers: unsigned simulation, compute headroom, Token-2022 parsing, mint/SOL-balance/token-account queries                                                                                                                  | `src/connector/{simulate,resource-limits}.ts`, `src/lib/solana/token-2022.ts`, `src/state/queries/{use-mint,use-sol-balance,use-token-account-existence}.ts`                      |
 | Explorer links by connector cluster                                                                                                                                                                                                | `src/state/use-query-context.ts`                                                                                                                                                  |
 
-Nothing is on the adapter anymore (as of 2026-10-20): the adapter provider,
-its auto-connect context, the network store, `use-wallet-connection.ts`, the
-old wallet menus and `lib/solana/endpoints.ts` are deleted, and
-`src/app/layout.tsx` no longer imports the adapter stylesheet. What still imports web3.js: `lib/solana/squads-multisig.ts`, on purpose
-(see its section), and nothing else; the package stays for the Squads SDK.
-Lamports become SOL through kit's `lamportsToSol`, whose fixed-point result
-is converted with `@solana/fixed-points` (`decimalFixedPointToNumber` /
-`decimalFixedPointToString`); `lib/solana/common.ts` keeps only the
-`lamportsToSolString` formatter on top of it. Turbo's credits are a
-twelve-decimal fixed-point value and its upload price a `Lamports`
-(`lib/turbo.ts`), which retired the Metaplex-style `Amount` on `bn.js`.
-The `@solana/wallet-adapter-*` packages, `@solana/spl-token`, `bs58`,
-`bn.js`, `bignumber.js` and the other dependencies nothing imported are
-gone from `apps/tools/package.json`. `grep -rl "@solana/web3.js"
-apps/tools/src` is the live list; `tsc` is clean.
+## What is left of web3.js
 
-Breaking other, not-yet-migrated tools while changing a shared query or
-helper is accepted; they get fixed when their turn comes. Keep `tsc` clean
-for the files you touch.
+`lib/solana/squads-multisig.ts` imports it on purpose, because the Squads
+SDK is built on it (see its section); nothing else does, and `grep -rl
+"@solana/web3.js" apps/tools/src` is the live list. The
+`@solana/wallet-adapter-*` packages, `@solana/spl-token`, `bs58`, `bn.js`
+and `bignumber.js` are gone from `apps/tools/package.json`; the adapter
+provider, its network store, the old wallet menus and the web3 batch sender
+are deleted. `@solana-program/token-2022` is deliberately not installed (it
+peers on `@solana/zk-sdk`); `lib/solana/token-2022.ts` holds what the app
+needs from that program.
+
+Peer declarations the workspace knowingly overrides are listed with their
+source in `pnpm-workspace.yaml` (`peerDependencyRules.allowedVersions`): all
+come from the x402 tree under `@ardrive/turbo-sdk` or the connector's mobile
+wallet adapter, and `pnpm peers check` should stay clean. The workspace's
+`minimumReleaseAge` holds back releases younger than two days, so a range
+may resolve to one version behind the latest.
 
 ## The building blocks
 
@@ -118,10 +119,12 @@ const asset = await rpc
 gate DAS queries on it. `network` namespaces cached asset data. To add a DAS
 method, extend `DasApi` in `app-rpc.ts` and the param/result types in
 `src/state/queries/types.ts`; don't declare methods nothing calls. Those types
-follow the Metaplex reference implementation (what Triton runs), not Helius:
-`searchAssets` `tokenType` values are PascalCase (`"Fungible"`, `"All"`),
-`content`, `royalty`, `creators`, `authorities` and `token_info` are optional,
-and `token_info.symbol` / `price_info` are provider extensions.
+follow the Metaplex reference implementation (what Triton runs), not Helius,
+with one exception: `searchAssets` `tokenType` is spelled the way the RPC in
+use wants it, camelCase (`"fungible"`, `"nonFungible"`); the PascalCase of the
+reference enum is rejected with "unknown variant". `content`, `royalty`,
+`creators`, `authorities` and `token_info` are optional, and
+`token_info.symbol` / `price_info` are provider extensions.
 
 The kit client below is built on the same RPC, so `client.rpc` has the DAS
 methods too.
@@ -163,9 +166,8 @@ was given (some stop at the first) gets the rest one at a time, counted on
 from what went out. A refusal throws `WalletRefusedError(sent, of)`;
 `isWalletRefusal` recognises code 4001, the connector's `USER_REJECTED` and
 the usual messages, through the cause chain. Anything else thrown means
-nothing was sent. The legacy `lib/solana/send-batches.ts` has the same shape
-over web3 and stays until transfer-authority migrates. The sender is an
-interface, so `send-batches.test.ts` drives the whole flow with a fake one.
+nothing was sent. The sender is an interface, so `send-batches.test.ts`
+drives the whole flow with a fake one.
 
 `sendInOrder(steps, sender, onProgress)` in the same file is for transactions
 that depend on each other, like the steps of a Squads proposal: one wallet
@@ -344,7 +346,7 @@ pinning versions that peer with Kit 8.5). `@solana-program/token-2022` is
 deliberately not installed (it peers on `@solana/zk-sdk`): the `token` client's
 builders take the Token-2022 program address via `programAddress`, and
 `lib/solana/token-2022.ts` holds that address plus the mint-extension parser.
-Metaplex programs go through Umi as described below.
+Metaplex programs go through Umi as described above.
 Account inputs accept an `Address` **or** a signer object; pass the signer
 when the account must sign.
 
@@ -405,9 +407,18 @@ a `KeyPairSigner` (via `createKeyPairSignerFromBytes`). A `KeyPairSigner` also e
 
 ### Numbers and strings
 
-- Lamports are `bigint` (`Lamports` brand). `lamportsToSol` /
-  `lamportsToSolString` in `lib/solana/common.ts` accept bigint.
-- Decimal SOL input: `solToLamports(sol("1.5"))` – exact, no float.
+- Lamports are `bigint` (`Lamports` brand; `lamports(n)` brands and checks
+  the range, so take the absolute value of a signed amount first).
+- Lamports to SOL: kit's `lamportsToSol(lamports)` returns a `Sol`, a
+  fixed-point object from `@solana/fixed-points`, not a number. Convert
+  with `decimalFixedPointToNumber` where arithmetic follows and
+  `decimalFixedPointToString` (trailing zeros dropped) for display, or
+  format with `lamportsToSolString(value, maxFractionDigits)` from
+  `lib/solana/common.ts`, the one app helper left, which takes a `number`
+  or `bigint` and keeps a sign. Other fixed-point amounts work the same
+  way: Turbo credits are `rawDecimalFixedPoint("unsigned", 64, 12)`.
+- Decimal SOL input: `solToLamports(sol("1.5"))` – exact, no float; `sol`
+  throws on more than nine decimals unless given a rounding mode.
 - `isAddress(str)` validates, `address(str)` brands. `Address` is a string, so
   `compress(address, 4)` and string compares against `useConnector().account`
   just work.
@@ -432,9 +443,11 @@ a `KeyPairSigner` (via `createKeyPairSignerFromBytes`). A `KeyPairSigner` also e
    (plan each message with `client.planTransaction`, add a blockhash, estimate
    compute units with Kit's factories, `compileTransaction`, wallet signs the
    batch, keypairs sign after, `sendAndConfirmTransactionFactory`) lives in
-   `solana-stake-tools/stake-create/stake-batch.ts`. Fall back to per-row
-   `sendTransaction` on `SOLANA_ERROR__SIGNER__WALLET_MULTISIGN_UNIMPLEMENTED`.
-   Reuse that file rather than re-deriving it.
+   `src/connector/send-batches.ts` (`sendBatches` for independent
+   transactions, `sendInOrder` for dependent ones), with the fallbacks for a
+   wallet that can't sign a batch or signs fewer than asked.
+   `solana-stake-tools/stake-create/stake-batch.ts` is the variant with
+   keypair co-signers. Reuse those rather than re-deriving them.
 
 3. **`disconnectWallet()` does not cancel a pending WalletConnect pairing.**
    While connecting there is no connected wallet, so the kit wallet plugin only
@@ -469,8 +482,8 @@ a `KeyPairSigner` (via `createKeyPairSignerFromBytes`). A `KeyPairSigner` also e
    `queryClient.invalidateQueries({ queryKey: solBalanceKey(owner) })`; the
    two-argument form is the exact key for one cluster.
 
-9. **Explorer links:** `useQueryContext().fmtUrlWithCluster` now reads
-   `useCluster().type`; the old network store is dead.
+9. **Explorer links:** `useQueryContext().fmtUrlWithCluster` reads
+   `useCluster().type`.
 
 10. **The connector's `getConnector(id)` returns the raw Wallet Standard
     wallet** at runtime despite the `WalletConnector` typing; access
@@ -502,24 +515,30 @@ a `KeyPairSigner` (via `createKeyPairSignerFromBytes`). A `KeyPairSigner` also e
     fee would charge for all of it. `setTransactionMessageComputeUnitLimit`
     replaces it in place; see `sendInOrder`.
 
-## Checklist for migrating a tool
+## Checklist for a new tool
 
-1. Replace `useWallet` / `useConnection` / `useWalletModal` with
-   `useKitClient`, `useConnector` (for `account`), `useSolanaClient` (reads),
-   `useConnectorDialog`.
-2. Replace `PublicKey` with `Address` (`isAddress` / `address`), `Keypair`
-   with `generateKeyPairSigner`, lamport `number`s with `bigint`.
-3. Build instructions with `@solana-program/*`; drop `ComputeBudgetProgram`,
-   blockhash fetching, `sendRawTransaction`, `confirmTransaction`,
-   `retryWithBackoff`, `signWithWalletFirst`.
-4. Send with `client.sendTransaction` (or `sendTransactions` + a plan), read
+1. Wallet and cluster come from `useKitClient`, `useConnector` (for
+   `account`), `useAppRpc` or `useSolanaClient` (reads) and
+   `useConnectorDialog`; never from the connector's byte-oriented signer.
+2. Addresses are `Address` (`isAddress` / `address`), keypairs come from
+   `generateKeyPairSigner`, lamports are `bigint`.
+3. Instructions come from `@solana-program/*`, Metaplex ones from the Umi
+   builders, Squads ones from the Squads module. No hand-built compute budget,
+   blockhash fetching, raw sends or confirmation loops.
+4. Send with `client.sendTransaction` (or `sendTransactions` + a plan) for
+   one transaction, `sendBatches` / `sendInOrder` for several; read
    `result.context.signature`, report errors via `transactionErrorMessage`.
-5. Move reads to a shared `src/state/queries/use-*.ts` on `useSolanaClient`,
-   decoded with the program client.
-6. Delete the legacy helper once its last importer is gone (`lib/solana/stake.ts`
-   went this way).
+5. Reads live in a shared `src/state/queries/use-*.ts`, keyed by `network`,
+   decoded with the program client. Read before you prompt: plan on the
+   accounts first so a doomed transaction never reaches the wallet.
+6. Pin what matters in a unit test: account lists and roles, instruction
+   data, packet size with a wallet-added priority fee, the plan's skips.
 7. `pnpm exec tsc --noEmit -p apps/tools/tsconfig.json`, `pnpm exec eslint
-<files>`, `pnpm exec vitest run` (one legacy test needs a local validator).
+<files>`, `pnpm exec vitest run` (no validator needed),
+   `pnpm -F @blastctrl/octane-core test` when the backend changed, and
+   `pnpm exec next build` before calling a page done: prerendering has rules
+   `next dev` doesn't enforce, like `useSearchParams` under a Suspense
+   boundary.
 
 ## Where the truth lives
 
@@ -535,6 +554,11 @@ docs for this work:
   (`planTransaction` / `sendTransaction` signatures).
 - `apps/tools/node_modules/@solana-program/<program>/dist/types/generated/`
   (instruction inputs, account decoders, program plugin).
+- `apps/tools/node_modules/@solana/fixed-points/dist/types/` (the `Sol`
+  shape and its conversions) and `@solana/rpc-types/dist/types/sol.d.ts`.
+- `apps/tools/node_modules/@solana/connector/dist/chunk-*.mjs` when a
+  capability flag looks wrong; that is where `supportsBatchSigning` was
+  traced to a non-standard feature name.
 - Kit docs: https://www.solanakit.com/docs/guides/sending-transactions,
   `/docs/advanced-guides/transactions`, `/docs/advanced-guides/instruction-plans`.
 - ConnectorKit repo: https://github.com/solana-foundation/connectorkit
