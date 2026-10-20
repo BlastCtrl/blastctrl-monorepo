@@ -38,14 +38,18 @@ Done (use these as reference implementations):
 Nothing is on the adapter anymore (as of 2026-10-20): the adapter provider,
 its auto-connect context, the network store, `use-wallet-connection.ts`, the
 old wallet menus and `lib/solana/endpoints.ts` are deleted, and
-`src/app/layout.tsx` no longer imports the adapter stylesheet. What still
-imports web3.js: `lib/solana/squads-multisig.ts` (on purpose, see its
-section), `lib/solana/common.ts` (`LAMPORTS_PER_SOL`), `common-tokens.ts` and
-`types/amount.ts`. The `@solana/wallet-adapter-*` packages, `@solana/spl-token`,
-`bs58` and the other dependencies nothing imported are dropped from
-`apps/tools/package.json`; `@solana/web3.js` stays for the Squads SDK and
-`bn.js` for `types/amount.ts` until Turbo's amounts move to `bigint`.
-`grep -rl "@solana/web3.js" apps/tools/src` is the live list; `tsc` is clean.
+`src/app/layout.tsx` no longer imports the adapter stylesheet. What still imports web3.js: `lib/solana/squads-multisig.ts`, on purpose
+(see its section), and nothing else; the package stays for the Squads SDK.
+Lamports become SOL through kit's `lamportsToSol`, whose fixed-point result
+is converted with `@solana/fixed-points` (`decimalFixedPointToNumber` /
+`decimalFixedPointToString`); `lib/solana/common.ts` keeps only the
+`lamportsToSolString` formatter on top of it. Turbo's credits are a
+twelve-decimal fixed-point value and its upload price a `Lamports`
+(`lib/turbo.ts`), which retired the Metaplex-style `Amount` on `bn.js`.
+The `@solana/wallet-adapter-*` packages, `@solana/spl-token`, `bs58`,
+`bn.js`, `bignumber.js` and the other dependencies nothing imported are
+gone from `apps/tools/package.json`. `grep -rl "@solana/web3.js"
+apps/tools/src` is the live list; `tsc` is clean.
 
 Breaking other, not-yet-migrated tools while changing a shared query or
 helper is accepted; they get fixed when their turn comes. Keep `tsc` clean

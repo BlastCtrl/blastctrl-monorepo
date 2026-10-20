@@ -1,8 +1,8 @@
 import { notify } from "@/components";
 import { useConnectorDialog } from "@/connector/connector-dialog";
 import { useLocalStorageState } from "@/lib/hooks/use-local-storage";
-import type { TurboStorage } from "@/lib/turbo";
-import { formatAmount } from "@/types";
+import { formatTurboCredits, type TurboStorage } from "@/lib/turbo";
+import { lamportsToSolString } from "@/lib/solana/common";
 import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
 import { Transition } from "@headlessui/react";
 import { QuestionMarkCircleIcon } from "@heroicons/react/20/solid";
@@ -307,7 +307,8 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
                       </a>
                     </dt>
                     <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
-                      {filePrice && formatAmount(filePrice)}
+                      {filePrice !== undefined &&
+                        `${lamportsToSolString(filePrice)} SOL`}
                       {priceError && (
                         <span role="alert">Unable to load upload price.</span>
                       )}
@@ -355,7 +356,7 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
         </p>
       )}
 
-      {balance?.basisPoints.gtn(0) && (
+      {balance && balance.raw > 0n && (
         <div className="mx-auto my-3 max-w-sm rounded-md border border-gray-300 px-3 py-2 shadow-xs">
           <div className="text-sm text-gray-900">
             <span className="mb-1 block text-xs tracking-wider text-gray-500 uppercase">
@@ -363,7 +364,7 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
             </span>
             <span className="font-medium text-gray-500">Turbo Credits </span>
             <span className="mx-1 text-base font-semibold text-gray-700">
-              {formatAmount(balance)}
+              {formatTurboCredits(balance)}
             </span>
           </div>
           <p className="pt-2 pb-1 text-xs text-gray-500">

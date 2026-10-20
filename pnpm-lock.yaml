@@ -110,12 +110,6 @@ importers:
       '@upstash/redis':
         specifier: ^1.35.6
         version: 1.35.6
-      bignumber.js:
-        specifier: ^9.3.1
-        version: 9.3.1
-      bn.js:
-        specifier: ^5.2.1
-        version: 5.2.2
       cache-manager:
         specifier: ^5.5.2
         version: 5.7.6
@@ -192,9 +186,6 @@ importers:
       '@tailwindcss/postcss':
         specifier: ^4.3.3
         version: 4.3.3
-      '@types/bn.js':
-        specifier: ^5.1.5
-        version: 5.1.6
       '@types/node':
         specifier: ^22.18.8
         version: 22.18.8

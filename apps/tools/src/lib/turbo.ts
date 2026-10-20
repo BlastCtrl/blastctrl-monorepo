@@ -5,18 +5,29 @@ import {
   type TurboAuthenticatedClient,
 } from "@ardrive/turbo-sdk/web";
 import type { WalletAdapterCompatible } from "@solana/connector/compat";
-import { getBase58Encoder } from "@solana/kit";
-import BigNumber from "bignumber.js";
-import type { Amount } from "@/types";
-import { amount, lamports, toBigNumber } from "@/types";
+import {
+  formatDecimalFixedPoint,
+  rawDecimalFixedPoint,
+  type DecimalFixedPoint,
+} from "@solana/fixed-points";
+import {
+  getBase58Encoder,
+  lamports,
+  sol,
+  solToLamports,
+  type Lamports,
+} from "@solana/kit";
 
-const LAMPORTS_PER_SOL = 1_000_000_000;
+/** Turbo credits, counted in "winc": a credit has twelve decimals. */
+export type TurboCredits = DecimalFixedPoint<"unsigned", 64, 12>;
+const turboCredits = rawDecimalFixedPoint("unsigned", 64, 12);
 
-export const TURBO_CREDIT = {
-  symbol: "Credits",
-  decimals: 12,
-} as const;
-export type TurboCreditAmount = Amount<typeof TURBO_CREDIT>;
+/** `credits` for display, up to all twelve decimals, trailing zeros dropped. */
+export const formatTurboCredits = (credits: TurboCredits) =>
+  formatDecimalFixedPoint(
+    new Intl.NumberFormat("en-US", { maximumFractionDigits: 12 }),
+    credits,
+  );
 
 export type TurboUploadResult = { id: string };
 
@@ -79,20 +90,21 @@ export class TurboStorage {
     return { id };
   }
 
-  async getBalance(): Promise<TurboCreditAmount> {
+  async getBalance(): Promise<TurboCredits> {
     const { winc } = await this.turbo.getBalance();
-    return amount(toBigNumber(winc), TURBO_CREDIT);
+    return turboCredits(BigInt(winc));
   }
 
-  async getUploadPrice(bytes: number) {
+  /**
+   * What `bytes` cost to upload, in lamports, with half as much again on
+   * top so a price that moves before the upload settles doesn't fail it.
+   * Turbo quotes in SOL; the result is rounded up to whole lamports.
+   */
+  async getUploadPrice(bytes: number): Promise<Lamports> {
     const { tokenPrice } = await this.turbo.getTokenPriceForBytes({
       byteCount: bytes,
     });
-    // Turbo quotes whole SOL; Amount stores integer lamports.
-    const buffered = new BigNumber(tokenPrice)
-      .multipliedBy(LAMPORTS_PER_SOL)
-      .multipliedBy(1.5)
-      .integerValue(BigNumber.ROUND_CEIL);
-    return lamports(toBigNumber(buffered.toString()));
+    const quoted = solToLamports(sol(tokenPrice, "ceil"));
+    return lamports((quoted * 3n + 1n) / 2n);
   }
 }
