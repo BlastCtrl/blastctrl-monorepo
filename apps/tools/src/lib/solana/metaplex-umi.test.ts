@@ -4,7 +4,7 @@ import { getUmi, toKitInstruction, toUmiSigner } from "./metaplex-umi";
 import {
   createMetadataInstructions,
   updateMetadataInstructions,
-} from "./token-metadata";
+} from "./metaplex-token-metadata";
 
 const TOKEN_METADATA_PROGRAM = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s";
 const wallet = address("BWia4unXYeEZAeZeTQFQ2sKoeQQmeGhGmVQ7z4GZJJnx");

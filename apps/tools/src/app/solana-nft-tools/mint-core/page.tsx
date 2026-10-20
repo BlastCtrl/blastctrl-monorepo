@@ -1,23 +1,17 @@
 "use client";
 
-import { InputGroup } from "@/components";
-import { useWallet } from "@solana/wallet-adapter-react";
-import Link from "next/link";
-import { useForm } from "react-hook-form";
-
-import { InputMultiline, notify } from "@/components";
-import { TurboStorage } from "@/lib/turbo";
-import { mimeTypeToCategory } from "@/lib/utils";
+import { InputGroup, InputMultiline, notify } from "@/components";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
+import { useArweaveUploader } from "@/lib/hooks/use-arweave-uploader";
+import { createCoreAssetInstructions } from "@/lib/solana/metaplex-core";
+import { uploadNftMetadata } from "@/lib/solana/metaplex-json-metadata";
 import { Button, Checkbox, SpinnerIcon } from "@blastctrl/ui";
-import { WalletError } from "@solana/wallet-adapter-base";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { MediaFiles } from "./_components/media-files";
-import useUmi from "@/lib/hooks/use-umi";
-import { generateSigner } from "@metaplex-foundation/umi";
-import { setComputeUnitPrice } from "@metaplex-foundation/mpl-toolbox";
-import * as base58 from "bs58";
+import { generateKeyPairSigner } from "@solana/kit";
 import { useState } from "react";
-import { createV1 } from "@metaplex-foundation/mpl-core";
+import { useForm } from "react-hook-form";
+import { MediaFiles } from "./_components/media-files";
 
 export type CreateFormInputs = {
   name: string;
@@ -30,11 +24,11 @@ export type CreateFormInputs = {
 };
 
 export default function Mint() {
-  const wallet = useWallet();
-  const { setVisible } = useWalletModal();
+  const { client } = useKitClient();
+  const { setOpen } = useConnectorDialog();
+  const upload = useArweaveUploader();
   const [isConfirming, setIsConfirming] = useState(false);
   const [createJson, setCreateJson] = useState(true);
-  const umi = useUmi();
 
   const {
     register,
@@ -53,149 +47,44 @@ export default function Mint() {
   });
 
   const submit = async (data: CreateFormInputs) => {
-    if (!wallet.publicKey) {
-      setVisible(true);
+    if (!client || !upload) {
+      setOpen(true);
       return;
     }
 
-    if (!wallet.signMessage) {
-      notify({
-        title: "Error",
-        description: "Selected wallet doesn't support signing messages",
-      });
-      return setVisible(true);
-    }
-
-    // Setup
     setIsConfirming(true);
-
-    const turbo = await TurboStorage.make(wallet);
-
-    // Check if we are uploading a json file
-    let jsonUrl: string;
-
     try {
-      if (createJson) {
-        notify({
-          title: "Uploading external metadata",
-          description:
-            "The metadata JSON file is being uploaded to Arweave via Turbo. This will require multiple wallet confirmations, including payment and signature verification.",
-        });
+      // The uploader's toasts report a failed upload; stop quietly after one.
+      const uri = createJson
+        ? await uploadNftMetadata(data, upload).catch(() => null)
+        : data.uri;
+      if (uri === null) return;
 
-        // Check if we're also uploading media files
-        const { image, animation_url } = data;
-        let imageUrl: string | undefined;
-        let animationUrl: string | undefined;
+      const asset = await generateKeyPairSigner();
+      const result = await client.sendTransaction(
+        createCoreAssetInstructions(client.payer.address, asset, {
+          name: data.name,
+          uri,
+        }),
+      );
 
-        try {
-          if (image)
-            imageUrl = `https://arweave.net/${(await turbo.uploadFile(image)).id}`;
-          if (animation_url)
-            animationUrl = `https://arweave.net/${(await turbo.uploadFile(animation_url)).id}`;
-        } catch (err) {
-          setIsConfirming(false);
-          return notify({
-            type: "error",
-            title: "File upload error",
-            description: (
-              <div className="break-normal">
-                <p>
-                  There has been an error while uploading with the message:{" "}
-                  <span className="font-medium break-all text-yellow-300">
-                    {err instanceof Error ? err.message : String(err)}
-                  </span>
-                  .
-                </p>
-                <p className="mt-2">
-                  You can recover any lost funds on the{" "}
-                  <Link
-                    href="/permanent-storage-tools/file-upload"
-                    className="font-medium text-blue-300"
-                  >
-                    /permanent-storage-tools
-                  </Link>{" "}
-                  page.
-                </p>
-              </div>
-            ),
-          });
-        }
-        const category = animation_url
-          ? mimeTypeToCategory(animation_url)
-          : image
-            ? mimeTypeToCategory(image)
-            : undefined;
-
-        const { name, symbol, description, external_url } = data;
-        const json = {
-          name,
-          symbol,
-          description,
-          external_url,
-        };
-
-        const files: Array<{ type?: string; uri: string }> = [];
-        if (imageUrl) {
-          Object.assign(json, { image: imageUrl });
-          files.push({ uri: imageUrl, type: image?.type });
-        }
-
-        if (animationUrl) {
-          Object.assign(json, { animation_url: animationUrl });
-          files.push({ uri: animationUrl, type: animation_url?.type });
-        }
-        if (files.length > 0)
-          Object.assign(json, { properties: { category, files } });
-
-        const metadata = new File([JSON.stringify(json)], data.name, {
-          type: "application/json",
-        });
-
-        jsonUrl = `https://arweave.net/${(await turbo.uploadFile(metadata)).id}`;
-      } else {
-        jsonUrl = data.uri;
-      }
-
-      const { name } = data;
-
-      const { signature } = await createV1(umi, {
-        asset: generateSigner(umi),
-        name,
-        uri: jsonUrl,
-      })
-        // .add(setComputeUnitLimit(umi, { units: 1_000_000 }))
-        .add(setComputeUnitPrice(umi, { microLamports: 1_000_000 }))
-        .sendAndConfirm(umi);
-
-      console.log(base58.encode(signature));
       notify({
         title: "NFT mint successful",
         description: (
           <>
-            The <span className="font-medium text-blue-300">{name}</span> NFT
-            has been minted to your wallet.
+            The <span className="font-medium text-blue-300">{data.name}</span>{" "}
+            NFT has been minted to your wallet.
           </>
         ),
         type: "success",
-        txid: base58.encode(signature),
+        txid: result.context.signature,
       });
     } catch (err) {
-      if (err instanceof WalletError) {
-        // The onError callback in the walletconnect context will handle it
-        return;
-      }
       console.log({ err });
-      if (
-        err instanceof Error &&
-        "getLogs" in err &&
-        typeof err.getLogs === "function"
-      ) {
-        console.log(await err.getLogs());
-      }
       notify({
         type: "error",
         title: "Error minting",
-        description: err instanceof Error ? err.message : String(err),
+        description: transactionErrorMessage(err),
       });
     } finally {
       setIsConfirming(false);

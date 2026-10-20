@@ -1,5 +1,6 @@
 import { useOwnerNfts } from "@/state/queries/use-owner-nfts";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnector } from "@solana/connector/react";
+import { isAddress } from "@solana/kit";
 import { useState } from "react";
 import type { FieldError, UseControllerProps } from "react-hook-form";
 import { useController } from "react-hook-form";
@@ -13,12 +14,11 @@ import {
 } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
 import { cn } from "@blastctrl/ui";
-import { isPublicKey } from "@/lib/solana/common";
 
 export const NftSelector = ({ control }: UseControllerProps<FormInputs>) => {
-  const { publicKey } = useWallet();
+  const { account } = useConnector();
   const [query, setQuery] = useState("");
-  const { data } = useOwnerNfts(publicKey?.toString() ?? "");
+  const { data } = useOwnerNfts(account ?? "");
 
   const {
     field: { ref, value, onChange },
@@ -28,7 +28,7 @@ export const NftSelector = ({ control }: UseControllerProps<FormInputs>) => {
     control,
     rules: {
       required: "Select an NFT or enter the mint address",
-      validate: (value) => isPublicKey(value ?? "") || "Not a valid address",
+      validate: (value) => isAddress(value ?? "") || "Not a valid address",
     },
   });
 
@@ -109,8 +109,8 @@ const NftComboboxInput = ({
   selectedMint: string;
   error?: FieldError;
 }) => {
-  const { publicKey } = useWallet();
-  const { data } = useOwnerNfts(publicKey?.toString() ?? "");
+  const { account } = useConnector();
+  const { data } = useOwnerNfts(account ?? "");
 
   const selectedNft = data?.find(({ id }) => id === selectedMint);
 

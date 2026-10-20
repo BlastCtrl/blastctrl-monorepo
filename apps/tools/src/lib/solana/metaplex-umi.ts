@@ -1,10 +1,13 @@
 import { mplCore } from "@metaplex-foundation/mpl-core";
 import { mplTokenMetadata } from "@metaplex-foundation/mpl-token-metadata";
 import {
+  createAmount,
   createNoopSigner,
   publicKey,
   type AccountMeta as UmiAccountMeta,
+  type Amount as UmiAmount,
   type Instruction as UmiInstruction,
+  type Option as UmiOption,
   type PublicKey as UmiPublicKey,
   type Signer as UmiSigner,
   type TransactionBuilder,
@@ -53,6 +56,14 @@ export const toUmiPublicKey = (account: Address): UmiPublicKey =>
  */
 export const toUmiSigner = (account: Address): UmiSigner =>
   createNoopSigner(publicKey(account));
+
+/** Royalty basis points (0–10000) as the percent `Amount` Token Metadata builders take. */
+export const toUmiBasisPoints = (basisPoints: number): UmiAmount<"%", 2> =>
+  createAmount(basisPoints, "%", 2);
+
+/** Unwraps a Umi `Option`: the value of `Some`, null for `None`. */
+export const fromUmiOption = <T>(option: UmiOption<T>): T | null =>
+  option.__option === "Some" ? option.value : null;
 
 /**
  * Map a Umi instruction to a kit `Instruction`. Field-for-field: Umi carries

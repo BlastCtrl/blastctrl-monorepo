@@ -1,38 +1,25 @@
 "use client";
 
-import { InputGroup } from "@/components";
-import { isPublicKey } from "@/lib/solana/common";
+import { InputGroup, InputMultiline, notify } from "@/components";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
+import { useArweaveUploader } from "@/lib/hooks/use-arweave-uploader";
+import { uploadNftMetadata } from "@/lib/solana/metaplex-json-metadata";
+import { createNftInstructions } from "@/lib/solana/metaplex-token-metadata";
+import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
+import { Switch } from "@headlessui/react";
 import {
   PlusCircleIcon,
   QuestionMarkCircleIcon,
   XMarkIcon,
 } from "@heroicons/react/20/solid";
-import { useWallet } from "@solana/wallet-adapter-react";
-import Link from "next/link";
-import { Controller, useFieldArray, useForm } from "react-hook-form";
-import { InputMultiline, notify } from "@/components";
-import { TurboStorage } from "@/lib/turbo";
-import { mimeTypeToCategory } from "@/lib/utils";
-import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
-import { Switch } from "@headlessui/react";
-import { WalletError } from "@solana/wallet-adapter-base";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { address, generateKeyPairSigner, isAddress } from "@solana/kit";
 import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { Attributes } from "./_components/attributes";
 import { MediaFiles } from "./_components/media-files";
-import useUmi from "@/lib/hooks/use-umi";
-import { createNft } from "@metaplex-foundation/mpl-token-metadata";
-import {
-  generateSigner,
-  percentAmount,
-  publicKey,
-} from "@metaplex-foundation/umi";
-import {
-  setComputeUnitLimit,
-  setComputeUnitPrice,
-} from "@metaplex-foundation/mpl-toolbox";
-import * as base58 from "bs58";
-import { useEffect, useState } from "react";
 
 const MAX_CREATORS = 5;
 
@@ -62,12 +49,12 @@ export type CreateFormInputs = {
 };
 
 export default function Mint() {
-  const wallet = useWallet();
-  const { setVisible } = useWalletModal();
+  const { client } = useKitClient();
+  const { setOpen } = useConnectorDialog();
+  const upload = useArweaveUploader();
   const params = useSearchParams();
   const [isConfirming, setIsConfirming] = useState(false);
   const [createJson, setCreateJson] = useState(true);
-  const umi = useUmi();
 
   const {
     register,
@@ -121,143 +108,59 @@ export default function Mint() {
   }, [params, setValue, setFocus]);
 
   const submit = async (data: CreateFormInputs) => {
-    if (!wallet.publicKey) {
-      setVisible(true);
+    if (!client || !upload) {
+      setOpen(true);
       return;
     }
 
-    if (!wallet.signMessage) {
+    // The program rejects other totals; check before paying for uploads.
+    const shareTotal = data.creators.reduce((sum, { share }) => sum + share, 0);
+    if (data.creators.length > 0 && shareTotal !== 100) {
+      setFocus("creators.0.share");
       notify({
-        title: "Error",
-        description: "Selected wallet doesn't support signing messages",
+        type: "error",
+        description: "Creator total shares must equal 100.",
       });
-      return setVisible(true);
+      return;
     }
 
-    // Setup
     setIsConfirming(true);
-
-    const turbo = await TurboStorage.make(wallet);
-
-    // Check if we are uploading a json file
-    let jsonUrl: string;
-
     try {
-      if (createJson) {
-        notify({
-          title: "Uploading external metadata",
-          description:
-            "The metadata JSON file is being uploaded to Arweave via Turbo. This will require multiple wallet confirmations, including payment and signature verification.",
-        });
+      // The uploader's toasts report a failed upload; stop quietly after one.
+      const uri = createJson
+        ? await uploadNftMetadata(data, upload).catch(() => null)
+        : data.uri;
+      if (uri === null) return;
 
-        // Check if we're also uploading media files
-        const { image, animation_url } = data;
-        let imageUrl: string | undefined;
-        let animationUrl: string | undefined;
+      const wallet = client.payer.address;
+      const mint = await generateKeyPairSigner();
+      const { name, symbol, isMutable, isCollection, collectionIsSized } = data;
+      const sellerFeePercentage =
+        dirtyFields.sellerFeePercentage &&
+        Number.isFinite(data.sellerFeePercentage)
+          ? data.sellerFeePercentage
+          : 0;
 
-        try {
-          if (image)
-            imageUrl = `https://arweave.net/${(await turbo.uploadFile(image)).id}`;
-          if (animation_url)
-            animationUrl = `https://arweave.net/${(await turbo.uploadFile(animation_url)).id}`;
-        } catch (err) {
-          setIsConfirming(false);
-          return notify({
-            type: "error",
-            title: "File upload error",
-            description: (
-              <div className="break-normal">
-                <p>
-                  There has been an error while uploading with the message:{" "}
-                  <span className="font-medium break-all text-yellow-300">
-                    {err instanceof Error ? err.message : String(err)}
-                  </span>
-                  .
-                </p>
-                <p className="mt-2">
-                  You can recover any lost funds on the{" "}
-                  <Link
-                    href="/permanent-storage-tools/file-upload"
-                    className="font-medium text-blue-300"
-                  >
-                    /permanent-storage-tools
-                  </Link>{" "}
-                  page.
-                </p>
-              </div>
-            ),
-          });
-        }
-        const category = animation_url
-          ? mimeTypeToCategory(animation_url)
-          : image
-            ? mimeTypeToCategory(image)
-            : undefined;
-
-        const { name, symbol, description, attributes, external_url } = data;
-        const json = {
+      const result = await client.sendTransaction(
+        createNftInstructions(wallet, mint, {
           name,
           symbol,
-          description,
-          external_url,
-        };
+          uri,
+          isMutable,
+          isCollection: isCollection && collectionIsSized,
+          maxSupply: data.maxSupply,
+          sellerFeeBasisPoints: Math.round(sellerFeePercentage * 100),
+          // Only the wallet can vouch for itself; everyone else stays unverified.
+          creators: dirtyFields.creators
+            ? data.creators.map((creator) => ({
+                address: address(creator.address),
+                share: creator.share,
+                verified: creator.address === wallet,
+              }))
+            : undefined,
+        }),
+      );
 
-        const files: Array<{ type?: string; uri: string }> = [];
-        if (attributes) Object.assign(json, { attributes });
-        if (imageUrl) {
-          Object.assign(json, { image: imageUrl });
-          files.push({ uri: imageUrl, type: image?.type });
-        }
-
-        if (animationUrl) {
-          Object.assign(json, { animation_url: animationUrl });
-          files.push({ uri: animationUrl, type: animation_url?.type });
-        }
-        if (files.length > 0)
-          Object.assign(json, { properties: { category, files } });
-
-        const metadata = new File([JSON.stringify(json)], data.name, {
-          type: "application/json",
-        });
-
-        jsonUrl = `https://arweave.net/${(await turbo.uploadFile(metadata)).id}`;
-      } else {
-        jsonUrl = data.uri;
-      }
-
-      const { name, symbol, isMutable, isCollection, maxSupply } = data;
-
-      const { signature } = await createNft(umi, {
-        mint: generateSigner(umi),
-        uri: jsonUrl,
-        name,
-        symbol,
-        isMutable,
-        isCollection,
-        sellerFeeBasisPoints: percentAmount(
-          dirtyFields.sellerFeePercentage ? data.sellerFeePercentage : 0,
-        ),
-        printSupply:
-          maxSupply === 0
-            ? {
-                __kind: "Zero",
-              }
-            : {
-                __kind: "Limited",
-                fields: [maxSupply],
-              },
-        creators: dirtyFields.creators
-          ? data.creators.map(({ address, share }) => ({
-              address: publicKey(address),
-              share,
-              verified: false,
-            }))
-          : undefined,
-      })
-        .add(setComputeUnitLimit(umi, { units: 1_000_000 }))
-        .add(setComputeUnitPrice(umi, { microLamports: 1_000_000 }))
-        .sendAndConfirm(umi);
-      console.log(base58.encode(signature));
       notify({
         title: "NFT mint successful",
         description: (
@@ -267,18 +170,14 @@ export default function Mint() {
           </>
         ),
         type: "success",
-        txid: base58.encode(signature),
+        txid: result.context.signature,
       });
     } catch (err) {
-      if (err instanceof WalletError) {
-        // The onError callback in the walletconnect context will handle it
-        return;
-      }
       console.log({ err });
       notify({
         type: "error",
         title: "Error minting",
-        description: err instanceof Error ? err.message : String(err),
+        description: transactionErrorMessage(err),
       });
     } finally {
       setIsConfirming(false);
@@ -410,7 +309,11 @@ export default function Mint() {
                   )}
                   aria-invalid={errors.maxSupply ? "true" : "false"}
                   {...register("maxSupply", {
-                    min: { value: 0, message: "Minimum is 0" },
+                    setValueAs: (value: string) =>
+                      value === "" ? 0 : Number(value),
+                    validate: (value) =>
+                      (Number.isInteger(value) && value >= 0) ||
+                      "Must be a whole number, 0 or more",
                   })}
                 />
               </div>
@@ -501,7 +404,7 @@ export default function Mint() {
                             {...register(`creators.${idx}.address` as const, {
                               required: true,
                               validate: {
-                                pubkey: isPublicKey,
+                                pubkey: isAddress,
                               },
                             })}
                             defaultValue=""
@@ -525,6 +428,7 @@ export default function Mint() {
                               required: true,
                               min: 0,
                               max: 100,
+                              valueAsNumber: true,
                             })}
                             className={cn(
                               "relative block w-full rounded-none border border-gray-300 bg-transparent px-3 py-2",

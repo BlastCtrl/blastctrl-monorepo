@@ -15,7 +15,7 @@ import { compress } from "@/lib/solana/common";
 import {
   createMetadataInstructions,
   updateMetadataInstructions,
-} from "@/lib/solana/token-metadata";
+} from "@/lib/solana/metaplex-token-metadata";
 import { TurboStorage } from "@/lib/turbo";
 import { cn } from "@blastctrl/ui";
 import { ChevronUpDownIcon } from "@heroicons/react/20/solid";

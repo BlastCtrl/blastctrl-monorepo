@@ -1,32 +1,32 @@
 "use client";
 
 import { InputGroup, notify } from "@/components";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
+import { useLocalStorageState } from "@/lib/hooks/use-local-storage";
+import {
+  fetchTokenMetadata,
+  updateNftInstructions,
+  type NftCreator,
+} from "@/lib/solana/metaplex-token-metadata";
 import type { DasAsset } from "@/state/queries/types";
 import { useOwnerNfts } from "@/state/queries/use-owner-nfts";
-import { isPublicKey } from "@/lib/solana/common";
 import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
 import { Description, Label } from "@blastctrl/ui/fieldset";
 import { Switch, SwitchField, SwitchGroup } from "@blastctrl/ui/switch";
 import { Field } from "@headlessui/react";
-import { NftSelector } from "./nft-selector";
 import {
   ExclamationCircleIcon,
   PlusCircleIcon,
   QuestionMarkCircleIcon,
   XMarkIcon,
 } from "@heroicons/react/20/solid";
-import { WalletError } from "@solana/wallet-adapter-base";
-import { useLocalStorage, useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useConnector } from "@solana/connector/react";
+import { address, isAddress } from "@solana/kit";
 import { useState } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
-import useUmi from "@/lib/hooks/use-umi";
-import {
-  fetchMetadataFromSeeds,
-  updateV1,
-} from "@metaplex-foundation/mpl-token-metadata";
-import { publicKey } from "@metaplex-foundation/umi";
-import * as base58 from "bs58";
+import { NftSelector } from "./nft-selector";
 
 export type FormToken = {
   name: string;
@@ -63,16 +63,14 @@ const defaultValues = {
 };
 
 export default function Update() {
-  const wallet = useWallet();
-  const { setVisible } = useWalletModal();
-  const { data } = useOwnerNfts(wallet?.publicKey?.toBase58() ?? "");
+  const { client } = useKitClient();
+  const { account } = useConnector();
+  const { setOpen } = useConnectorDialog();
+  const { data } = useOwnerNfts(account ?? "");
   const [isConfirming, setIsConfirming] = useState(false);
-  const umi = useUmi();
 
-  const [isShowingCurrentValues, setIsShowingCurrentValues] = useLocalStorage(
-    "showCurrentValues",
-    true,
-  );
+  const [isShowingCurrentValues, setIsShowingCurrentValues] =
+    useLocalStorageState("showCurrentValues", true);
 
   const {
     register,
@@ -118,38 +116,14 @@ export default function Update() {
   };
 
   const submit = async (data: FormInputs) => {
-    if (!wallet.publicKey) {
-      setVisible(true);
-      return;
-    }
-
-    setIsConfirming(true);
-
-    const initialMetadata = await fetchMetadataFromSeeds(umi, {
-      mint: publicKey(data.mint),
-    });
-
-    if (initialMetadata.updateAuthority !== wallet.publicKey.toBase58()) {
-      notify({
-        type: "error",
-        title: "Invalid update authority",
-        description: (
-          <>
-            Your wallet is not the valid update authority. Update authority is{" "}
-            <span className="font-medium text-blue-300">
-              {initialMetadata.updateAuthority}
-            </span>
-          </>
-        ),
-      });
-
-      setIsConfirming(false);
+    if (!client) {
+      setOpen(true);
       return;
     }
 
     const shareTotal = data.creators.reduce((sum, { share }) => sum + share, 0);
     if (data.creators.length > 0 && shareTotal !== 100) {
-      setFocus(`creators.${"0"}.share`);
+      setFocus("creators.0.share");
       notify({
         type: "error",
         description: "Creator total shares must equal 100.",
@@ -157,50 +131,95 @@ export default function Update() {
       return;
     }
 
+    setIsConfirming(true);
     try {
-      const { signature } = await updateV1(umi, {
-        mint: publicKey(data.mint),
-        isMutable: dirtyFields.isMutable ? data.isMutable : undefined,
-        primarySaleHappened: dirtyFields.primarySaleHappened
-          ? data.primarySaleHappened
-          : undefined,
-        newUpdateAuthority: dirtyFields.updateAuthority
-          ? publicKey(data.updateAuthority)
-          : undefined,
-        data: {
-          ...initialMetadata,
-          name: dirtyFields.name ? data.name : initialMetadata.name,
-          symbol: dirtyFields.symbol ? data.symbol : initialMetadata.symbol,
-          uri: dirtyFields.uri ? data.uri : initialMetadata.uri,
-          creators: dirtyFields.creators
-            ? data.creators.map(({ address, share }) => ({
-                address: publicKey(address),
-                share,
-                verified: false,
-              }))
-            : initialMetadata.creators,
-          sellerFeeBasisPoints: dirtyFields.sellerFeeBasisPoints
-            ? data.sellerFeeBasisPoints
-            : initialMetadata.sellerFeeBasisPoints,
-        },
-      }).sendAndConfirm(umi);
+      const wallet = client.payer.address;
+      const mint = address(data.mint);
+      const current = await fetchTokenMetadata(client.rpc, mint);
 
-      console.log(base58.encode(signature as Uint8Array));
+      if (!current) {
+        notify({
+          type: "error",
+          title: "No metadata found",
+          description: (
+            <>
+              <span className="font-medium text-blue-300">{data.mint}</span> has
+              no Token Metadata account.
+            </>
+          ),
+        });
+        return;
+      }
+      if (current.updateAuthority !== wallet) {
+        notify({
+          type: "error",
+          title: "Invalid update authority",
+          description: (
+            <>
+              Your wallet is not the valid update authority. Update authority is{" "}
+              <span className="font-medium text-blue-300">
+                {current.updateAuthority}
+              </span>
+            </>
+          ),
+        });
+        return;
+      }
+
+      // Verification is kept for creators already on the NFT and granted to
+      // the wallet, which signs; the program rejects anything else.
+      const creators: NftCreator[] | null = dirtyFields.creators
+        ? data.creators.map((creator) => ({
+            address: address(creator.address),
+            share: creator.share,
+            verified:
+              current.creators?.find((c) => c.address === creator.address)
+                ?.verified ?? creator.address === wallet,
+          }))
+        : current.creators;
+      const isDataDirty =
+        dirtyFields.name ||
+        dirtyFields.symbol ||
+        dirtyFields.uri ||
+        dirtyFields.creators ||
+        dirtyFields.sellerFeeBasisPoints;
+
+      const result = await client.sendTransaction(
+        updateNftInstructions(wallet, mint, {
+          // Immutable metadata rejects a data write, even an unchanged one.
+          data: isDataDirty
+            ? {
+                name: dirtyFields.name ? data.name : current.name,
+                symbol: dirtyFields.symbol ? data.symbol : current.symbol,
+                uri: dirtyFields.uri ? data.uri : current.uri,
+                sellerFeeBasisPoints: dirtyFields.sellerFeeBasisPoints
+                  ? data.sellerFeeBasisPoints
+                  : current.sellerFeeBasisPoints,
+                creators,
+              }
+            : undefined,
+          newUpdateAuthority:
+            dirtyFields.updateAuthority && data.updateAuthority
+              ? address(data.updateAuthority)
+              : undefined,
+          isMutable: dirtyFields.isMutable ? data.isMutable : undefined,
+          primarySaleHappened: dirtyFields.primarySaleHappened
+            ? data.primarySaleHappened
+            : undefined,
+        }),
+      );
+
       notify({
         title: "Metadata update success",
         type: "success",
-        txid: base58.encode(signature as Uint8Array),
+        txid: result.context.signature,
       });
-    } catch (err: any) {
-      if (err instanceof WalletError) {
-        // The onError callback in the walletconnect context will handle it
-        return;
-      }
+    } catch (err) {
       console.log({ err });
       notify({
         type: "error",
         title: "Error updating",
-        description: err?.problem,
+        description: transactionErrorMessage(err),
       });
     } finally {
       setIsConfirming(false);
@@ -362,7 +381,7 @@ export default function Update() {
                             {...register(`creators.${idx}.address` as const, {
                               required: true,
                               validate: {
-                                pubkey: isPublicKey,
+                                pubkey: isAddress,
                               },
                             })}
                             defaultValue=""
@@ -386,6 +405,7 @@ export default function Update() {
                               required: true,
                               min: 0,
                               max: 100,
+                              valueAsNumber: true,
                             })}
                             className={cn(
                               "relative block w-full rounded-none border-gray-300 bg-transparent",
@@ -498,7 +518,7 @@ export default function Update() {
               {...register("updateAuthority", {
                 validate: {
                   pubkey: (value) =>
-                    isPublicKey(value) || value === "" || "Not a valid pubkey",
+                    isAddress(value) || value === "" || "Not a valid pubkey",
                 },
               })}
               error={errors?.updateAuthority}
