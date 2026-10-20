@@ -1,22 +1,29 @@
+import { InputGroup, InputMultiline, notify } from "@/components";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { useKitClient } from "@/connector/use-kit-client";
+import { compress } from "@/lib/solana/common";
 import {
-  InputGroup,
-  InputMultiline,
-  notify,
-  notifyManyPromises,
-  notifyPromise,
-} from "@/components";
-
-import type { TxSetAndVerifyData } from "@/app/api/tx/add-to-collection/route";
-import { fetcher } from "@/lib/utils";
-import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
-import { useWalletConnection } from "@/state/use-wallet-connection";
-import { compress, isPublicKey } from "@/lib/solana/common";
+  addToCollectionInstructions,
+  fetchTokenMetadatas,
+} from "@/lib/solana/metaplex-token-metadata";
+import { zipMap } from "@/lib/utils";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { address, isAddress } from "@solana/kit";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import useUmi from "@/lib/hooks/use-umi";
-import * as base58 from "bs58";
+import { BatchStatus } from "./batch-status";
+import {
+  invalidMintLine,
+  NFTS_PER_ADD_TRANSACTION,
+  parseMintList,
+  planAddToCollection,
+  type SkippedNft,
+} from "./collection-plan";
+import {
+  confirmedItems,
+  notifySendFailure,
+  useCollectionBatches,
+} from "./use-collection-batches";
 
 type FormData = {
   nftList: string;
@@ -24,123 +31,67 @@ type FormData = {
 };
 
 export const AddTo = () => {
-  const { network } = useNetworkConfigurationStore();
-  const { wallet } = useWalletConnection();
-  const { setVisible } = useWalletModal();
+  const { client } = useKitClient();
+  const { setOpen } = useConnectorDialog();
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<FormData>();
-  const [isConfirming, setIsConfirming] = useState(false);
-  const umi = useUmi();
+  const [isWorking, setIsWorking] = useState(false);
+  const [skipped, setSkipped] = useState<SkippedNft[]>([]);
+  const { batches, send, reset } = useCollectionBatches(
+    (wallet, { mint, collection }) =>
+      addToCollectionInstructions(wallet, mint, collection),
+    NFTS_PER_ADD_TRANSACTION,
+  );
 
-  const onSetCollection = async (data: FormData) => {
-    if (!wallet) {
-      return setVisible(true);
+  const submit = async (data: FormData) => {
+    if (!client) {
+      setOpen(true);
+      return;
     }
-
-    const collectionAddress = data.collectionMint;
-    const nftMints = data.nftList.split("\n").filter(Boolean);
+    setIsWorking(true);
+    reset();
+    setSkipped([]);
     try {
-      // set
-      setIsConfirming(true);
-
-      const {
-        tx: addCollectionResponse,
-        blockhash,
-        lastValidBlockHeight,
-      } = await fetcher<TxSetAndVerifyData>("/api/tx/add-to-collection", {
-        method: "POST",
-        body: JSON.stringify({
-          authorityAddress: wallet.toBase58(),
-          collectionAddress,
-          nftMints,
-          network,
-        }),
-        headers: { "Content-type": "application/json; charset=UTF-8" },
-      });
-
-      const transactions = addCollectionResponse.map((tx) =>
-        umi.transactions.deserialize(Buffer.from(tx, "base64")),
+      const collection = address(data.collectionMint);
+      const mints = parseMintList(data.nftList).map(address);
+      const [collectionMetadata = null, ...metadatas] =
+        await fetchTokenMetadatas(client.rpc, [collection, ...mints]);
+      const plan = planAddToCollection(
+        client.payer.address,
+        { mint: collection, metadata: collectionMetadata },
+        zipMap(mints, metadatas, (mint, metadata) => ({ mint, metadata })),
       );
-
-      if (!transactions[0]) {
-        console.log("Nothing to sign");
+      setSkipped(plan.skipped);
+      if (plan.items.length === 0) {
+        notify({
+          type: "info",
+          title: "Nothing to add",
+          description: "None of these NFTs can go into the collection.",
+        });
         return;
       }
 
-      if (transactions.length > 1) {
-        notify({
-          type: "info",
-          description: `This action requires multiple transactions and will be split into ${transactions.length} batches.`,
-        });
-      } else {
-        return void notifyPromise(
-          umi.rpc.sendTransaction(
-            await umi.identity.signTransaction(transactions[0]),
-          ),
-          {
-            loading: { description: "Confirming transaction..." },
-            success: {
-              title: "Add to collection success",
-              description: `${nftMints.length} NFTs added to collection ${compress(
-                collectionAddress,
-                4,
-              )}`,
+      const confirmed = confirmedItems(await send(client, plan.items));
+      notify(
+        confirmed === plan.items.length
+          ? {
+              type: "success",
+              title: "Added to collection",
+              description: `${confirmed} NFTs added to ${compress(collection, 4)}`,
+            }
+          : {
+              type: "error",
+              title: "Some transactions failed",
+              description: `${confirmed} of ${plan.items.length} NFTs were added`,
             },
-            error: (err) => ({
-              title: "Add to collection Error",
-              description: (
-                <div>
-                  <p className="block">Transaction failed with message: </p>
-                  <p className="mt-1.5 block">{err?.message}</p>
-                </div>
-              ),
-            }),
-          },
-        );
-      }
-
-      // Request signature from wallet
-      const signed = await umi.identity.signAllTransactions(transactions);
-      const txids = await Promise.all(
-        signed.map(async (signedTx) => {
-          return await umi.rpc.sendTransaction(signedTx);
-        }),
       );
-
-      const promises = txids.map(async (signature) => {
-        const { value } = await umi.rpc.confirmTransaction(signature, {
-          commitment: "confirmed",
-          strategy: {
-            blockhash,
-            lastValidBlockHeight,
-            type: "blockhash",
-          },
-        });
-        if (value.err) throw Error("msg", { cause: "test" });
-        return { value };
-      });
-
-      const transactionPromises = promises.map((promise, idx) => ({
-        label: `SetAndVerify ~ batch ${idx + 1}`,
-        txid: base58.encode(txids[idx]!),
-        promise,
-      }));
-
-      void notifyManyPromises({
-        title: "Confirming multiple transactions",
-        promises: transactionPromises,
-      });
     } catch (err) {
-      notify({
-        type: "error",
-        title: "Add to collection error",
-        description: err instanceof Error ? err.message : String(err),
-      });
+      notifySendFailure(err, "Add to collection error");
     } finally {
-      setIsConfirming(false);
+      setIsWorking(false);
     }
   };
 
@@ -157,14 +108,15 @@ export const AddTo = () => {
             className="text-blue-500"
             target="_blank"
             rel="noreferrer"
-            href="https://docs.metaplex.com/programs/token-metadata/accounts#metadata"
+            href="https://developers.metaplex.com/token-metadata/collections"
           >
             update authority
           </a>{" "}
-          of both the collection and all the NFTs.
+          of both the collection and all the NFTs. Every transaction is signed
+          in one go.
         </p>
       </div>
-      <form onSubmit={handleSubmit(onSetCollection)}>
+      <form onSubmit={handleSubmit(submit)}>
         <div className="my-4 flex flex-col gap-y-4">
           <InputGroup
             className="w-full"
@@ -172,7 +124,7 @@ export const AddTo = () => {
             label="Collection NFT mint"
             {...register("collectionMint", {
               required: true,
-              validate: (value) => isPublicKey(value) || "Not a valid pubkey",
+              validate: (value) => isAddress(value) || "Not a valid address",
             })}
             error={errors?.collectionMint}
           />
@@ -180,27 +132,27 @@ export const AddTo = () => {
             className="w-full"
             rows={10}
             label="NFT addresses"
-            description="Mint addresses, each in a new line"
+            description="Mint addresses, each on its own line"
             {...register("nftList", {
               required: true,
               validate: (value) => {
-                const list = value.split("\n");
-                const invalid = list.find((row) => !isPublicKey(row));
-                return !invalid || `There is an invalid pubkey: ${invalid}`;
+                const invalid = invalidMintLine(value);
+                return !invalid || `Not a valid address: ${invalid}`;
               },
             })}
             error={errors?.nftList}
           />
         </div>
         <div className="my-4 flex items-center justify-end py-2">
-          <Button color="indigo" type="submit" disabled={isConfirming}>
-            {isConfirming && (
+          <Button color="indigo" type="submit" disabled={isWorking}>
+            {isWorking && (
               <SpinnerIcon className="mr-1 -ml-1 inline h-5 w-5 animate-spin" />
             )}
-            Submit
+            {client ? "Add to collection" : "Connect your wallet"}
           </Button>
         </div>
       </form>
+      <BatchStatus batches={batches} skipped={skipped} />
     </div>
   );
 };

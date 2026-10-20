@@ -1,133 +1,107 @@
-import type { TxUnverifyData } from "@/app/api/tx/remove-from-collection/route";
+import { InputMultiline, notify } from "@/components";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { useKitClient } from "@/connector/use-kit-client";
 import {
-  InputMultiline,
-  notify,
-  notifyManyPromises,
-  notifyPromise,
-} from "@/components";
-import useUmi from "@/lib/hooks/use-umi";
-import { isPublicKey } from "@/lib/solana/common";
-import { fetcher } from "@/lib/utils";
-import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
-import { useWalletConnection } from "@/state/use-wallet-connection";
+  fetchTokenMetadatas,
+  removeFromCollectionInstructions,
+} from "@/lib/solana/metaplex-token-metadata";
+import { zipMap } from "@/lib/utils";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { address } from "@solana/kit";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import * as base58 from "bs58";
+import { BatchStatus } from "./batch-status";
+import {
+  collectionsOf,
+  invalidMintLine,
+  NFTS_PER_REMOVE_TRANSACTION,
+  parseMintList,
+  planRemoveFromCollection,
+  type SkippedNft,
+} from "./collection-plan";
+import {
+  confirmedItems,
+  notifySendFailure,
+  useCollectionBatches,
+} from "./use-collection-batches";
 
 type FormData = {
   nftList: string;
 };
 
 export const RemoveFrom = () => {
-  const { network } = useNetworkConfigurationStore();
-  const { wallet } = useWalletConnection();
-  const { setVisible } = useWalletModal();
+  const { client } = useKitClient();
+  const { setOpen } = useConnectorDialog();
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<FormData>({});
-  const [isConfirming, setIsConfirming] = useState(false);
-  const umi = useUmi();
+  } = useForm<FormData>();
+  const [isWorking, setIsWorking] = useState(false);
+  const [skipped, setSkipped] = useState<SkippedNft[]>([]);
+  const { batches, send, reset } = useCollectionBatches(
+    (wallet, { mint, collection }) =>
+      removeFromCollectionInstructions(wallet, mint, collection),
+    NFTS_PER_REMOVE_TRANSACTION,
+  );
 
-  const onUnverifyItems = async (data: FormData) => {
-    if (!wallet) {
-      return setVisible(true);
+  const submit = async (data: FormData) => {
+    if (!client) {
+      setOpen(true);
+      return;
     }
-
-    const nftMints = data.nftList.split("\n").filter(Boolean);
-
+    setIsWorking(true);
+    reset();
+    setSkipped([]);
     try {
-      // unverify
-      setIsConfirming(true);
-      const {
-        tx: removeCollectionResponse,
-        blockhash,
-        lastValidBlockHeight,
-      } = await fetcher<TxUnverifyData>("/api/tx/remove-from-collection", {
-        method: "POST",
-        body: JSON.stringify({
-          authorityAddress: wallet.toBase58(),
-          nftMints,
-          network,
-        }),
-        headers: { "Content-type": "application/json; charset=UTF-8" },
-      });
-
-      const transactions = removeCollectionResponse.map((tx) =>
-        umi.transactions.deserialize(Buffer.from(tx, "base64")),
+      const mints = parseMintList(data.nftList).map(address);
+      const nfts = zipMap(
+        mints,
+        await fetchTokenMetadatas(client.rpc, mints),
+        (mint, metadata) => ({ mint, metadata }),
       );
-
-      if (transactions.length > 1) {
+      // Who may unverify depends on each collection's own update authority.
+      const collectionMints = collectionsOf(nfts);
+      const collections = new Map(
+        zipMap(
+          collectionMints,
+          await fetchTokenMetadatas(client.rpc, collectionMints),
+          (mint, metadata) => [mint, metadata] as const,
+        ),
+      );
+      const plan = planRemoveFromCollection(
+        client.payer.address,
+        nfts,
+        collections,
+      );
+      setSkipped(plan.skipped);
+      if (plan.items.length === 0) {
         notify({
           type: "info",
-          description: `This action requires multiple transactions and will be split into ${transactions.length} batches.`,
+          title: "Nothing to remove",
+          description: "None of these NFTs can be taken out of a collection.",
         });
-      } else if (transactions[0]) {
-        return void notifyPromise(
-          umi.rpc.sendTransaction(
-            await umi.identity.signTransaction(transactions[0]),
-          ),
-          {
-            loading: { description: "Confirming transaction..." },
-            success: {
-              title: "Remove from collection success",
-              description: `${nftMints.length} NFTs removed from collection.`,
-            },
-            error: (err) => ({
-              title: "Error removing from collection",
-              description: (
-                <div>
-                  <p className="block">Transaction failed with message: </p>
-                  <p className="mt-1.5 block">{err?.message}</p>
-                </div>
-              ),
-            }),
-          },
-        );
+        return;
       }
 
-      // Request signature from wallet
-      const signed = await umi.identity.signAllTransactions(transactions);
-      const txids = await Promise.all(
-        signed.map(async (signedTx) => {
-          return await umi.rpc.sendTransaction(signedTx);
-        }),
+      const confirmed = confirmedItems(await send(client, plan.items));
+      notify(
+        confirmed === plan.items.length
+          ? {
+              type: "success",
+              title: "Removed from collection",
+              description: `${confirmed} NFTs removed from their collection`,
+            }
+          : {
+              type: "error",
+              title: "Some transactions failed",
+              description: `${confirmed} of ${plan.items.length} NFTs were removed`,
+            },
       );
-
-      const promises = txids.map(async (signature) => {
-        const { value } = await umi.rpc.confirmTransaction(signature, {
-          commitment: "confirmed",
-          strategy: {
-            blockhash,
-            lastValidBlockHeight,
-            type: "blockhash",
-          },
-        });
-        if (value.err) throw Error("msg", { cause: "test" });
-        return { value };
-      });
-
-      const transactionPromises = promises.map((promise, idx) => ({
-        label: `SetAndVerify ~ batch ${idx + 1}`,
-        txid: base58.encode(txids[idx]!),
-        promise,
-      }));
-
-      notifyManyPromises({
-        title: "Confirming multiple transactions",
-        promises: transactionPromises,
-      });
     } catch (err) {
-      notify({
-        type: "error",
-        title: "Remove from collection Error",
-        description: err instanceof Error ? err.message : String(err),
-      });
+      notifySendFailure(err, "Remove from collection error");
     } finally {
-      setIsConfirming(false);
+      setIsWorking(false);
     }
   };
 
@@ -138,47 +112,47 @@ export const RemoveFrom = () => {
           Remove from collection
         </h1>
         <p className="text-sm text-gray-500">
-          Enter a list of NFTs that you wish to remove from a collection. All
-          NFTs should belong to the same on-chain collection and you need to be
-          the{" "}
+          Enter a list of NFTs that you wish to remove from their collection.
+          You need to be the{" "}
           <a
             className="text-blue-500"
             target="_blank"
             rel="noreferrer"
-            href="https://docs.metaplex.com/programs/token-metadata/accounts#metadata"
+            href="https://developers.metaplex.com/token-metadata/collections"
           >
             update authority
           </a>{" "}
-          of both the collection and all the NFTs.
+          of the collection. The NFTs keep their collection key, marked
+          unverified. Every transaction is signed in one go.
         </p>
       </div>
-      <form onSubmit={handleSubmit(onUnverifyItems)}>
+      <form onSubmit={handleSubmit(submit)}>
         <div className="my-4 flex flex-col gap-y-4">
           <InputMultiline
             className="w-full"
             rows={10}
             label="NFT addresses"
-            description="Mint addresses, each in a new line"
+            description="Mint addresses, each on its own line"
             {...register("nftList", {
               required: true,
               validate: (value) => {
-                const list = value.split("\n");
-                const invalid = list.find((row) => !isPublicKey(row));
-                return !invalid || `There is an invalid pubkey: ${invalid}`;
+                const invalid = invalidMintLine(value);
+                return !invalid || `Not a valid address: ${invalid}`;
               },
             })}
             error={errors?.nftList}
           />
         </div>
         <div className="my-4 flex items-center justify-end py-2">
-          <Button color="indigo" type="submit" disabled={isConfirming}>
-            {isConfirming && (
+          <Button color="indigo" type="submit" disabled={isWorking}>
+            {isWorking && (
               <SpinnerIcon className="mr-1 -ml-1 inline h-5 w-5 animate-spin" />
             )}
-            Submit
+            {client ? "Remove from collection" : "Connect your wallet"}
           </Button>
         </div>
       </form>
+      <BatchStatus batches={batches} skipped={skipped} />
     </div>
   );
 };

@@ -1,37 +1,5 @@
-import type { PublicKey as UmiPublicKey } from "@metaplex-foundation/umi";
-import { publicKey } from "@metaplex-foundation/umi";
-import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import base58 from "bs58";
-
-export const PROGRAM_ADDRESS = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s";
-export const METADATA_PROGRAM_ID = new PublicKey(PROGRAM_ADDRESS);
-
-export const getMasterEdition = (mint: UmiPublicKey): UmiPublicKey => {
-  return publicKey(
-    PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("metadata"),
-        METADATA_PROGRAM_ID.toBuffer(),
-        new PublicKey(mint).toBuffer(),
-        Buffer.from("edition"),
-      ],
-      METADATA_PROGRAM_ID,
-    )[0].toBase58(),
-  );
-};
-
-export const getMetadata = (mint: UmiPublicKey): UmiPublicKey => {
-  return publicKey(
-    PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("metadata"),
-        METADATA_PROGRAM_ID.toBuffer(),
-        new PublicKey(mint).toBuffer(),
-      ],
-      METADATA_PROGRAM_ID,
-    )[0].toBase58(),
-  );
-};
 
 export function isPublicKey(putativeAddress: string) {
   // Based on the implementation of assertIsAddress in the new web3.js SDK666

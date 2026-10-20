@@ -6,20 +6,25 @@ import {
   mintV1,
   printSupply,
   TokenStandard,
+  unverifyCollectionV1,
   updateMetadataAccountV2,
   updateV1,
+  verifyCollectionV1,
   type CreatorArgs,
   type DataV2Args,
 } from "@metaplex-foundation/mpl-token-metadata";
 import {
   address,
   fetchEncodedAccount,
+  fetchEncodedAccounts,
   type Address,
   type GetAccountInfoApi,
+  type GetMultipleAccountsApi,
   type Instruction,
   type Rpc,
   type TransactionSigner,
 } from "@solana/kit";
+import { chunk } from "../utils";
 import {
   fromUmiOption,
   getUmi,
@@ -167,8 +172,18 @@ export function createNftInstructions(
 }
 
 /**
+ * The collection an NFT points at, and whether the collection's authority has
+ * verified that. Only a verified link counts; anyone can write the key.
+ */
+export type NftCollection = {
+  key: Address;
+  verified: boolean;
+};
+
+/**
  * What this app reads from a metadata account: the `Data` struct it writes
- * back with `updateV1`, plus the update authority it checks first.
+ * back with `updateV1`, plus the update authority it checks first and the
+ * collection link the collection tools go by.
  */
 export type TokenMetadata = {
   updateAuthority: Address;
@@ -178,6 +193,7 @@ export type TokenMetadata = {
   /** Royalties in basis points, 0–10000. */
   sellerFeeBasisPoints: number;
   creators: NftCreator[] | null;
+  collection: NftCollection | null;
 };
 
 /** The metadata PDA of `mint`. */
@@ -185,19 +201,13 @@ export const findMetadataAddress = (mint: Address): Address =>
   address(findMetadataPda(getUmi(), { mint: toUmiPublicKey(mint) })[0]);
 
 /**
- * Reads the Token Metadata account of `mint`; null when the mint has none.
  * Decoded with the program client's serializer rather than Umi's RPC, since
  * the app's Umi never talks to a node. The program null-pads the strings on
  * chain; Umi's utf8 decoder strips that, so they come back clean.
  */
-export async function fetchTokenMetadata(
-  rpc: Rpc<GetAccountInfoApi>,
-  mint: Address,
-): Promise<TokenMetadata | null> {
-  const account = await fetchEncodedAccount(rpc, findMetadataAddress(mint));
-  if (!account.exists) return null;
-
-  const [data] = getMetadataAccountDataSerializer().deserialize(account.data);
+function decodeTokenMetadata(bytes: Uint8Array): TokenMetadata {
+  const [data] = getMetadataAccountDataSerializer().deserialize(bytes);
+  const collection = fromUmiOption(data.collection);
   return {
     updateAuthority: address(data.updateAuthority),
     name: data.name,
@@ -210,7 +220,43 @@ export async function fetchTokenMetadata(
         share: creator.share,
         verified: creator.verified,
       })) ?? null,
+    collection: collection && {
+      key: address(collection.key),
+      verified: collection.verified,
+    },
   };
+}
+
+/** Reads the Token Metadata account of `mint`; null when the mint has none. */
+export async function fetchTokenMetadata(
+  rpc: Rpc<GetAccountInfoApi>,
+  mint: Address,
+): Promise<TokenMetadata | null> {
+  const account = await fetchEncodedAccount(rpc, findMetadataAddress(mint));
+  return account.exists ? decodeTokenMetadata(account.data) : null;
+}
+
+/** The most accounts one `getMultipleAccounts` request may ask for. */
+const ACCOUNTS_PER_REQUEST = 100;
+
+/**
+ * {@link fetchTokenMetadata} for many mints at once, a hundred accounts per
+ * request. Same order as `mints`; null for each mint without metadata.
+ */
+export async function fetchTokenMetadatas(
+  rpc: Rpc<GetMultipleAccountsApi>,
+  mints: Address[],
+): Promise<(TokenMetadata | null)[]> {
+  const accounts = await Promise.all(
+    chunk(mints.map(findMetadataAddress), ACCOUNTS_PER_REQUEST).map(
+      (addresses) => fetchEncodedAccounts(rpc, addresses),
+    ),
+  );
+  return accounts
+    .flat()
+    .map((account) =>
+      account.exists ? decodeTokenMetadata(account.data) : null,
+    );
 }
 
 export type UpdateNftFields = {
@@ -218,7 +264,7 @@ export type UpdateNftFields = {
    * The whole `Data` struct, which the program replaces as one. Omit to leave
    * it untouched, which immutable metadata requires.
    */
-  data?: Omit<TokenMetadata, "updateAuthority">;
+  data?: Omit<TokenMetadata, "updateAuthority" | "collection">;
   newUpdateAuthority?: Address;
   isMutable?: boolean;
   primarySaleHappened?: boolean;
@@ -250,6 +296,61 @@ export function updateNftInstructions(
         : undefined,
       isMutable: fields.isMutable,
       primarySaleHappened: fields.primarySaleHappened,
+    }),
+  );
+}
+
+/**
+ * Puts `mint` into `collection`, verified, in the two steps the program
+ * wants: `updateV1` writes the collection key, which can only be written
+ * unverified, then `verifyCollectionV1` verifies it. `wallet` must be the
+ * update authority of the NFT for the first and of the collection for the
+ * second.
+ */
+export function addToCollectionInstructions(
+  wallet: Address,
+  mint: Address,
+  collection: Address,
+): Instruction[] {
+  const umi = getUmi();
+  const authority = toUmiSigner(wallet);
+  const collectionMint = toUmiPublicKey(collection);
+  return toKitInstructions(
+    updateV1(umi, {
+      mint: toUmiPublicKey(mint),
+      authority,
+      payer: authority,
+      collection: {
+        __kind: "Set",
+        fields: [{ key: collectionMint, verified: false }],
+      },
+    }).add(
+      verifyCollectionV1(umi, {
+        authority,
+        metadata: findMetadataPda(umi, { mint: toUmiPublicKey(mint) }),
+        collectionMint,
+      }),
+    ),
+  );
+}
+
+/**
+ * Takes `mint` out of `collection` by unverifying the link. The metadata
+ * keeps the collection key, marked unverified, which is what wallets and
+ * marketplaces go by. `wallet` must be the update authority of the
+ * collection, or of the NFT itself once the collection has been burned.
+ */
+export function removeFromCollectionInstructions(
+  wallet: Address,
+  mint: Address,
+  collection: Address,
+): Instruction[] {
+  const umi = getUmi();
+  return toKitInstructions(
+    unverifyCollectionV1(umi, {
+      authority: toUmiSigner(wallet),
+      metadata: findMetadataPda(umi, { mint: toUmiPublicKey(mint) }),
+      collectionMint: toUmiPublicKey(collection),
     }),
   );
 }

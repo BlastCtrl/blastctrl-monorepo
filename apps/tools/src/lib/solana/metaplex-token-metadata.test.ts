@@ -1,25 +1,34 @@
 import {
   getCreateV1InstructionDataSerializer,
   getMetadataAccountDataSerializer,
+  getUnverifyCollectionV1InstructionDataSerializer,
   getUpdateV1InstructionDataSerializer,
+  getVerifyCollectionV1InstructionDataSerializer,
   TokenStandard,
+  type MetadataAccountDataArgs,
 } from "@metaplex-foundation/mpl-token-metadata";
 import {
   AccountRole,
   address,
   generateKeyPairSigner,
+  getAddressDecoder,
   getAddressEncoder,
   getBase64Decoder,
   getProgramDerivedAddress,
+  type Address,
   type GetAccountInfoApi,
+  type GetMultipleAccountsApi,
   type Rpc,
 } from "@solana/kit";
 import { describe, expect, it } from "vitest";
 import { toUmiPublicKey } from "./metaplex-umi";
 import {
+  addToCollectionInstructions,
   createNftInstructions,
   fetchTokenMetadata,
+  fetchTokenMetadatas,
   findMetadataAddress,
+  removeFromCollectionInstructions,
   updateNftInstructions,
 } from "./metaplex-token-metadata";
 
@@ -225,20 +234,44 @@ describe("updateNftInstructions", () => {
   });
 });
 
+/** An account's RPC shape, as `getAccountInfo` and `getMultipleAccounts` give it. */
+const rpcAccount = (data: Uint8Array) => ({
+  data: [getBase64Decoder().decode(data), "base64"] as const,
+  executable: false,
+  lamports: 1n,
+  owner: TOKEN_METADATA_PROGRAM,
+  rentEpoch: 0n,
+  space: BigInt(data.length),
+});
+
+/** A metadata account as the program stores it, null-padded strings and all. */
+const metadataAccount = (fields: Partial<MetadataAccountDataArgs> = {}) =>
+  getMetadataAccountDataSerializer().serialize({
+    updateAuthority: toUmiPublicKey(wallet),
+    mint: toUmiPublicKey(mint),
+    name: "Test".padEnd(32, "\0"),
+    symbol: "TST".padEnd(10, "\0"),
+    uri: "https://arweave.net/x".padEnd(200, "\0"),
+    sellerFeeBasisPoints: 550,
+    creators: [{ address: toUmiPublicKey(wallet), share: 100, verified: true }],
+    primarySaleHappened: false,
+    isMutable: true,
+    editionNonce: null,
+    tokenStandard: TokenStandard.NonFungible,
+    collection: null,
+    uses: null,
+    collectionDetails: null,
+    programmableConfig: null,
+    ...fields,
+  });
+
 describe("fetchTokenMetadata", () => {
   const rpcWith = (data: Uint8Array | null) =>
     ({
       getAccountInfo: () => ({
         send: async () => ({
           context: { slot: 0n },
-          value: data && {
-            data: [getBase64Decoder().decode(data), "base64"] as const,
-            executable: false,
-            lamports: 1n,
-            owner: TOKEN_METADATA_PROGRAM,
-            rentEpoch: 0n,
-            space: BigInt(data.length),
-          },
+          value: data && rpcAccount(data),
         }),
       }),
     }) as unknown as Rpc<GetAccountInfoApi>;
@@ -248,33 +281,152 @@ describe("fetchTokenMetadata", () => {
   });
 
   it("decodes the account; Umi strips the program's null padding", async () => {
-    const encoded = getMetadataAccountDataSerializer().serialize({
-      updateAuthority: toUmiPublicKey(wallet),
-      mint: toUmiPublicKey(mint),
-      name: "Test".padEnd(32, "\0"),
-      symbol: "TST".padEnd(10, "\0"),
-      uri: "https://arweave.net/x".padEnd(200, "\0"),
-      sellerFeeBasisPoints: 550,
-      creators: [
-        { address: toUmiPublicKey(wallet), share: 100, verified: true },
-      ],
-      primarySaleHappened: false,
-      isMutable: true,
-      editionNonce: null,
-      tokenStandard: TokenStandard.NonFungible,
-      collection: null,
-      uses: null,
-      collectionDetails: null,
-      programmableConfig: null,
-    });
-
-    expect(await fetchTokenMetadata(rpcWith(encoded), mint)).toEqual({
+    expect(await fetchTokenMetadata(rpcWith(metadataAccount()), mint)).toEqual({
       updateAuthority: wallet,
       name: "Test",
       symbol: "TST",
       uri: "https://arweave.net/x",
       sellerFeeBasisPoints: 550,
       creators: [{ address: wallet, share: 100, verified: true }],
+      collection: null,
     });
+  });
+
+  it("reads the collection link", async () => {
+    const encoded = metadataAccount({
+      collection: { key: toUmiPublicKey(other), verified: true },
+    });
+    expect(await fetchTokenMetadata(rpcWith(encoded), mint)).toMatchObject({
+      collection: { key: other, verified: true },
+    });
+  });
+});
+
+describe("fetchTokenMetadatas", () => {
+  it("asks a hundred accounts per request, in order, null for the missing", async () => {
+    const requests: number[] = [];
+    const rpc = {
+      getMultipleAccounts: (addresses: Address[]) => ({
+        send: async () => {
+          requests.push(addresses.length);
+          return {
+            context: { slot: 0n },
+            value: addresses.map((account) =>
+              account === findMetadataAddress(mint)
+                ? rpcAccount(metadataAccount())
+                : null,
+            ),
+          };
+        },
+      }),
+    } as unknown as Rpc<GetMultipleAccountsApi>;
+    const mints = [
+      ...Array.from({ length: 149 }, (_, i) =>
+        getAddressDecoder().decode(new Uint8Array(32).fill(i + 1)),
+      ),
+      mint,
+    ];
+
+    const result = await fetchTokenMetadatas(rpc, mints);
+
+    expect(requests).toEqual([100, 50]);
+    expect(result).toHaveLength(150);
+    expect(result.slice(0, 149).every((m) => m === null)).toBe(true);
+    expect(result[149]).toMatchObject({
+      updateAuthority: wallet,
+      name: "Test",
+    });
+  });
+});
+
+describe("addToCollectionInstructions", () => {
+  const collection = other;
+  const [update, verify, ...rest] = addToCollectionInstructions(
+    wallet,
+    mint,
+    collection,
+  );
+
+  it("sets the collection, unverified, then verifies it", () => {
+    expect(rest).toEqual([]);
+    expect(update?.programAddress).toBe(TOKEN_METADATA_PROGRAM);
+    expect(verify?.programAddress).toBe(TOKEN_METADATA_PROGRAM);
+
+    const [data] = getUpdateV1InstructionDataSerializer().deserialize(
+      new Uint8Array(update!.data!),
+    );
+    expect(data.collection).toEqual({
+      __kind: "Set",
+      fields: [{ key: collection, verified: false }],
+    });
+    expect(data.data).toEqual({ __option: "None" });
+    expect(verify?.data).toEqual(
+      getVerifyCollectionV1InstructionDataSerializer().serialize({}),
+    );
+  });
+
+  it("has the wallet sign both, as the NFT's and then the collection's authority", async () => {
+    // updateV1: authority, delegateRecord, token, mint, metadata, edition, payer, …
+    expect(update?.accounts?.[0]).toEqual({
+      address: wallet,
+      role: AccountRole.READONLY_SIGNER,
+    });
+    expect(update?.accounts?.[3]).toEqual({
+      address: mint,
+      role: AccountRole.READONLY,
+    });
+    expect(update?.accounts?.[4]).toEqual({
+      address: findMetadataAddress(mint),
+      role: AccountRole.WRITABLE,
+    });
+    expect(update?.accounts?.[6]).toEqual({
+      address: wallet,
+      role: AccountRole.WRITABLE_SIGNER,
+    });
+
+    // verifyCollectionV1: authority, delegateRecord, metadata, collectionMint,
+    // collectionMetadata, collectionMasterEdition, …
+    const encoder = getAddressEncoder();
+    const [masterEdition] = await getProgramDerivedAddress({
+      programAddress: TOKEN_METADATA_PROGRAM,
+      seeds: [
+        "metadata",
+        encoder.encode(TOKEN_METADATA_PROGRAM),
+        encoder.encode(collection),
+        "edition",
+      ],
+    });
+    expect(verify?.accounts?.slice(0, 6)).toEqual([
+      { address: wallet, role: AccountRole.READONLY_SIGNER },
+      { address: TOKEN_METADATA_PROGRAM, role: AccountRole.READONLY },
+      { address: findMetadataAddress(mint), role: AccountRole.WRITABLE },
+      { address: collection, role: AccountRole.READONLY },
+      { address: findMetadataAddress(collection), role: AccountRole.WRITABLE },
+      { address: masterEdition, role: AccountRole.READONLY },
+    ]);
+  });
+});
+
+describe("removeFromCollectionInstructions", () => {
+  it("unverifies the link, with the wallet as the collection's authority", () => {
+    const [unverify, ...rest] = removeFromCollectionInstructions(
+      wallet,
+      mint,
+      other,
+    );
+
+    expect(rest).toEqual([]);
+    expect(unverify?.programAddress).toBe(TOKEN_METADATA_PROGRAM);
+    expect(unverify?.data).toEqual(
+      getUnverifyCollectionV1InstructionDataSerializer().serialize({}),
+    );
+    // unverifyCollectionV1: authority, delegateRecord, metadata, collectionMint, collectionMetadata, …
+    expect(unverify?.accounts?.slice(0, 5)).toEqual([
+      { address: wallet, role: AccountRole.READONLY_SIGNER },
+      { address: TOKEN_METADATA_PROGRAM, role: AccountRole.READONLY },
+      { address: findMetadataAddress(mint), role: AccountRole.WRITABLE },
+      { address: other, role: AccountRole.READONLY },
+      { address: findMetadataAddress(other), role: AccountRole.WRITABLE },
+    ]);
   });
 });

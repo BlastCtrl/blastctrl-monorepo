@@ -220,6 +220,42 @@ describe("sendBatches with a wallet that asks per transaction", () => {
   });
 });
 
+describe("sendBatches with a wallet that signs only the first of a batch", () => {
+  /** Signs the first transaction it is given; its `n`th prompt throws `error`. */
+  const firstOnlyWallet = (n = 0, error = Error("unused")) => {
+    const state = { prompts: 0 };
+    const sign: BatchSender["sign"] = async (transactions) => {
+      state.prompts++;
+      if (state.prompts === n) throw error;
+      return transactions.slice(0, 1);
+    };
+    return { state, sign };
+  };
+
+  it("sends what came back and asks one at a time for the rest", async () => {
+    const wallet = firstOnlyWallet();
+    const { outcome, results, stages } = await run(
+      senderWith({ sign: wallet.sign }),
+    );
+    expect(outcome).toBeUndefined();
+    expect(wallet.state.prompts).toBe(5);
+    expect(results.map((r) => r.status)).toEqual(Array(5).fill("confirmed"));
+    // Batch 0 was in the one that came back; the others each got a prompt.
+    expect(stages.slice(0, 6)).toEqual([
+      ...batches.map((b) => `${b.index}:signing`),
+      "0:confirming",
+    ]);
+  });
+
+  it("counts the one that went out when a later prompt is refused", async () => {
+    const wallet = firstOnlyWallet(3, Error("User rejected the request."));
+    const { outcome, results } = await run(senderWith({ sign: wallet.sign }));
+    expect(outcome).toBeInstanceOf(WalletRefusedError);
+    expect(outcome).toMatchObject({ sent: 2, of: 5 });
+    expect(results.map((r) => r.status)).toEqual(["confirmed", "confirmed"]);
+  });
+});
+
 describe("isWalletRefusal", () => {
   it("knows a refusal by its code or its message", () => {
     expect(isWalletRefusal(Error("User rejected the request."))).toBe(true);

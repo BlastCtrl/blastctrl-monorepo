@@ -174,8 +174,9 @@ type Batches<B> = {
 export async function sendBatches<B extends { index: number }>(
   batches: B[],
   { sender, build }: Batches<B>,
-  { onBatchResult, onStage }: BatchCallbacks,
+  callbacks: BatchCallbacks,
 ): Promise<void> {
+  const { onBatchResult, onStage } = callbacks;
   if (batches.length === 0) return;
   const fail = (index: number, err: unknown) =>
     onBatchResult({
@@ -218,7 +219,7 @@ export async function sendBatches<B extends { index: number }>(
       await sendOneByOne(
         ready.map((r) => r.batch),
         { sender, build },
-        { onBatchResult, onStage },
+        callbacks,
       );
       return;
     }
@@ -228,23 +229,37 @@ export async function sendBatches<B extends { index: number }>(
     throw err;
   }
 
-  await Promise.all(
-    ready.map(({ batch }, i) => {
+  // A wallet may hand back fewer than it was given (some stop at the first).
+  // Those go out; the rest are asked for one at a time, counted on from
+  // here so a refusal still says how far the whole run got.
+  const signedCount = Math.min(signed.length, ready.length);
+  const sending = Promise.all(
+    ready.slice(0, signedCount).map(({ batch }, i) => {
       onStage?.(batch.index, "confirming");
       return report(batch.index, sender.sendAndConfirm(signed[i]!));
     }),
   );
+  const rest = ready.slice(signedCount).map((r) => r.batch);
+  try {
+    if (rest.length > 0) {
+      await sendOneByOne(rest, { sender, build }, callbacks, signedCount);
+    }
+  } finally {
+    await sending;
+  }
 }
 
 /**
  * For wallets that ask once per transaction. Each batch gets its own fresh
  * blockhash, since the next prompt waits for the last confirmation. By the
- * time one is turned down, every batch before it has reported.
+ * time one is turned down, every batch before it has reported. `sentBefore`
+ * is how many went out before this run, in one prompt.
  */
 async function sendOneByOne<B extends { index: number }>(
   batches: B[],
   { sender, build }: Batches<B>,
   { onBatchResult, onStage }: BatchCallbacks,
+  sentBefore = 0,
 ): Promise<void> {
   const fail = (index: number, err: unknown) =>
     onBatchResult({
@@ -253,7 +268,8 @@ async function sendOneByOne<B extends { index: number }>(
       error: transactionErrorMessage(err),
     });
 
-  for (const [sent, batch] of batches.entries()) {
+  for (const [i, batch] of batches.entries()) {
+    const sent = sentBefore + i;
     let lifetime: BlockhashLifetime;
     try {
       lifetime = await sender.latestBlockhash();
@@ -262,7 +278,7 @@ async function sendOneByOne<B extends { index: number }>(
       // Earlier batches went out, so this isn't "nothing was sent". The RPC
       // is likely down: fail this batch and the rest rather than wait on
       // each in turn.
-      batches.slice(sent).forEach((rest) => fail(rest.index, err));
+      batches.slice(i).forEach((rest) => fail(rest.index, err));
       return;
     }
 
@@ -280,7 +296,7 @@ async function sendOneByOne<B extends { index: number }>(
       [signed] = (await sender.sign([transaction])) as [PreparedTransaction];
     } catch (err) {
       if (isWalletRefusal(err)) {
-        throw new WalletRefusedError(sent, batches.length, err);
+        throw new WalletRefusedError(sent, sentBefore + batches.length, err);
       }
       fail(batch.index, err);
       continue;
