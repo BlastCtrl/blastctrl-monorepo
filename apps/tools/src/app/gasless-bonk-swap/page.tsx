@@ -1,23 +1,20 @@
 "use client";
 
 import { Select, notify, notifyPromise } from "@/components";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { isWalletRefusal } from "@/connector/send-batches";
+import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useDebounce } from "@/lib/hooks/use-debounce";
-import { buildWhirlpoolsSwapTransaction } from "@/lib/octane";
+import { useGaslessSwap } from "@/lib/hooks/use-gasless-swap";
+import type { SwapTransaction } from "@/lib/octane";
+import { lamportsToSol } from "@/lib/solana/common";
 import { formatNumber, numberFormatter } from "@/lib/utils";
 import { useJupQuery } from "@/state/queries/use-jup-quote";
 import { useTokenBalance } from "@/state/queries/use-token-balance";
-import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
-import { lamportsToSol } from "@/lib/solana/common";
 import { SpinnerIcon, cn } from "@blastctrl/ui";
 import { ChevronRightIcon } from "@heroicons/react/20/solid";
 import { CogIcon } from "@heroicons/react/24/outline";
-import {
-  WalletAdapterNetwork,
-  WalletSignTransactionError,
-} from "@solana/wallet-adapter-base";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import type { VersionedTransaction } from "@solana/web3.js";
+import { useCluster, useConnector } from "@solana/connector/react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
@@ -40,10 +37,10 @@ const slippages = [
 ];
 
 export default function BonkSwap() {
-  const { network } = useNetworkConfigurationStore();
-  const { publicKey, signTransaction } = useWallet();
-  const { connection } = useConnection();
-  const { setVisible } = useWalletModal();
+  const { type: network } = useCluster();
+  const { account } = useConnector();
+  const { setOpen } = useConnectorDialog();
+  const { prepare, send } = useGaslessSwap();
   const {
     register,
     handleSubmit,
@@ -66,59 +63,43 @@ export default function BonkSwap() {
   });
 
   const submitSwap = async (data: FormData) => {
-    if (!publicKey || !signTransaction) return;
+    if (!account) return;
     // Bonk!
-    const { swapAmount, slippage } = data;
-    const amountAsDecimals = Math.floor(swapAmount * 10 ** BONK_DECIMALS);
+    const amountAsDecimals = Math.floor(data.swapAmount * 10 ** BONK_DECIMALS);
 
-    let transaction: VersionedTransaction;
+    let signed: SwapTransaction;
     setIsSwapping(true);
     try {
-      const swap = await buildWhirlpoolsSwapTransaction(
-        publicKey,
-        BONK_MINT_58,
-        amountAsDecimals,
-        slippage,
-      );
-
-      // The fee payer has already signed, so only ask the wallet to sign and
-      // send it ourselves. Phantom blocks sign-and-send requests for
-      // transactions with another signer as possibly malicious.
-      transaction = await signTransaction(swap.transaction);
+      ({ signed } = await prepare(BONK_MINT_58, amountAsDecimals));
     } catch (err) {
       setIsSwapping(false);
-      if (err instanceof WalletSignTransactionError) return;
+      if (isWalletRefusal(err)) return;
       return notify({
         type: "error",
         title: "Error Creating Swap Transaction",
-        description: err instanceof Error ? err.message : String(err),
+        description: transactionErrorMessage(err),
       });
     }
-    const signature = await connection.sendRawTransaction(
-      transaction.serialize(),
-    );
-    const { value } = await connection.getLatestBlockhashAndContext();
 
-    await notifyPromise(
-      connection.confirmTransaction({ signature, ...value }, "confirmed"),
-      {
-        loading: { description: "Confirming transaction" },
-        success: () => ({
-          title: "BONK Swap Success",
-          txid: signature,
-        }),
-        error: (err) => ({
-          title: "Bonk Swap Error",
-          description: err?.message,
-        }),
-      },
-    ).finally(() => {
-      setIsSwapping(false);
-      void balanceQuery.refetch();
-    });
+    await notifyPromise(send(signed), {
+      loading: { description: "Confirming transaction" },
+      success: (signature) => ({
+        title: "BONK Swap Success",
+        txid: signature,
+      }),
+      error: (err) => ({
+        title: "Bonk Swap Error",
+        description: transactionErrorMessage(err),
+      }),
+    })
+      .catch(() => undefined)
+      .finally(() => {
+        setIsSwapping(false);
+        void balanceQuery.refetch();
+      });
   };
 
-  if (network === WalletAdapterNetwork.Devnet) {
+  if (network && network !== "mainnet") {
     return (
       <div className="mx-auto text-lg">
         This page is only available on mainnet! Switch your network in the
@@ -312,7 +293,7 @@ export default function BonkSwap() {
                 ))}
               </Select.Options>
             </Select>
-            {publicKey ? (
+            {account ? (
               <button
                 type="submit"
                 disabled={isSwapping}
@@ -324,7 +305,7 @@ export default function BonkSwap() {
             ) : (
               <button
                 type="button"
-                onClick={() => setVisible(true)}
+                onClick={() => setOpen(true)}
                 className="inline-flex flex-auto items-center justify-center rounded-md bg-amber-500 px-2 py-2 font-medium text-white hover:bg-amber-600 disabled:bg-amber-600"
               >
                 Connect wallet

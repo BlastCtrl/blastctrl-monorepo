@@ -19,14 +19,16 @@ export type GetAssetParams = {
 export type GetAssetsParams = { ids: string[] };
 
 /**
- * `searchAssets` params. `tokenType` takes the reference `TokenTypeClass`
- * variants in PascalCase (Triton's docs use `"All"`); Helius spells them in
- * camelCase instead. Default `limit` is 1000, the maximum.
+ * `searchAssets` params. `tokenType` is spelled the way the RPC wants it:
+ * the reference enum is PascalCase (`"Fungible"`), but the RPC in use rejects
+ * that with "unknown variant, expected one of `fungible`, `nonFungible`, …",
+ * so these are the camelCase spellings. Default `limit` is 1000, the maximum.
  */
 export type SearchAssetsParams = {
   ownerAddress?: string;
   authorityAddress?: string;
-  tokenType?: "Fungible" | "NonFungible" | "Compressed" | "Nft" | "All";
+  tokenType?:
+    "fungible" | "nonFungible" | "regularNFT" | "compressedNFT" | "all";
 };
 
 export type SearchAssetsResult = {

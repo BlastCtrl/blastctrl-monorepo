@@ -43,7 +43,7 @@ export function jupTokensQuery(
       const [jupResponse, userAssets] = await Promise.all([
         jupFetch,
         rpc
-          .searchAssets({ ownerAddress: wallet, tokenType: "Fungible" })
+          .searchAssets({ ownerAddress: wallet, tokenType: "fungible" })
           .send(),
       ]);
 

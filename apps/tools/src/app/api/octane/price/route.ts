@@ -1,7 +1,7 @@
-import { z } from "zod";
-import { isPublicKey } from "@/lib/solana/common";
 import { redisClient } from "@/lib/redis";
+import { isAddress } from "@solana/kit";
 import Decimal from "decimal.js";
+import { z } from "zod";
 
 export const maxDuration = 60;
 export const runtime = "nodejs";
@@ -20,9 +20,7 @@ type JupiterPriceResponse = {
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const schema = z.object({
-    mint: z
-      .string()
-      .refine((val) => isPublicKey(val), "Must be a valid Solana public key"),
+    mint: z.string().refine(isAddress, "Must be a valid Solana address"),
   });
   const result = schema.safeParse({
     mint: searchParams.get("mint"),

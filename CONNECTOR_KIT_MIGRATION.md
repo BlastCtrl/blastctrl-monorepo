@@ -30,19 +30,21 @@ Done (use these as reference implementations):
 | Reclaim-rent and reclaim-sol: token-account and mint scan on the kit RPC, close / withdraw-excess / fee instructions from the program clients, batches signed in one wallet prompt                                                 | `src/app/spl-token-tools/reclaim-rent/**`, `src/app/reclaim-sol/**`, `src/connector/send-batches.ts`, `src/state/queries/use-reclaimable-accounts.ts`                             |
 | NFT collections: add (`updateV1` Set + `verifyCollectionV1`) and remove (`unverifyCollectionV1`) built in the browser, metadata read first so only what can work is sent, batches in one prompt                                    | `src/app/solana-nft-tools/collections/**`, `src/lib/solana/metaplex-token-metadata.ts` (`fetchTokenMetadatas`, the collection builders)                                           |
 | Transfer-authority: metadata through the shared `useTokenMetadata` query, transfer and verify-creator through the Metaplex builders, batches packed by kit size, Squads proposals through the Squads module and the ordered sender | `src/app/solana-nft-tools/transfer-authority/**`, `src/lib/solana/squads-multisig.ts`, `src/connector/send-batches.ts` (`sendInOrder`), `src/state/queries/use-token-metadata.ts` |
+| Octane backend (gasless swaps): `packages/octane-core` builds the fee-payer-signed swap on kit; the build route serves it base64-encoded                                                                                           | `packages/octane-core/src/**`, `apps/tools/src/app/api/octane/{build-jup-swap,price}/route.ts`                                                                                    |
+| Gasless swap and gasless BONK swap: the backend's fee-payer-signed transaction decoded with kit, signed by the wallet through the kit signer, sent and confirmed with kit's factory                                                | `src/app/{gasless-swap,gasless-bonk-swap}/**`, `src/lib/octane.ts`, `src/lib/hooks/use-gasless-swap.ts`, `src/state/queries/use-token-balance.ts`                                 |
 | Shared helpers: unsigned simulation, compute headroom, Token-2022 parsing, mint/SOL-balance/token-account queries                                                                                                                  | `src/connector/{simulate,resource-limits}.ts`, `src/lib/solana/token-2022.ts`, `src/state/queries/{use-mint,use-sol-balance,use-token-account-existence}.ts`                      |
 | Explorer links by connector cluster                                                                                                                                                                                                | `src/state/use-query-context.ts`                                                                                                                                                  |
 
-Still on the adapter (as of 2026-10-20): gasless swaps, `src/app/layout.tsx`
-(still imports the adapter stylesheet), `src/state/context/SolanaProvider.tsx`,
-`src/state/use-wallet-connection.ts`, `src/state/queries/use-token-balance.ts`
-(gasless swaps), `lib/solana/{send,endpoints,common}` (`common.ts` still has
-web3 lamport helpers and `isPublicKey`), and the old
-`components/layout/{desktop,mobile}-wallet.tsx` (unreferenced; delete when
-nothing else needs them). `@metaplex-foundation/umi-signer-wallet-adapters` in
-package.json has no importer now that `lib/hooks/use-umi.ts` is gone. The API
-routes that built collection transactions server-side are gone; `src/app/api/`
-is now only Octane. `grep -rl "@solana/wallet-adapter" apps/tools/src` is the
+Nothing is on the adapter anymore (as of 2026-10-20): the adapter provider,
+its auto-connect context, the network store, `use-wallet-connection.ts`, the
+old wallet menus and `lib/solana/endpoints.ts` are deleted, and
+`src/app/layout.tsx` no longer imports the adapter stylesheet. What still
+imports web3.js: `lib/solana/squads-multisig.ts` (on purpose, see its
+section), `lib/solana/common.ts` (`LAMPORTS_PER_SOL`), `common-tokens.ts` and
+`types/amount.ts`. The `@solana/wallet-adapter-*` packages have no importer
+and can be dropped from `apps/tools/package.json`; `@solana/web3.js` stays
+for the Squads SDK and `@solana/spl-token` for what still imports it.
+`grep -rl "@solana/wallet-adapter\|@solana/web3.js" apps/tools/src` is the
 live list; `tsc` is clean.
 
 Breaking other, not-yet-migrated tools while changing a shared query or
@@ -236,6 +238,39 @@ signs as fee payer. Executing is the one call that still needs a web3
 `Connection`, since the SDK reads the stored transaction through it to list the
 accounts execution touches: `executeSteps(rpcUrl, …)` makes one from the
 connector's RPC URL for that call only.
+
+### Server side: the Octane backend
+
+`packages/octane-core` (the gasless-swap builder) is on kit too, and is the
+reference for kit on the server. `createSolanaRpc(url)` is the RPC; the fee
+payer is `createKeyPairSignerFromBytes(getBase58Encoder().encode(secret))`,
+made once at module load (a top-level `await`, which Next's node runtime
+allows); the user is `createNoopSigner(address)`, since the program clients
+want a signer object for any account that signs and the user signs later in
+their wallet. The message is version 0, compressed with
+`compressTransactionMessageUsingAddressLookupTables` after the tables are
+read with `fetchJsonParsedAccounts` (the node decodes them; `data.addresses`
+is the list), the fee comes from `rpc.getFeeForMessage` on the compiled
+message bytes, and `partiallySignTransactionMessageWithSigners` signs with
+the keypair and leaves the user's slot empty. The route hands the result out
+as `getBase64EncodedWireTransaction(transaction)`; the wire format is what
+web3's `VersionedTransaction.deserialize` reads, so the legacy frontend only
+switched from base58 to base64. Jupiter's instructions arrive as JSON and map
+to kit's `{ programAddress, accounts, data }` the same way Umi's and web3's do.
+The package's tests fake `fetch` and the RPC, so they need no validator.
+
+### A transaction built elsewhere
+
+The gasless swap gets a transaction the backend built and partially signed.
+`src/lib/octane.ts` decodes it with `getTransactionDecoder` from the base64
+wire string and puts the lifetime the route sends alongside back on it; the
+wallet signs it through `client.payer.modifyAndSignTransactions([tx])`, which
+keeps the fee payer's signature and the lifetime when the wallet leaves the
+message alone; `assertIsSendableTransaction` and
+`assertIsTransactionWithBlockhashLifetime` then let
+`sendAndConfirmTransactionFactory` take it. `use-gasless-swap.ts` is the
+reference. Sign only, never sign-and-send: Phantom blocks sign-and-send for a
+transaction that already carries another signature.
 
 ### `useKitClient()` – the way to send transactions
 

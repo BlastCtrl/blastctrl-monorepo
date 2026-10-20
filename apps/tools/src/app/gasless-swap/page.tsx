@@ -1,19 +1,22 @@
 "use client";
 
 import { notify } from "@/components";
+import { useAppRpc } from "@/connector/app-rpc";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { isWalletRefusal } from "@/connector/send-batches";
+import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useDebounce } from "@/lib/hooks/use-debounce";
-import * as Octane from "@/lib/octane";
+import { useGaslessSwap } from "@/lib/hooks/use-gasless-swap";
+import type { JupiterQuote, SwapTransaction } from "@/lib/octane";
 import { lamportsToSol } from "@/lib/solana/common";
 import { formatNumber, numberFormatter } from "@/lib/utils";
 import { useJupQuery } from "@/state/queries/use-jup-quote";
+import { jupTokensQuery } from "@/state/queries/use-jup-tokens";
 import { useTokenBalance } from "@/state/queries/use-token-balance";
-import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
 import { Button } from "@blastctrl/ui";
 import { ChevronRightIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
-import { WalletSignTransactionError } from "@solana/wallet-adapter-base";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import type { VersionedTransaction } from "@solana/web3.js";
+import { useCluster, useConnector } from "@solana/connector/react";
+import { useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
@@ -21,9 +24,6 @@ import { useForm } from "react-hook-form";
 import { Popover, PopoverButton, PopoverPanel } from "./_components/popover";
 import { TokenQuote } from "./_components/token-quote";
 import { TokenSelectPanel } from "./_components/token-select-panel";
-import { useQueryClient } from "@tanstack/react-query";
-import { useAppRpc } from "@/connector/app-rpc";
-import { jupTokensQuery } from "@/state/queries/use-jup-tokens";
 
 type FormData = {
   swapAmount: number;
@@ -38,10 +38,11 @@ type SelectToken = {
 };
 
 export default function GaslessSwap() {
-  const { network } = useNetworkConfigurationStore();
-  const { publicKey, signTransaction } = useWallet();
+  const { type: network } = useCluster();
+  const { account } = useConnector();
   const { rpc: appRpc } = useAppRpc();
-  const { setVisible } = useWalletModal();
+  const { setOpen } = useConnectorDialog();
+  const { prepare, send } = useGaslessSwap();
   const {
     register,
     handleSubmit,
@@ -64,46 +65,36 @@ export default function GaslessSwap() {
       ? debouncedSwapAmount * Math.pow(10, selectToken?.decimals)
       : 0,
   });
-  const { connection } = useConnection();
   const queryClient = useQueryClient();
 
   const prefetchJupTokens = () => {
     void queryClient.prefetchQuery(
-      jupTokensQuery(appRpc, publicKey?.toString() ?? "", false),
+      jupTokensQuery(appRpc, account ?? "", false),
     );
   };
 
   const submitSwap = async (data: FormData) => {
-    if (!selectToken || !publicKey || !signTransaction) return;
-    const { swapAmount, slippage } = data;
+    if (!selectToken || !account) return;
     const amountAsDecimals = Math.floor(
-      swapAmount * 10 ** selectToken.decimals,
+      data.swapAmount * 10 ** selectToken.decimals,
     );
 
-    let transaction: VersionedTransaction;
-    let quote: Octane.WhirlpoolsQuote;
+    let signed: SwapTransaction;
+    let quote: JupiterQuote;
 
     setIsSwapping(true);
     try {
-      const swap = await Octane.buildWhirlpoolsSwapTransaction(
-        publicKey,
+      ({ signed, quote } = await prepare(
         selectToken.address,
         amountAsDecimals,
-        slippage,
-      );
-
-      // The fee payer has already signed, so only ask the wallet to sign and
-      // send it ourselves. Phantom blocks sign-and-send requests for
-      // transactions with another signer as possibly malicious.
-      transaction = await signTransaction(swap.transaction);
-      quote = swap.quote;
+      ));
     } catch (err) {
       setIsSwapping(false);
-      if (err instanceof WalletSignTransactionError) return;
+      if (isWalletRefusal(err)) return;
       return notify({
         type: "error",
         title: "Error Creating Swap Transaction",
-        description: err instanceof Error ? err.message : String(err),
+        description: transactionErrorMessage(err),
       });
     }
 
@@ -112,39 +103,26 @@ export default function GaslessSwap() {
       description: "Confirming transaction",
     });
     try {
-      const signature = await connection.sendRawTransaction(
-        transaction.serialize(),
+      const signature = await send(signed);
+      const amountOut = formatNumber.format(
+        lamportsToSol(Number(quote.outAmount)),
+        5,
       );
-      const { value } = await connection.getLatestBlockhashAndContext();
-      const res = await connection.confirmTransaction(
-        { signature, ...value },
-        "confirmed",
-      );
-
-      if (res.value.err) {
-        throw Error("Error while confirming swap");
-      }
-
-      const amountOut = quote.estimatedAmountOut
-        ? `- receiving ${quote.estimatedAmountOut} SOL`
-        : "";
-
       notify(
         {
           type: "success",
-          title: `${selectToken.name} Swap Success ${amountOut}`,
+          title: `${selectToken.name} Swap Success - receiving ${amountOut} SOL`,
           txid: signature,
           testId: "swap-success-toast",
         },
         id,
       );
     } catch (err) {
-      if (err instanceof WalletSignTransactionError) return;
       notify(
         {
           type: "error",
           title: "Swap Error",
-          description: err instanceof Error ? err.message : String(err),
+          description: transactionErrorMessage(err),
         },
         id,
       );
@@ -154,7 +132,7 @@ export default function GaslessSwap() {
     }
   };
 
-  if (network === "devnet") {
+  if (network && network !== "mainnet") {
     return (
       <div className="mx-auto text-lg">
         This page is only available on mainnet! Switch your network in the
@@ -295,7 +273,7 @@ export default function GaslessSwap() {
         <TokenQuote quoteToken={selectToken} />
 
         <div className="mt-6 flex w-full gap-x-2">
-          {publicKey ? (
+          {account ? (
             <Button
               color="indigo"
               type="submit"
@@ -310,7 +288,7 @@ export default function GaslessSwap() {
               color="indigo"
               type="button"
               className="w-full"
-              onClick={() => setVisible(true)}
+              onClick={() => setOpen(true)}
             >
               Connect your wallet
             </Button>

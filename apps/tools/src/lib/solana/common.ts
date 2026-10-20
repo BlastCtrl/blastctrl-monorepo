@@ -1,22 +1,4 @@
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import base58 from "bs58";
-
-export function isPublicKey(putativeAddress: string) {
-  // Based on the implementation of assertIsAddress in the new web3.js SDK666
-  // Fast-path; see if the input string is of an acceptable length.
-  if (
-    // Lowest address (32 bytes of zeroes)
-    putativeAddress.length < 32 ||
-    // Highest address (32 bytes of 255)
-    putativeAddress.length > 44
-  ) {
-    return false;
-  }
-  // Slow-path; actually attempt to decode the input string.
-
-  const bytes = base58.decodeUnsafe(putativeAddress);
-  return 32 === bytes?.byteLength;
-}
 
 export function compress(str: string, chars: number) {
   return str.slice(0, chars) + "..." + str.slice(-chars);

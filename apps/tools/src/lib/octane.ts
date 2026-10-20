@@ -1,68 +1,59 @@
-import type { PublicKey } from "@solana/web3.js";
-import { VersionedTransaction } from "@solana/web3.js";
-import base58 from "bs58";
+import type { JupiterQuote } from "@blastctrl/octane-core";
+import {
+  getBase64Encoder,
+  getTransactionDecoder,
+  type Address,
+  type Blockhash,
+  type Transaction,
+  type TransactionWithBlockhashLifetime,
+} from "@solana/kit";
 
-export type TokenFee = {
-  mint: string;
-  account: string;
-  decimals: number;
-  fee: number;
-  burnFeeBp?: number;
-  transferFeeBp?: number;
-};
+export type { JupiterQuote };
 
-export type WhirlpoolsQuote = {
-  estimatedAmountIn: string;
-  estimatedAmountOut: string;
-  estimatedEndTickIndex: number;
-  estimatedEndSqrtPrice: string;
-  estimatedFeeAmount: string;
-  amount: string;
-  amountSpecifiedIsInput: boolean;
-  aToB: boolean;
-  otherAmountThreshold: string;
-  sqrtPriceLimit: string;
-  tickArray0: string;
-  tickArray1: string;
-  tickArray2: string;
-};
-
-export interface BuildWhirlpoolsSwapResponse {
+type SwapResponse = {
   status: "ok";
+  /** Base64 wire encoding, signed by the fee payer. */
   transaction: string;
-  quote: WhirlpoolsQuote;
-  messageToken: string;
-}
+  lifetime: { blockhash: string; lastValidBlockHeight: string };
+  quote: JupiterQuote;
+};
 
-// const OCTANE_ENDPOINT = "https://octane-server-seven.vercel.app/api";
-const OCTANE_ENDPOINT = "/api/octane";
+/** The fee payer has signed; the user's signature is still missing. */
+export type SwapTransaction = Transaction & TransactionWithBlockhashLifetime;
 
-export async function buildWhirlpoolsSwapTransaction(
-  user: PublicKey,
+/**
+ * Asks the Octane backend for a swap of `amount` (in the mint's raw units)
+ * of `sourceMint` to SOL for `user`, paid for and already signed by Octane's
+ * fee payer. The user signs it next and sends it themselves.
+ */
+export async function buildSwapToSol(
+  user: Address,
   sourceMint: string,
   amount: number,
-  slippageTolerance = 0.5,
-): Promise<{
-  transaction: VersionedTransaction;
-  quote: WhirlpoolsQuote;
-}> {
-  const response = await fetch(OCTANE_ENDPOINT + "/build-jup-swap", {
+): Promise<{ transaction: SwapTransaction; quote: JupiterQuote }> {
+  const response = await fetch("/api/octane/build-jup-swap", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      user: user.toBase58(),
-      sourceMint: sourceMint,
-      amount: amount,
-      slippageTolerance,
-    }),
-  })
-    .then((res) => res.json())
-    .then((data) => data as BuildWhirlpoolsSwapResponse);
-
+    body: JSON.stringify({ user, sourceMint, amount }),
+  });
+  if (!response.ok) {
+    const { error } = (await response.json().catch(() => ({}))) as {
+      error?: string;
+    };
+    throw Error(error ?? `${response.status} ${response.statusText}`);
+  }
+  const data = (await response.json()) as SwapResponse;
+  const transaction = getTransactionDecoder().decode(
+    getBase64Encoder().encode(data.transaction),
+  );
   return {
-    transaction: VersionedTransaction.deserialize(
-      base58.decode(response.transaction),
-    ),
-    quote: response.quote,
+    transaction: {
+      ...transaction,
+      lifetimeConstraint: {
+        blockhash: data.lifetime.blockhash as Blockhash,
+        lastValidBlockHeight: BigInt(data.lifetime.lastValidBlockHeight),
+      },
+    },
+    quote: data.quote,
   };
 }

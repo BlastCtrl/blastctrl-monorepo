@@ -1,27 +1,35 @@
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey } from "@solana/web3.js";
+import { useAppRpc } from "@/connector/app-rpc";
+import {
+  findAssociatedTokenPda,
+  TOKEN_PROGRAM_ADDRESS,
+} from "@solana-program/token";
+import { useConnector } from "@solana/connector/react";
+import { address, isAddress } from "@solana/kit";
 import { useQuery } from "@tanstack/react-query";
 
-export function useTokenBalance(tokenMint: string | PublicKey) {
-  const { connection } = useConnection();
-  const { publicKey } = useWallet();
+/**
+ * The connected wallet's balance in its associated token account of `mint`
+ * (Token program), zero when there isn't one.
+ */
+export function useTokenBalance(mint: string) {
+  const { account } = useConnector();
+  const { rpc, network } = useAppRpc();
 
   return useQuery({
-    enabled: !!publicKey && !!tokenMint,
-    queryKey: ["token-balance", publicKey?.toString(), tokenMint?.toString()],
+    enabled: !!account && !!rpc && isAddress(mint),
+    queryKey: ["token-balance", network, account, mint],
     queryFn: async () => {
-      if (!publicKey) throw Error("No address provided");
-      const mint =
-        typeof tokenMint === "string" ? new PublicKey(tokenMint) : tokenMint;
-      const ata = getAssociatedTokenAddressSync(mint, publicKey, true);
-
+      if (!account || !rpc) throw Error("No address provided");
+      const [ata] = await findAssociatedTokenPda({
+        owner: account,
+        mint: address(mint),
+        tokenProgram: TOKEN_PROGRAM_ADDRESS,
+      });
       try {
-        const result = await connection.getTokenAccountBalance(
-          ata,
-          "confirmed",
-        );
-        return { uiAmount: result.value.uiAmount, amount: result.value.amount };
+        const { value } = await rpc
+          .getTokenAccountBalance(ata, { commitment: "confirmed" })
+          .send();
+        return { uiAmount: value.uiAmount ?? 0, amount: value.amount };
       } catch {
         return { uiAmount: 0, amount: "0" };
       }
