@@ -57,11 +57,12 @@ const apiInstruction = (
 });
 
 /** What Jupiter answers; records what it was asked. */
-const jupiter = { quoteAmount: "", outAmount: "123456789" };
+const jupiter = { quoteAmount: "", slippageBps: 0, outAmount: "123456789" };
 const fakeFetch = async (input: string | URL, init?: RequestInit) => {
   const url = new URL(input.toString());
   if (url.pathname.endsWith("/quote")) {
     jupiter.quoteAmount = url.searchParams.get("amount") ?? "";
+    jupiter.slippageBps = Number(url.searchParams.get("slippageBps"));
     return Response.json({
       inputMint: url.searchParams.get("inputMint"),
       inAmount: jupiter.quoteAmount,
@@ -150,6 +151,7 @@ describe("buildJupiterSwapToSOL", () => {
       user,
       sourceMint,
       amount,
+      slippageBps: 50,
       cache: newCache(),
       fees,
     });
@@ -173,6 +175,8 @@ describe("buildJupiterSwapToSOL", () => {
   it("orders the instructions: budget (reversed), wrap, swap, unwrap, repay", async () => {
     const { feePayer, message, quote } = await build(usdc, 1_000_000n);
     assert.equal(message.feePayer.address, feePayer.address);
+    assert.equal(jupiter.slippageBps, 50);
+    assert.equal(quote.slippageBps, 50);
     const programs = Array.from(message.instructions, (i) => i.programAddress);
     assert.deepEqual(programs, [
       COMPUTE_BUDGET,
@@ -223,7 +227,15 @@ describe("buildJupiterSwapToSOL", () => {
   it("refuses an empty amount and a repeat within a few seconds", async () => {
     const feePayer = await generateKeyPairSigner();
     const cache = newCache();
-    const args = { rpc, feePayer, user, sourceMint: usdc, cache, fees };
+    const args = {
+      rpc,
+      feePayer,
+      user,
+      sourceMint: usdc,
+      slippageBps: 50,
+      cache,
+      fees,
+    };
     await assert.rejects(
       buildJupiterSwapToSOL({ ...args, amount: 0n }),
       /zero or less/,
@@ -252,6 +264,7 @@ describe("buildJupiterSwapToSOL", () => {
       user,
       sourceMint: usdc,
       amount: 5n,
+      slippageBps: 50,
       cache: down,
       fees,
     });

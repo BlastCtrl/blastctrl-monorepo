@@ -18,7 +18,11 @@ import {
 export function useGaslessSwap() {
   const { client } = useKitClient();
 
-  const prepare = async (sourceMint: string, amount: number) => {
+  const prepare = async (
+    sourceMint: string,
+    amount: number,
+    slippageBps: number,
+  ) => {
     if (!client) throw Error("Wallet not connected");
     if (!isTransactionModifyingSigner(client.payer)) {
       throw Error("The connected wallet can't sign transactions");
@@ -27,6 +31,7 @@ export function useGaslessSwap() {
       client.payer.address,
       sourceMint,
       amount,
+      slippageBps,
     );
     const [signed] = await client.payer.modifyAndSignTransactions([
       transaction,

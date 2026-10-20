@@ -1,6 +1,6 @@
 "use client";
 
-import { Select, notify, notifyPromise } from "@/components";
+import { notify, notifyPromise } from "@/components";
 import { useConnectorDialog } from "@/connector/connector-dialog";
 import { isWalletRefusal } from "@/connector/send-batches";
 import { transactionErrorMessage } from "@/connector/transaction-error";
@@ -12,13 +12,16 @@ import { useJupQuery } from "@/state/queries/use-jup-quote";
 import { useTokenBalance } from "@/state/queries/use-token-balance";
 import { SpinnerIcon, cn } from "@blastctrl/ui";
 import { ChevronRightIcon } from "@heroicons/react/20/solid";
-import { CogIcon } from "@heroicons/react/24/outline";
 import { useCluster, useConnector } from "@solana/connector/react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import BonkSmall from "../../../public/bonk_small.png";
+import {
+  SlippageSelect,
+  toSlippageBps,
+} from "../gasless-swap/_components/slippage-select";
 import { FormLeft } from "./_components/form-left";
 import { lamports, lamportsToSol } from "@solana/kit";
 import { decimalFixedPointToNumber } from "@solana/fixed-points";
@@ -31,12 +34,6 @@ type FormData = {
 const BONK_MINT_58 = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
 const BONK_DECIMALS = 5;
 
-const slippages = [
-  { value: 0.1, label: "0.1%", id: 0 },
-  { value: 0.5, label: "0.5%", id: 1 },
-  { value: 1, label: "1%", id: 2 },
-];
-
 export default function BonkSwap() {
   const { type: network } = useCluster();
   const { account } = useConnector();
@@ -47,12 +44,15 @@ export default function BonkSwap() {
     handleSubmit,
     setValue,
     watch,
+    control,
     formState: { errors },
   } = useForm<FormData>({
-    defaultValues: { slippage: 0.5 },
+    // What the picker showed selected before it was wired up.
+    defaultValues: { slippage: 1 },
     mode: "onSubmit",
   });
   const swapAmount = watch("swapAmount");
+  const slippageBps = toSlippageBps(watch("slippage"));
   const [isSwapping, setIsSwapping] = useState(false);
   const [isFetchingQuote] = useState(false);
   const balanceQuery = useTokenBalance(BONK_MINT_58);
@@ -61,6 +61,7 @@ export default function BonkSwap() {
   const quoteQuery = useJupQuery({
     inputMint: BONK_MINT_58,
     amount: debouncedSwapAmount * Math.pow(10, BONK_DECIMALS),
+    slippageBps,
   });
 
   const submitSwap = async (data: FormData) => {
@@ -71,7 +72,11 @@ export default function BonkSwap() {
     let signed: SwapTransaction;
     setIsSwapping(true);
     try {
-      ({ signed } = await prepare(BONK_MINT_58, amountAsDecimals));
+      ({ signed } = await prepare(
+        BONK_MINT_58,
+        amountAsDecimals,
+        toSlippageBps(data.slippage),
+      ));
     } catch (err) {
       setIsSwapping(false);
       if (isWalletRefusal(err)) return;
@@ -264,38 +269,17 @@ export default function BonkSwap() {
           </div>
 
           <div className="mt-6 flex w-full gap-x-2">
-            <Select defaultValue={slippages[2]}>
-              <Select.Button className="group h-full grow-0 rounded-md bg-amber-500 px-3 text-white hover:bg-amber-600">
-                {({ open }) => (
-                  <CogIcon
-                    className={cn(
-                      "h-6 w-6 transition-transform duration-200 group-hover:rotate-90",
-                      open && "rotate-90",
-                    )}
-                  />
-                )}
-              </Select.Button>
-              <Select.Options>
-                <div className="px-2 text-left text-sm text-gray-500">
-                  Slippage
-                </div>
-                {slippages.map((slippage, i) => (
-                  <Select.Option
-                    key={i}
-                    value={slippage}
-                    className={({ selected, active }) =>
-                      cn(
-                        "cursor-pointer rounded-full px-3",
-                        selected && "bg-amber-500 text-white",
-                        active && !selected && "bg-amber-500/30",
-                      )
-                    }
-                  >
-                    {slippage.label}
-                  </Select.Option>
-                ))}
-              </Select.Options>
-            </Select>
+            <Controller
+              name="slippage"
+              control={control}
+              render={({ field }) => (
+                <SlippageSelect
+                  value={field.value}
+                  onChange={field.onChange}
+                  color="amber"
+                />
+              )}
+            />
             {account ? (
               <button
                 type="submit"

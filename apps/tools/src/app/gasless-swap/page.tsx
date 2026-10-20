@@ -19,8 +19,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { Popover, PopoverButton, PopoverPanel } from "./_components/popover";
+import { SlippageSelect, toSlippageBps } from "./_components/slippage-select";
 import { TokenQuote } from "./_components/token-quote";
 import { TokenSelectPanel } from "./_components/token-select-panel";
 import { lamports, lamportsToSol } from "@solana/kit";
@@ -49,12 +50,14 @@ export default function GaslessSwap() {
     handleSubmit,
     setValue,
     watch,
+    control,
     formState: { errors },
   } = useForm<FormData>({
     defaultValues: { slippage: 0.5 },
     mode: "onSubmit",
   });
   const swapAmount = watch("swapAmount");
+  const slippageBps = toSlippageBps(watch("slippage"));
   const debouncedSwapAmount = useDebounce(swapAmount, 400);
   const [selectToken, setSelectToken] = useState<SelectToken | null>(null);
   const [isSwapping, setIsSwapping] = useState(false);
@@ -65,6 +68,7 @@ export default function GaslessSwap() {
     amount: selectToken
       ? debouncedSwapAmount * Math.pow(10, selectToken?.decimals)
       : 0,
+    slippageBps,
   });
   const queryClient = useQueryClient();
 
@@ -88,6 +92,7 @@ export default function GaslessSwap() {
       ({ signed, quote } = await prepare(
         selectToken.address,
         amountAsDecimals,
+        toSlippageBps(data.slippage),
       ));
     } catch (err) {
       setIsSwapping(false);
@@ -278,6 +283,13 @@ export default function GaslessSwap() {
         <TokenQuote quoteToken={selectToken} />
 
         <div className="mt-6 flex w-full gap-x-2">
+          <Controller
+            name="slippage"
+            control={control}
+            render={({ field }) => (
+              <SlippageSelect value={field.value} onChange={field.onChange} />
+            )}
+          />
           {account ? (
             <Button
               color="indigo"

@@ -44,9 +44,6 @@ export const BONK_MINT = address(
  */
 export const LAMPORTS_PER_TOKEN_ACCOUNT = 2_039_280n;
 
-/** Jupiter is asked for this much slippage whatever the user chose; it always was. */
-const SLIPPAGE_BPS = 1000;
-
 /** A user may ask for the same mint again only after this long. */
 const SAME_MINT_TIMEOUT_MS = 3_000;
 
@@ -89,6 +86,7 @@ export async function buildJupiterSwapToSOL({
   user,
   sourceMint,
   amount,
+  slippageBps,
   cache,
   fees,
 }: {
@@ -98,6 +96,8 @@ export async function buildJupiterSwapToSOL({
   sourceMint: Address;
   /** In the mint's raw units. */
   amount: bigint;
+  /** How far the price may move before Jupiter fails the swap, in basis points. */
+  slippageBps: number;
   cache: SwapCache;
   fees: SwapFees;
 }): Promise<SwapToSol> {
@@ -123,7 +123,7 @@ export async function buildJupiterSwapToSOL({
     user,
     inputMint: sourceMint,
     amount,
-    slippageBps: SLIPPAGE_BPS,
+    slippageBps,
   });
 
   // SOLFLARE SPECIAL CASE: Solflare likes to edit compute budget instructions.

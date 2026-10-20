@@ -30,11 +30,12 @@ export async function buildSwapToSol(
   user: Address,
   sourceMint: string,
   amount: number,
+  slippageBps: number,
 ): Promise<{ transaction: SwapTransaction; quote: JupiterQuote }> {
   const response = await fetch("/api/octane/build-jup-swap", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user, sourceMint, amount }),
+    body: JSON.stringify({ user, sourceMint, amount, slippageBps }),
   });
   if (!response.ok) {
     const { error } = (await response.json().catch(() => ({}))) as {

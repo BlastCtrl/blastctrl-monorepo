@@ -36,7 +36,7 @@ export function useJupQuery({
   const outputMint = "So11111111111111111111111111111111111111112";
 
   return useQuery<QuoteResponse, Error>({
-    queryKey: ["jup-quote", inputMint, amount],
+    queryKey: ["jup-quote", inputMint, amount, slippageBps],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append("inputMint", inputMint);

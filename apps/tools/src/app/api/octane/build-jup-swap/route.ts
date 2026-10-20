@@ -26,8 +26,8 @@ const body = z.object({
   sourceMint: z.string().refine(isAddress, "Not an address"),
   /** In the mint's raw units, as a number or a string. */
   amount: z.coerce.bigint().positive(),
-  // Accepted for the frontend's sake; the swap is quoted at a fixed slippage.
-  slippageTolerance: z.number().optional(),
+  /** How far the price may move before the swap fails, in basis points. */
+  slippageBps: z.number().int().min(1).max(10_000),
 });
 
 export async function POST(req: Request) {
@@ -37,13 +37,14 @@ export async function POST(req: Request) {
       throw Error(parsed.error.issues[0]?.message ?? "Invalid request body");
     }
 
-    const { user, sourceMint, amount } = parsed.data;
+    const { user, sourceMint, amount, slippageBps } = parsed.data;
     const { quote, transaction } = await buildJupiterSwapToSOL({
       rpc,
       feePayer,
       user: address(user),
       sourceMint: address(sourceMint),
       amount,
+      slippageBps,
       cache,
       fees: {
         bonkBurnFeeBps: env.BONK_BURN_FEE_BPS,
