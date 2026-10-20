@@ -33,9 +33,10 @@ const toDemoMints = (
 export const DEMO_MINTS = toDemoMints(mainnetMints);
 
 /**
- * The devnet counterpart: mints made for the panel, with the same split and
- * a similar spread of extensions. Devnet gets reset now and then; if they
- * disappear, make a new set and replace the file.
+ * The devnet counterpart: mints made for the panel by
+ * `scripts/make-devnet-demo-mints.mjs`, plain Token program mints. Devnet
+ * gets reset now and then; if they disappear, make a new set and replace
+ * the file.
  */
 export const DEVNET_DEMO_MINTS = toDemoMints(devnetMints);
 

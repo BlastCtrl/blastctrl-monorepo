@@ -16,7 +16,7 @@ import {
 } from "@heroicons/react/20/solid";
 import { address, generateKeyPairSigner, isAddress } from "@solana/kit";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { Attributes } from "./_components/attributes";
 import { MediaFiles } from "./_components/media-files";
@@ -48,7 +48,19 @@ export type CreateFormInputs = {
   maxSupply: number;
 };
 
+/**
+ * The form reads its defaults from the query string, which Next only lets a
+ * client component do under a Suspense boundary when the page is prerendered.
+ */
 export default function Mint() {
+  return (
+    <Suspense fallback={null}>
+      <MintForm />
+    </Suspense>
+  );
+}
+
+function MintForm() {
   const { client } = useKitClient();
   const { setOpen } = useConnectorDialog();
   const upload = useArweaveUploader();

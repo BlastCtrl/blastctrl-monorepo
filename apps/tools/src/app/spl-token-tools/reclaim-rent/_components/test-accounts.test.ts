@@ -48,17 +48,35 @@ const compile = (instructions: Instruction[]) =>
 /** What fits in one packet for a version 0 transaction. */
 const PACKET_SIZE = getTransactionSizeLimit(compile([]));
 
+describe("the demo mint lists", () => {
+  it("have mainnet mints on both token programs", () => {
+    expect(new Set(DEMO_MINTS.map((m) => m.program))).toEqual(
+      new Set([TOKEN_PROGRAM_ADDRESS, TOKEN_2022_PROGRAM_ADDRESS]),
+    );
+  });
+
+  it("have devnet mints on a token program, Token at least", () => {
+    const programs = new Set(DEVNET_DEMO_MINTS.map((m) => m.program));
+    expect(programs.has(TOKEN_PROGRAM_ADDRESS)).toBe(true);
+    for (const program of programs) {
+      expect([TOKEN_PROGRAM_ADDRESS, TOKEN_2022_PROGRAM_ADDRESS]).toContain(
+        program,
+      );
+    }
+  });
+
+  it.each([
+    ["mainnet", DEMO_MINTS],
+    ["devnet", DEVNET_DEMO_MINTS],
+  ])("have distinct mints on %s", (_, mints) => {
+    expect(new Set(mints.map((m) => m.mint)).size).toBe(mints.length);
+  });
+});
+
 describe.each([
   ["mainnet", DEMO_MINTS],
   ["devnet", DEVNET_DEMO_MINTS],
 ])("buildTestAccountInstructions on %s", (_, mints) => {
-  it("has distinct demo mints on both token programs", () => {
-    expect(new Set(mints.map((m) => m.program))).toEqual(
-      new Set([TOKEN_PROGRAM_ADDRESS, TOKEN_2022_PROGRAM_ADDRESS]),
-    );
-    expect(new Set(mints.map((m) => m.mint)).size).toBe(mints.length);
-  });
-
   it("covers every demo mint, a create and a transfer each", async () => {
     const groups = await buildTestAccountInstructions(mints, wallet, 550_840);
     expect(groups).toHaveLength(
