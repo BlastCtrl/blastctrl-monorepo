@@ -12,7 +12,20 @@ minimumReleaseAgeExclude:
   - "@next/*"
 peerDependencyRules:
   allowedVersions:
-    "@solana/kit": "2 || 5"
+    # x402, under @ardrive/turbo-sdk, pins its own kit 5; the app is on 8.
+    "@solana/kit": "5"
+    # Type-level peers: the x402 tree under @ardrive/turbo-sdk (its own kit
+    # 5.5) and tsconfck under vite-tsconfig-paths ask for 5; 6 works.
+    typescript: "5 || 6"
+    # isows, in the same x402 tree, asks for ws 7; the ws 8 the override
+    # installs is what it gets everywhere else too.
+    ws: "7 || 8"
+    # valtio (walletconnect, under the same x402 tree) ships a React 18 shim
+    # for an API React 19 has natively.
+    react: "18 || 19"
+    # porto (wagmi, same tree) asks for a newer react-native than the
+    # connector's mobile wallet adapter installs; this is a web app.
+    react-native: "0.79 || >=0.81"
 overrides:
   "elliptic@<=6.6.0": "^6.6.1"
   "protobufjs@<7.5.5": "^7.5.5"
