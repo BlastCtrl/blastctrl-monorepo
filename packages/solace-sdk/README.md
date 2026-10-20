@@ -6,9 +6,13 @@ the checked-in `openapi.yaml`. Builds never download anything.
 - `openapi.yaml`: the backend's OpenAPI document.
 - `openapi.source.json`: the backend repo and the exact commit the schema was taken at.
 - `src/generated/`: Orval output, do not edit by hand.
-- `src/custom-fetch.ts`: prepends the base URL and merges the default headers given to
-  `build(baseUrl, headers)`. The app passes `/blast-api` and a `Bearer` token; neither
-  comes from the schema, so schema updates do not affect them.
+- `src/custom-fetch.ts`: Orval's mutator. It performs the request and returns
+  `{ data, status, headers }` for every status code, so the generated response unions apply.
+- `src/index.ts`: `build(baseUrl, headers)` binds the generated functions to a base URL and
+  default headers and returns an independent instance (no module state). The app passes
+  `/blast-api` and a `Bearer` token; neither comes from the schema, so schema updates do not
+  affect them. Every request function still takes `RequestInit` as its last argument, e.g.
+  `{ signal }` to abort.
 
 ## Updating the schema
 
