@@ -3,6 +3,7 @@
 import React, { useState, useRef, ChangeEvent } from "react";
 import Papa from "papaparse";
 import { Button } from "@blastctrl/ui";
+import { isAddress } from "@solana/kit";
 import { Box } from "../box";
 import { MAX_RECIPIENTS } from "../common";
 import { usePasteAddresses } from "./use-paste-addresses";
@@ -66,15 +67,11 @@ const SolaceAirdropper = ({ onNext }: SolaceAirdropperProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   usePasteAddresses(amount, setRecipients);
 
-  const validateSolAddress = (address: string): boolean => {
-    // Basic validation - Solana addresses are 32-44 characters
-    return address.length >= 32 && address.length <= 44;
-  };
+  const validateSolAddress = (address: string): boolean =>
+    isAddress(address.trim());
 
-  const validateMintAddress = (address: string): boolean => {
-    // Same validation as Solana addresses - mint addresses follow same format
-    return address.length >= 32 && address.length <= 44;
-  };
+  const validateMintAddress = (address: string): boolean =>
+    isAddress(address.trim());
 
   const validateAmount = (amount: string): boolean => {
     return !isNaN(Number(amount)) && parseFloat(amount) > 0;

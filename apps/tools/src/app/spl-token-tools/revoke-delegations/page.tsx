@@ -4,7 +4,7 @@ import { notify } from "@/components";
 import { useConnectorDialog } from "@/connector/connector-dialog";
 import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient } from "@/connector/use-kit-client";
-import { TOKEN_2022_PROGRAM_ADDRESS } from "@/lib/solana/token-programs";
+import { TOKEN_2022_PROGRAM_ADDRESS } from "@/lib/solana/token-2022";
 import { useDelegatedAssets } from "@/state/queries/use-delegated-assets";
 import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
 import {

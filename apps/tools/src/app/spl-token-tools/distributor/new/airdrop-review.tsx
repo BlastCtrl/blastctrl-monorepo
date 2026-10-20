@@ -1,15 +1,18 @@
 import { notify } from "@/components";
 import { InfoTooltip } from "@/components/info-tooltip";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { lamportsToSol } from "@/lib/solana/common";
+import { useTokenAccountExistence } from "@/state/queries/use-token-account-existence";
+import { CreateTokenAirdropBodyTokenProgram } from "@blastctrl/solace-sdk";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { useConnector } from "@solana/connector/react";
+import { decimalFixedPoint, type Address } from "@solana/kit";
 import { useRouter } from "next/navigation";
 import React from "react";
 import { Box } from "../box";
-import { useCreateAirdrop, useCreateTokenAirdrop } from "../state";
 import { BATCH_SIZE, TOKEN_BATCH_SIZE } from "../common";
 import { MintAddressLink } from "../mint-address-link";
-import { useTokenAccountExistence } from "@/state/queries/use-token-account-existence";
+import { useCreateAirdrop, useCreateTokenAirdrop } from "../state";
 
 type Recipient = {
   address: string;
@@ -27,8 +30,30 @@ interface SolaceAirdropReviewProps {
   tokenType: TokenType;
   mintAddress: string;
   decimals: number;
+  tokenProgram?: Address;
   onBack: () => void;
 }
+
+/** The backend accepts exactly the two token programs; the mint's owner must be one of them. */
+const isSupportedTokenProgram = (
+  program: string,
+): program is CreateTokenAirdropBodyTokenProgram =>
+  Object.values<string>(CreateTokenAirdropBodyTokenProgram).includes(program);
+
+/** Base fee of one single-signature transaction, in SOL. */
+const COST_PER_BATCH = 0.000005;
+/** Rent of a token account; paid by the sender for recipients that have none. */
+const TOKEN_ACCOUNT_CREATION_COST_SOL = lamportsToSol(2_039_280n);
+
+/**
+ * Exact decimal-string to base-unit conversion (no float arithmetic). Digits
+ * beyond `decimals` are dropped. The backend takes the amount as a JSON
+ * number, which is exact up to 2^53 base units.
+ */
+const toAtomicAmount = (amount: string, decimals: number): number =>
+  Number(
+    decimalFixedPoint("unsigned", 64, decimals)(amount.trim(), "trunc").raw,
+  );
 
 const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
   airdropType,
@@ -38,9 +63,11 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
   tokenType,
   mintAddress,
   decimals,
+  tokenProgram,
   onBack,
 }) => {
-  const { publicKey } = useWallet();
+  const { account } = useConnector();
+  const { setOpen } = useConnectorDialog();
   const {
     mutate: mutateSol,
     isPending: isPendingSol,
@@ -57,7 +84,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
   const error = errorSol || errorToken;
   const [searchTerm, setSearchTerm] = React.useState("");
 
-  // Hook to check token account existence for custom tokens
+  // Which recipients still need a token account, to show the rent we will pay.
   const {
     data: tokenAccountData,
     isLoading: isLoadingTokenAccounts,
@@ -65,11 +92,8 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
   } = useTokenAccountExistence(
     tokenType === "custom" ? mintAddress : "",
     tokenType === "custom" ? recipients.map((r) => r.address) : [],
+    tokenProgram,
   );
-
-  // Constants
-  const COST_PER_BATCH = 0.000005;
-  const TOKEN_ACCOUNT_CREATION_COST = 2039280; // in lamports (0.00203928 SOL)
 
   // Calculate totals
   const recipientsCount: number = recipients.length;
@@ -81,7 +105,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
   // Calculate token account creation costs
   const tokenAccountsToCreate = tokenAccountData?.accountsToCreate ?? 0;
   const tokenAccountCreationFee =
-    (tokenAccountsToCreate * TOKEN_ACCOUNT_CREATION_COST) / LAMPORTS_PER_SOL;
+    tokenAccountsToCreate * TOKEN_ACCOUNT_CREATION_COST_SOL;
   const totalTokenFees = transactionFee + tokenAccountCreationFee;
 
   // Calculate total SOL to distribute
@@ -110,26 +134,30 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
   const clearSearch = () => void setSearchTerm("");
 
   const startAirdrop = () => {
-    if (!publicKey) {
-      notify({
-        type: "error",
-        description: "Sign all transactions feature is unavailable",
-      });
+    if (!account) {
+      setOpen(true);
       return;
     }
 
-    const batches: Array<Array<{ address: string; atomicAmount: number }>> = [];
-    const batchSize = tokenType === "sol" ? BATCH_SIZE : TOKEN_BATCH_SIZE;
-    for (let i = 0; i < recipients.length; i += batchSize) {
-      batches.push(
-        recipients.slice(i, i + batchSize).map((r) => ({
-          address: r.address,
-          atomicAmount:
-            tokenType === "sol"
-              ? Number(r.amount) * LAMPORTS_PER_SOL
-              : Number(r.amount) * Math.pow(10, decimals),
-        })),
-      );
+    let batches: Array<Array<{ address: string; atomicAmount: number }>>;
+    try {
+      const batchSize = tokenType === "sol" ? BATCH_SIZE : TOKEN_BATCH_SIZE;
+      batches = [];
+      for (let i = 0; i < recipients.length; i += batchSize) {
+        batches.push(
+          recipients.slice(i, i + batchSize).map((r) => ({
+            address: r.address.trim(),
+            atomicAmount: toAtomicAmount(r.amount, decimals),
+          })),
+        );
+      }
+    } catch (err) {
+      notify({
+        type: "error",
+        title: "Invalid amount",
+        description: err instanceof Error ? err.message : String(err),
+      });
+      return;
     }
 
     if (tokenType === "sol") {
@@ -142,10 +170,19 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
         },
       );
     } else {
+      if (!tokenProgram || !isSupportedTokenProgram(tokenProgram)) {
+        notify({
+          type: "error",
+          title: "Unsupported token program",
+          description: `The mint is owned by ${tokenProgram ?? "an unknown program"}, which the airdropper does not support.`,
+        });
+        return;
+      }
       mutateToken(
         {
           mintAddress,
           decimals,
+          tokenProgram,
           batches,
         },
         {
@@ -247,7 +284,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
               {tokenType === "sol" && (
                 <div className="flex items-center justify-between py-1 text-sm">
                   <span className="text-gray-600">Distribution amount</span>
-                  <span>{totalDistribution.toFixed(decimals)} Tokens</span>
+                  <span>{totalDistribution.toFixed(decimals)} SOL</span>
                 </div>
               )}
 
@@ -261,7 +298,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
                   <span className="flex items-center text-gray-600">
                     Token account creation
                     <InfoTooltip className="ml-1">
-                      If a recipient does&apos;t own a token account for this
+                      If a recipient doesn&apos;t own a token account for this
                       token, we need to create it for them. The fee is
                       0.00203928 SOL per account.
                     </InfoTooltip>
@@ -274,7 +311,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
                     ) : tokenAccountError ? (
                       <span className="text-xs text-red-500">Error</span>
                     ) : (
-                      `${tokenAccountsToCreate} × ${(TOKEN_ACCOUNT_CREATION_COST / LAMPORTS_PER_SOL).toFixed(8)} = ${tokenAccountCreationFee.toFixed(6)} SOL`
+                      `${tokenAccountsToCreate} × ${TOKEN_ACCOUNT_CREATION_COST_SOL.toFixed(8)} = ${tokenAccountCreationFee.toFixed(6)} SOL`
                     )}
                   </span>
                 </div>
@@ -419,7 +456,7 @@ const SolaceAirdropReview: React.FC<SolaceAirdropReviewProps> = ({
         </Button>
         <Button
           onClick={startAirdrop}
-          disabled={hasInsufficientFunds}
+          disabled={hasInsufficientFunds || isPending}
           color="indigo"
           className="px-6!"
         >

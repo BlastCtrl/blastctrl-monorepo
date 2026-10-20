@@ -1,3 +1,4 @@
+import { withComputeUnitBuffer } from "@/connector/resource-limits";
 import { transactionErrorMessage } from "@/connector/transaction-error";
 import type { KitClient } from "@/connector/use-kit-client";
 import { STAKE_ACCOUNT_SIZE } from "@/lib/solana/stake-account";
@@ -281,19 +282,3 @@ async function sendRowsOneByOne(
     }
   }
 }
-
-/** Adds headroom to a simulated compute estimate, like the client's executor does. */
-const withComputeUnitBuffer =
-  (
-    estimate: ReturnType<typeof estimateResourceLimitsFactory>,
-  ): ReturnType<typeof estimateResourceLimitsFactory> =>
-  async (message, config) => {
-    const limits = await estimate(message, config);
-    return {
-      ...limits,
-      computeUnitLimit: Math.min(
-        1_400_000,
-        Math.ceil(limits.computeUnitLimit * 1.1) + 300,
-      ),
-    };
-  };

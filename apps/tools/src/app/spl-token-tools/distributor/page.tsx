@@ -1,111 +1,104 @@
 "use client";
 
-import { useLocalStorageState } from "@/lib/hooks/use-local-storage";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { Box } from "./box";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { Button } from "@blastctrl/ui";
-import base58 from "bs58";
-import type {
-  ListAirdrops200Item,
-  GetAirdrop200,
-} from "@blastctrl/solace-sdk";
-import { useState, useCallback, useEffect, useRef } from "react";
-import Link from "next/link";
-import { useSolace } from "./solace-provider";
-import { useDeleteAirdrop, useGetAirdrops, useSetLabel } from "./state";
-import { formatDate, useFadeIn } from "./common";
-import { jwtDecode } from "jwt-decode";
 import { notify } from "@/components/notification";
-import { ArrowTurnDownRightIcon, TrashIcon } from "@heroicons/react/16/solid";
-import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import type { GetAirdrop200, ListAirdrops200Item } from "@blastctrl/solace-sdk";
+import { Button } from "@blastctrl/ui";
 import { Input } from "@headlessui/react";
-import { flushSync } from "react-dom";
+import { ArrowTurnDownRightIcon, TrashIcon } from "@heroicons/react/16/solid";
+import {
+  useCluster,
+  useConnector,
+  useTransactionSigner,
+} from "@solana/connector/react";
+import { getBase58Decoder } from "@solana/kit";
 import clsx from "clsx";
+import { jwtDecode } from "jwt-decode";
+import Link from "next/link";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from "react";
+import { flushSync } from "react-dom";
+import { Box } from "./box";
+import { formatDate, SolaceError, useFadeIn } from "./common";
 import { MintAddressLink } from "./mint-address-link";
+import { useSolace, useSolaceAuth } from "./solace-provider";
+import { useDeleteAirdrop, useGetAirdrops, useSetLabel } from "./state";
 
 export default function Overview() {
-  const { network } = useNetworkConfigurationStore();
-  const { publicKey, signMessage } = useWallet();
-  const { setVisible } = useWalletModal();
+  const { type: network } = useCluster();
+  const { account } = useConnector();
+  const { setOpen } = useConnectorDialog();
+  // The connector's byte-level signer is the one place that exposes the
+  // wallet's raw `signMessage`, which the sign-in challenge is verified with.
+  const { signer } = useTransactionSigner();
   const solace = useSolace();
-  const [authToken, setAuthToken] = useLocalStorageState<{
-    token: string;
-    expiresAt: number;
-    refreshToken: string;
-  } | null>("authToken", null);
+  const { authToken, setAuthToken } = useSolaceAuth();
 
-  const refreshAccessToken = useCallback(async () => {
-    if (!authToken?.refreshToken || !publicKey) return;
+  // Reads the latest token and account when the timer fires.
+  const refreshAccessToken = useEffectEvent(async () => {
+    if (!authToken?.refreshToken || !account) return;
     const response = await solace.api.refreshAuthToken({
-      address: publicKey?.toString(),
+      address: account,
       refreshToken: authToken.refreshToken,
     });
 
     if (response.status !== 200) {
       console.error(
         "Auth refresh failed: %s",
-        response?.data?.message ?? JSON.stringify(response.data),
+        SolaceError.fromResponse(response).message,
       );
       return;
     }
 
     setAuthToken(response.data);
-  }, [publicKey, authToken?.refreshToken, setAuthToken]);
+  });
 
   const clearAuthToken = useCallback(() => {
     setAuthToken(null);
   }, [setAuthToken]);
 
+  const expiresAt = authToken?.expiresAt;
   useEffect(() => {
-    if (authToken?.expiresAt) {
-      // Set timeout to refresh 1 minute before token expires.
-      const refreshInMs = Math.max(
-        authToken?.expiresAt * 1000 - Date.now() - 60 * 1000,
-        0,
-      );
-      const timeoutId = window.setTimeout(() => {
-        refreshAccessToken();
-      }, refreshInMs);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [authToken?.expiresAt, refreshAccessToken]);
+    if (!expiresAt) return;
+    // Refresh one minute before the token expires.
+    const refreshInMs = Math.max(expiresAt * 1000 - Date.now() - 60 * 1000, 0);
+    const timeoutId = window.setTimeout(() => {
+      void refreshAccessToken();
+    }, refreshInMs);
+    return () => clearTimeout(timeoutId);
+  }, [expiresAt]);
 
+  // Signed in with a different wallet than the token was issued to: start over.
   useEffect(() => {
-    if (publicKey === null) return;
-    if (authToken === null) return;
-    if (authToken) {
-      const decoded = jwtDecode(authToken.token);
-      if (publicKey.toString() !== decoded.sub) {
-        // we signed in with a different pubkey, wipe the auth token
-        setAuthToken(null);
-      }
+    if (!account || !authToken) return;
+    if (jwtDecode(authToken.token).sub !== account) {
+      setAuthToken(null);
     }
-  }, [publicKey]);
+  }, [account, authToken, setAuthToken]);
 
   const handleRequestAuth = async () => {
     try {
-      if (!publicKey || !signMessage) {
-        throw new Error("wallet cannot sign");
+      if (!account) throw new Error("Connect your wallet first");
+      if (!signer?.signMessage || !signer.getCapabilities().canSignMessage) {
+        throw new Error("The connected wallet cannot sign messages");
       }
 
-      const challenge = await solace.api.getAuthChallenge({
-        address: publicKey.toString(),
-      });
-      if (challenge.status !== 200) {
-        throw new Error("Auth challenge error", { cause: challenge.data });
-      }
-      const msgUint8 = new TextEncoder().encode(challenge.data.message);
-      const signature = await signMessage(msgUint8);
+      const challenge = await solace.api.getAuthChallenge({ address: account });
+      if (challenge.status !== 200) throw SolaceError.fromResponse(challenge);
 
+      const signature = await signer.signMessage(
+        new TextEncoder().encode(challenge.data.message),
+      );
       const authResp = await solace.api.verifyAuthChallenge({
-        address: publicKey?.toString(),
-        signature: base58.encode(signature),
+        address: account,
+        signature: getBase58Decoder().decode(signature),
       });
-
-      if (authResp.status !== 200) {
-        throw new Error(authResp.data.message);
-      }
+      if (authResp.status !== 200) throw SolaceError.fromResponse(authResp);
 
       setAuthToken(authResp.data);
     } catch (error) {
@@ -118,7 +111,7 @@ export default function Overview() {
     }
   };
 
-  if (network === "devnet" || network === "testnet") {
+  if (network !== "mainnet") {
     return (
       <Box className="flex justify-center text-sm/6">
         This tool is currently only available on mainnet. Switch your network
@@ -127,11 +120,11 @@ export default function Overview() {
     );
   }
 
-  if (!publicKey) {
+  if (!account) {
     return (
       <Box className="flex justify-center">
         <Button
-          onClick={() => setVisible(true)}
+          onClick={() => setOpen(true)}
           color="indigo"
           className="w-full max-w-fit px-6!"
         >
@@ -141,13 +134,11 @@ export default function Overview() {
     );
   }
 
-  if (publicKey && !authToken) {
+  if (!authToken) {
     return (
       <Box className="flex justify-center">
         <Button
-          onClick={async () => {
-            await handleRequestAuth();
-          }}
+          onClick={() => void handleRequestAuth()}
           color="indigo"
           className="w-full max-w-fit px-6!"
         >
@@ -172,7 +163,7 @@ const SolaceAirdropDashboard = ({
     null,
   );
 
-  const { disconnect } = useWallet();
+  const { disconnectWallet } = useConnector();
   const { data: airdrops, isLoading, isError, error } = useGetAirdrops();
   const { mutate, isPending } = useDeleteAirdrop();
 
@@ -228,7 +219,7 @@ const SolaceAirdropDashboard = ({
                   className="block"
                   onClick={() => {
                     clearAuthToken();
-                    void disconnect();
+                    void disconnectWallet();
                   }}
                 >
                   Sign out
@@ -456,7 +447,6 @@ function AirdropName({ airdrop }: { airdrop: ListAirdrops200Item }) {
   const { mutate } = useSetLabel(airdrop.id);
 
   useEffect(() => {
-    // fucking typescript
     function handleEscapePress(event: globalThis.KeyboardEvent) {
       if (event.code === "Escape") {
         setState("view");

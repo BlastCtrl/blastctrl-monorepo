@@ -13,20 +13,20 @@ Versions this was written against: `@solana/connector` 0.3.0,
 
 Done (use these as reference implementations):
 
-| Area                                                                            | Files                                                                                                                                                            |
-| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Wallet UI (button, menu, connect dialog incl. WalletConnect)                    | `apps/tools/src/connector/`                                                                                                                                      |
-| Kit client hook                                                                 | `apps/tools/src/connector/use-kit-client.ts`                                                                                                                     |
-| Shared error helper                                                             | `apps/tools/src/connector/transaction-error.ts`                                                                                                                  |
-| Stake tools (create UI + CSV, set-lockup, authorize, merge, split, MEV rewards) | `apps/tools/src/app/solana-stake-tools/**`                                                                                                                       |
-| SPL token tools: close-empty, revoke-delegations, recover-nested, token-hoover  | `apps/tools/src/app/spl-token-tools/{close-empty,revoke-delegations,recover-nested,token-hoover}/**`                                                             |
-| Permanent storage file upload (Turbo SDK via `@solana/connector/compat`)        | `apps/tools/src/app/permanent-storage-tools/file-upload/**`, `lib/turbo.ts`                                                                                      |
-| DAS-extended RPC + token-account scans                                          | `src/connector/app-rpc.ts`, `src/state/queries/{use-asset-data,use-owner-assets,use-delegated-assets,use-reclaimable-accounts,use-owner-nfts,use-jup-tokens}.ts` |
-| Shared reads on Kit RPC                                                         | `src/state/queries/use-stake-account.ts`, `use-user-stake-accounts.ts`, `use-epoch.ts`, `use-rent.ts`                                                            |
-| Explorer links by connector cluster                                             | `src/state/use-query-context.ts`                                                                                                                                 |
+| Area                                                                                                                                       | Files                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Wallet UI (button, menu, connect dialog incl. WalletConnect)                                                                               | `apps/tools/src/connector/`                                                                                                                                      |
+| Kit client hook                                                                                                                            | `apps/tools/src/connector/use-kit-client.ts`                                                                                                                     |
+| Shared error helper                                                                                                                        | `apps/tools/src/connector/transaction-error.ts`                                                                                                                  |
+| Stake tools (create UI + CSV, set-lockup, authorize, merge, split, MEV rewards)                                                            | `apps/tools/src/app/solana-stake-tools/**`                                                                                                                       |
+| SPL token tools: close-empty, revoke-delegations, recover-nested, token-hoover, distributor (Solace airdrops, incl. `packages/solace-sdk`) | `apps/tools/src/app/spl-token-tools/{close-empty,revoke-delegations,recover-nested,token-hoover,distributor}/**`                                                 |
+| Permanent storage file upload (Turbo SDK via `@solana/connector/compat`)                                                                   | `apps/tools/src/app/permanent-storage-tools/file-upload/**`, `lib/turbo.ts`                                                                                      |
+| DAS-extended RPC + token-account scans                                                                                                     | `src/connector/app-rpc.ts`, `src/state/queries/{use-asset-data,use-owner-assets,use-delegated-assets,use-reclaimable-accounts,use-owner-nfts,use-jup-tokens}.ts` |
+| Shared reads on Kit RPC                                                                                                                    | `src/state/queries/use-stake-account.ts`, `use-user-stake-accounts.ts`, `use-epoch.ts`, `use-rent.ts`                                                            |
+| Explorer links by connector cluster                                                                                                        | `src/state/use-query-context.ts`                                                                                                                                 |
 
 Still on the adapter (as of 2026-10-20): NFT tools, the other SPL token tools
-(create-token, distributor, reclaim-rent),
+(create-token, reclaim-rent),
 gasless swaps, reclaim-sol, `src/app/layout.tsx`
 (still imports the adapter stylesheet), `src/state/context/SolanaProvider.tsx`,
 `src/state/use-wallet-connection.ts`, the `use-*` queries that take a web3
@@ -66,7 +66,11 @@ for the files you touch.
 Avoid `useTransactionSigner()` / `useWallet()` from the connector for new
 code: they return the connector's own byte-oriented signer, not a Kit signer,
 and `capabilities.supportsBatchSigning` checks for a non-standard
-`solana:signAllTransactions` feature that standard wallets don't expose.
+`solana:signAllTransactions` feature that standard wallets don't expose. The
+one exception is raw message signing: `useTransactionSigner().signer.signMessage`
+is the wallet's `solana:signMessage`, which the distributor's sign-in challenge
+is verified with. `useSignOffchainMessage()` is a different thing (the v1
+off-chain message envelope, few wallets support it) and would not verify.
 
 ### Opening the connect dialog
 
@@ -106,6 +110,24 @@ and `token_info.symbol` / `price_info` are provider extensions.
 
 The kit client below is built on the same RPC, so `client.rpc` has the DAS
 methods too.
+
+### Signing without sending
+
+When a backend submits the transactions (the distributor), or several must be
+signed in one wallet prompt (CSV stake creation), the client's executor is
+bypassed: `client.planTransaction(instructions)`, then
+`setTransactionMessageLifetimeUsingBlockhash`, then
+`estimateAndSetResourceLimitsWithBuffer(client.rpc)` from
+`src/connector/resource-limits.ts`, then `compileTransaction`, then
+`client.payer.modifyAndSignTransactions([...])` (fall back to one call per
+transaction on `SOLANA_ERROR__SIGNER__WALLET_MULTISIGN_UNIMPLEMENTED`), then
+`getBase64EncodedWireTransaction`. `distributor/transactions.ts` is the compact
+reference, `stake-create/stake-batch.ts` the one with keypair co-signers.
+
+If the receiving side requires a transaction version, pin it instead of relying
+on the planner's default: `useKitClient({ transactionConfig: { version: 0 } })`
+with the config as a module constant (the hook memoizes on it), and check
+`message.version` before compiling. The Solace backend requires version 0.
 
 ### `useKitClient()` – the way to send transactions
 
@@ -207,6 +229,14 @@ a `KeyPairSigner` (via `createKeyPairSignerFromBytes`). A `KeyPairSigner` also e
   `jsonParsed` zod schema, coerce numeric fields.
 - Shared queries take `useSolanaClient().client.rpc` internally and are
   `enabled` only when it exists, so pages render before the wallet connects.
+- `useMintAccount(mint)` (`src/state/queries/use-mint.ts`) gives a mint's
+  decimals, owning program and Token-2022 extension ids
+  (`lib/solana/token-2022.ts` parses the TLV list without
+  `@solana-program/token-2022`). Use the program for ATA derivation and
+  transfers so Token-2022 mints work; `useTokenAccountExistence` takes it too.
+  The distributor sends it to the backend as `tokenProgram` at creation and
+  reads it back from the airdrop for start and retry, and refuses mints with
+  the transfer-fee or transfer-hook extension before anything is signed.
 - Narrow cluster types with `getClusterType(cluster)` from
   `@solana/connector/headless`. `chainIdToClusterType` expects genesis-hash
   chain ids (`solana:5eykt4…`), not cluster ids, and returns null for the

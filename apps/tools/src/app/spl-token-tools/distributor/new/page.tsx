@@ -1,12 +1,14 @@
 "use client";
 
-import React from "react";
-import SolaceAirdropper from "./airdrop-start";
-import SolaceAirdropReview from "./airdrop-review";
-import { useSolBalance } from "@/state/queries/use-sol-balance";
-import { useAssetData } from "@/state/queries/use-asset-data";
 import { notify } from "@/components/notification";
+import { MINT_EXTENSION } from "@/lib/solana/token-2022";
+import { useMintAccount } from "@/state/queries/use-mint";
+import { useSolBalance } from "@/state/queries/use-sol-balance";
+import type { Address } from "@solana/kit";
+import React from "react";
 import { Box } from "../box";
+import SolaceAirdropReview from "./airdrop-review";
+import SolaceAirdropper from "./airdrop-start";
 
 // Define types
 type Recipient = {
@@ -25,7 +27,24 @@ interface AirdropDetails {
   tokenType: TokenType;
   mintAddress: string;
   decimals?: number;
+  /** The program owning the mint (Token or Token-2022); set once the mint is fetched. */
+  tokenProgram?: Address;
 }
+
+const SOL_DECIMALS = 9;
+
+/**
+ * Token-2022 extensions the airdropper cannot send yet. A transfer hook needs
+ * extra accounts the backend rejects; a transfer fee would land on chain with
+ * recipients receiving less than recorded. Stop before anything is signed.
+ */
+const unsupportedMintExtension = (extensions: number[]): string | null => {
+  if (extensions.includes(MINT_EXTENSION.TransferHook)) return "transfer hook";
+  if (extensions.includes(MINT_EXTENSION.TransferFeeConfig)) {
+    return "transfer fee";
+  }
+  return null;
+};
 
 export default function CreateNewFlow() {
   const { data: balance } = useSolBalance();
@@ -52,8 +71,11 @@ export default function CreateNewFlow() {
     setStep(1);
   };
 
-  const handleTokenDataFetched = (decimals: number): void => {
-    setAirdropDetails((prev) => ({ ...prev, decimals }));
+  const handleTokenDataFetched = (mint: {
+    decimals: number;
+    tokenProgram: Address;
+  }): void => {
+    setAirdropDetails((prev) => ({ ...prev, ...mint }));
     setStep(2);
   };
 
@@ -81,7 +103,12 @@ export default function CreateNewFlow() {
           recipients={airdropDetails.recipients}
           tokenType={airdropDetails.tokenType}
           mintAddress={airdropDetails.mintAddress}
-          decimals={airdropDetails.decimals ?? 0}
+          decimals={
+            airdropDetails.tokenType === "sol"
+              ? SOL_DECIMALS
+              : (airdropDetails.decimals ?? 0)
+          }
+          tokenProgram={airdropDetails.tokenProgram}
           onBack={handleBack}
         />
       )}
@@ -91,26 +118,22 @@ export default function CreateNewFlow() {
 
 interface TokenDataFetcherProps {
   mintAddress: string;
-  onSuccess: (decimals: number) => void;
+  onSuccess: (mint: { decimals: number; tokenProgram: Address }) => void;
   onError: () => void;
 }
 
+/** Reads the mint account for its decimals and owning program before the review step. */
 const TokenDataFetcher: React.FC<TokenDataFetcherProps> = ({
   mintAddress,
   onSuccess,
   onError,
 }) => {
-  const {
-    data: assetData,
-    isLoading,
-    isError,
-    error,
-  } = useAssetData(mintAddress);
+  const { data: mint, isLoading, isError, error } = useMintAccount(mintAddress);
 
   React.useEffect(() => {
     if (isLoading) return;
 
-    if (isError || !assetData?.token_info?.decimals) {
+    if (isError || !mint) {
       notify({
         type: "error",
         title: "Token data fetch failed",
@@ -122,10 +145,19 @@ const TokenDataFetcher: React.FC<TokenDataFetcherProps> = ({
       return;
     }
 
-    if (assetData.token_info.decimals !== undefined) {
-      onSuccess(assetData.token_info.decimals);
+    const unsupported = unsupportedMintExtension(mint.extensions);
+    if (unsupported) {
+      notify({
+        type: "error",
+        title: "Token not supported yet",
+        description: `This mint uses the Token-2022 ${unsupported} extension, which the airdropper cannot distribute yet.`,
+      });
+      onError();
+      return;
     }
-  }, [assetData, isLoading, isError, error, onSuccess, onError]);
+
+    onSuccess({ decimals: mint.decimals, tokenProgram: mint.programAddress });
+  }, [mint, isLoading, isError, error, onSuccess, onError]);
 
   return (
     <Box className="flex flex-col items-center justify-center py-12">

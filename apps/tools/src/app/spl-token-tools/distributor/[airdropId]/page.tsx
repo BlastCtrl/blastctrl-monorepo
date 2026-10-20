@@ -1,39 +1,37 @@
 "use client";
 
 import { notify } from "@/components";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
 import { compress } from "@/lib/solana";
 import type { GetAirdrop200 } from "@blastctrl/solace-sdk";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import {
-  ComputeBudgetProgram,
-  PublicKey,
-  SystemProgram,
-  Transaction,
-} from "@solana/web3.js";
+import { ArrowTurnUpLeftIcon } from "@heroicons/react/16/solid";
 import clsx from "clsx";
 import React, { use } from "react";
 import { Box } from "../box";
 import { formatDate, useFadeIn } from "../common";
+import { MintAddressLink } from "../mint-address-link";
 import {
   useGetAirdropById,
   useRetryMany,
   useRetryTransaction,
   useStartAirdrop,
 } from "../state";
-import { ArrowTurnUpLeftIcon } from "@heroicons/react/16/solid";
 import {
-  createAssociatedTokenAccountIdempotentInstruction,
-  createTransferCheckedInstruction,
-  getAssociatedTokenAddressSync,
-} from "@solana/spl-token";
-import { MintAddressLink } from "../mint-address-link";
+  signBatches,
+  TRANSACTION_CONFIG,
+  type AirdropBatch,
+  type SignedBatch,
+} from "../transactions";
 
 type TransactionStatus = GetAirdrop200["transactions"][number]["status"];
 type AirdropStatus = GetAirdrop200["status"];
 type AirdropIdQueryReturnData = NonNullable<
   ReturnType<typeof useGetAirdropById>["data"]
 >;
+/** Signs the given batches with the connected wallet; null until the wallet is connected. */
+type SignBatches = ((batches: AirdropBatch[]) => Promise<SignedBatch[]>) | null;
 
 export default function AirdropDetails({
   params,
@@ -42,16 +40,15 @@ export default function AirdropDetails({
 }) {
   const { airdropId } = use(params);
   const isVisible = useFadeIn();
-  const { connection } = useConnection();
-  const { publicKey, signAllTransactions } = useWallet();
-  const {
-    mutate,
-    isPending,
-    data: startData,
-  } = useStartAirdrop(airdropId);
+  const { client } = useKitClient({ transactionConfig: TRANSACTION_CONFIG });
+  const { mutate, isPending, data: startData } = useStartAirdrop(airdropId);
   const hasStarted = !!startData;
   const [showOnlyPending, setShowOnlyPending] = React.useState(false);
+  const [isSigning, setIsSigning] = React.useState(false);
   const { data, refetch } = useGetAirdropById(airdropId, hasStarted);
+
+  const sign: SignBatches =
+    client && data ? (batches) => signBatches(client, data, batches) : null;
 
   const getAirdropStatusBadgeStyle = (status: AirdropStatus) => {
     switch (status) {
@@ -79,89 +76,21 @@ export default function AirdropDetails({
   };
 
   const handleStartAirdrop = async () => {
-    if (!publicKey) return;
-    if (!data) return;
-    if (!signAllTransactions) {
+    if (!sign || !data) return;
+
+    setIsSigning(true);
+    try {
+      const signed = await sign(data.transactions);
+      mutate(signed, { onSuccess: () => void refetch() });
+    } catch (error) {
       notify({
         type: "error",
-        description:
-          "Sign all transactions is unavailable. Ledger is not supported.",
+        title: "Could not sign the airdrop transactions",
+        description: transactionErrorMessage(error),
       });
-      return;
+    } finally {
+      setIsSigning(false);
     }
-
-    const { value, context } =
-      await connection.getLatestBlockhashAndContext("confirmed");
-    const transactions = data.transactions.map((txBatch) => {
-      let transferInstructions;
-      if (data.mintAddress === null) {
-        transferInstructions = txBatch.recipients.map((r) =>
-          SystemProgram.transfer({
-            lamports: r.atomicAmount,
-            fromPubkey: publicKey,
-            toPubkey: new PublicKey(r.address),
-          }),
-        );
-      } else {
-        const mint = new PublicKey(data.mintAddress);
-        transferInstructions = txBatch.recipients
-          .map((r) => {
-            const distributorAta = getAssociatedTokenAddressSync(
-              mint,
-              publicKey,
-            );
-            const recipient = new PublicKey(r.address);
-            const recipientAta = getAssociatedTokenAddressSync(mint, recipient);
-            return [
-              createAssociatedTokenAccountIdempotentInstruction(
-                publicKey,
-                recipientAta,
-                recipient,
-                mint,
-              ),
-              createTransferCheckedInstruction(
-                distributorAta,
-                mint,
-                recipientAta,
-                publicKey,
-                r.atomicAmount,
-                data.decimals,
-              ),
-            ];
-          })
-          .flat();
-      }
-      const tx = new Transaction({ ...value, feePayer: publicKey }).add(
-        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
-        ComputeBudgetProgram.setComputeUnitLimit({
-          units: transferInstructions.length * 30_000,
-        }),
-        ...transferInstructions,
-      );
-      tx.recentBlockhash = value.blockhash;
-      tx.lastValidBlockHeight = context.slot;
-      return tx;
-    });
-
-    const signedTransactions = await signAllTransactions(
-      transactions.map((tx) => tx),
-    );
-
-    mutate(
-      signedTransactions.map((tx, i) => ({
-        batchId: data.transactions[i]!.id,
-        minContextSlot: context.slot,
-        txBase64: tx
-          .serialize({ requireAllSignatures: true, verifySignatures: true })
-          .toString("base64"),
-        ...value,
-      })),
-      {
-        onSuccess: () => {
-          void refetch();
-        },
-      },
-    );
   };
 
   const progress = calculateProgress();
@@ -175,14 +104,14 @@ export default function AirdropDetails({
     >
       {/* Header with back button */}
       <div className="mb-4 flex flex-wrap items-center justify-between">
-        <h1 className="sr-only whitespace-nowrap text-lg font-semibold sm:not-sr-only">
+        <h1 className="sr-only text-lg font-semibold whitespace-nowrap sm:not-sr-only">
           Airdrop Details
         </h1>
 
         <Button
           href="/spl-token-tools/distributor"
           color="dark/zinc"
-          className="whitespace-nowrap px-4! text-sm"
+          className="px-4! text-sm whitespace-nowrap"
         >
           <ArrowTurnUpLeftIcon aria-hidden="true" className="size-3.5" />
           Back to Airdrops
@@ -288,10 +217,13 @@ export default function AirdropDetails({
                 <div className="mt-4">
                   <Button
                     onClick={handleStartAirdrop}
-                    disabled={isPending}
+                    disabled={!sign || isPending || isSigning}
                     color="indigo"
                     className="w-full"
                   >
+                    {(isPending || isSigning) && (
+                      <SpinnerIcon className="size-4 animate-spin" />
+                    )}
                     Start Airdrop
                   </Button>
                 </div>
@@ -321,12 +253,11 @@ export default function AirdropDetails({
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-base font-semibold">Transaction Batches</h2>
                 <div className="flex items-center space-x-3">
-                  {data && (
-                    <RetryAllButton
-                      airdropData={data}
-                      refetchAirdrop={refetch}
-                    />
-                  )}
+                  <RetryAllButton
+                    airdropData={data}
+                    sign={sign}
+                    refetchAirdrop={refetch}
+                  />
                   <button
                     onClick={() => setShowOnlyPending(!showOnlyPending)}
                     className={`rounded-md px-2 py-1 text-xs transition-colors ${
@@ -367,6 +298,7 @@ export default function AirdropDetails({
                           batch={batch}
                           airdropId={data.id}
                           airdropData={data}
+                          sign={sign}
                           refetchAirdrop={refetch}
                         />
                       ))
@@ -386,20 +318,22 @@ function Batch({
   index,
   airdropId,
   airdropData,
+  sign,
   refetchAirdrop,
 }: {
-  batch: GetAirdrop200["transactions"][number];
+  batch: AirdropBatch;
   airdropId: string;
   airdropData: AirdropIdQueryReturnData;
+  sign: SignBatches;
   refetchAirdrop: () => Promise<unknown>;
   index: number;
 }) {
-  const { connection } = useConnection();
-  const { publicKey, signTransaction } = useWallet();
   const { mutate, isPending, error } = useRetryTransaction(
     airdropId,
     batch.id.toString(),
   );
+  const [isSigning, setIsSigning] = React.useState(false);
+
   const getStatusBadgeStyle = (status: TransactionStatus) => {
     switch (status) {
       case "pending":
@@ -416,77 +350,27 @@ function Batch({
   };
 
   const handleRetry = async () => {
-    if (!publicKey || !signTransaction) {
+    if (!sign) return;
+
+    setIsSigning(true);
+    try {
+      const [signed] = await sign([batch]);
+      if (!signed) return;
+      const { blockhash, lastValidBlockHeight, minContextSlot, txBase64 } =
+        signed;
+      mutate(
+        { blockhash, lastValidBlockHeight, minContextSlot, txBase64 },
+        { onSuccess: () => void refetchAirdrop() },
+      );
+    } catch (error) {
       notify({
         type: "error",
-        description: "Sign transaction feature not available",
+        title: "Could not sign the transaction",
+        description: transactionErrorMessage(error),
       });
-      return;
+    } finally {
+      setIsSigning(false);
     }
-    const { context, value } =
-      await connection.getLatestBlockhashAndContext("confirmed");
-
-    let transferInstructions;
-    if (!airdropData.mintAddress) {
-      // SOL transfer
-      transferInstructions = batch.recipients.map((r) =>
-        SystemProgram.transfer({
-          fromPubkey: publicKey,
-          toPubkey: new PublicKey(r.address),
-          lamports: r.atomicAmount,
-        }),
-      );
-    } else {
-      // Token transfer
-      const mint = new PublicKey(airdropData.mintAddress);
-      transferInstructions = batch.recipients
-        .map((r) => {
-          const distributorAta = getAssociatedTokenAddressSync(mint, publicKey);
-          const recipient = new PublicKey(r.address);
-          const recipientAta = getAssociatedTokenAddressSync(mint, recipient);
-          return [
-            createAssociatedTokenAccountIdempotentInstruction(
-              publicKey,
-              recipientAta,
-              recipient,
-              mint,
-            ),
-            createTransferCheckedInstruction(
-              distributorAta,
-              mint,
-              recipientAta,
-              publicKey,
-              r.atomicAmount,
-              airdropData.decimals,
-            ),
-          ];
-        })
-        .flat();
-    }
-
-    const transaction = new Transaction({ ...value, feePayer: publicKey }).add(
-      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
-      ComputeBudgetProgram.setComputeUnitLimit({
-        units: transferInstructions.length * 30_000,
-      }),
-      ...transferInstructions,
-    );
-    const signed = await signTransaction(transaction);
-
-    mutate(
-      {
-        ...value,
-        minContextSlot: context.slot,
-        txBase64: signed
-          .serialize({ requireAllSignatures: true, verifySignatures: true })
-          .toString("base64"),
-      },
-      {
-        onSuccess: async () => {
-          await refetchAirdrop();
-        },
-      },
-    );
   };
 
   return (
@@ -505,12 +389,12 @@ function Batch({
 
         {batch.status === "expired" && (
           <Button
-            onClick={() => handleRetry()}
-            disabled={isPending}
+            onClick={() => void handleRetry()}
+            disabled={!sign || isPending || isSigning}
             color="indigo"
             className="px-3! text-xs leading-4!"
           >
-            {isPending && <SpinnerIcon className="size-4" />}
+            {(isPending || isSigning) && <SpinnerIcon className="size-4" />}
             Retry
           </Button>
         )}
@@ -518,7 +402,7 @@ function Batch({
 
         {/* Show spinner for processing batches */}
         {batch.status === "confirming" && (
-          <div className="size-5 animate-spin rounded-full border-2 border-b-indigo-200 border-l-indigo-200 border-r-indigo-200 border-t-indigo-600"></div>
+          <div className="size-5 animate-spin rounded-full border-2 border-t-indigo-600 border-r-indigo-200 border-b-indigo-200 border-l-indigo-200"></div>
         )}
       </div>
 
@@ -554,7 +438,7 @@ function Batch({
                 key={i}
                 className="mb-1 flex max-w-full justify-between gap-4"
               >
-                <span className="break-all font-mono">{recipient.address}</span>
+                <span className="font-mono break-all">{recipient.address}</span>
                 <span className="whitespace-nowrap">
                   {(
                     recipient.atomicAmount / Math.pow(10, airdropData.decimals)
@@ -572,16 +456,17 @@ function Batch({
 
 function RetryAllButton({
   airdropData,
+  sign,
   refetchAirdrop,
 }: {
   airdropData: AirdropIdQueryReturnData;
+  sign: SignBatches;
   refetchAirdrop: () => Promise<unknown>;
 }) {
-  const { connection } = useConnection();
-  const { publicKey, signAllTransactions } = useWallet();
   const { mutate, isPending } = useRetryMany(airdropData.id);
+  const [isSigning, setIsSigning] = React.useState(false);
 
-  // airdropData "status" must be failed and there must be NO airdropData transactions that are either "pending" or "confirming"
+  // Only once the airdrop has failed and nothing is still in flight.
   const canRetryAll =
     airdropData.status === "failed" &&
     !airdropData.transactions.some(
@@ -592,98 +477,41 @@ function RetryAllButton({
   }
 
   const handleRetryAll = async () => {
-    if (!publicKey || !signAllTransactions) {
-      return;
-    }
-
-    const expiredTransactions = airdropData.transactions.filter(
+    if (!sign) return;
+    const expired = airdropData.transactions.filter(
       (t) => t.status === "expired",
     );
-    const { value, context } =
-      await connection.getLatestBlockhashAndContext("confirmed");
-    const transactions = expiredTransactions.map((txBatch) => {
-      let transferInstructions;
-      if (!airdropData.mintAddress) {
-        // SOL transfer
-        transferInstructions = txBatch.recipients.map((r) =>
-          SystemProgram.transfer({
-            lamports: r.atomicAmount,
-            fromPubkey: publicKey,
-            toPubkey: new PublicKey(r.address),
-          }),
-        );
-      } else {
-        // Token transfer
-        const mint = new PublicKey(airdropData.mintAddress);
-        transferInstructions = txBatch.recipients
-          .map((r) => {
-            const distributorAta = getAssociatedTokenAddressSync(
-              mint,
-              publicKey,
-            );
-            const recipient = new PublicKey(r.address);
-            const recipientAta = getAssociatedTokenAddressSync(mint, recipient);
-            return [
-              createAssociatedTokenAccountIdempotentInstruction(
-                publicKey,
-                recipientAta,
-                recipient,
-                mint,
-              ),
-              createTransferCheckedInstruction(
-                distributorAta,
-                mint,
-                recipientAta,
-                publicKey,
-                r.atomicAmount,
-                airdropData.decimals,
-              ),
-            ];
-          })
-          .flat();
-      }
+    if (expired.length === 0) return;
 
-      const tx = new Transaction({ ...value, feePayer: publicKey }).add(
-        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
-        ComputeBudgetProgram.setComputeUnitLimit({
-          units: transferInstructions.length * 30_000,
-        }),
-        ...transferInstructions,
+    setIsSigning(true);
+    try {
+      const signed = await sign(expired);
+      mutate(
+        signed.map(({ batchId, ...data }) => ({ batchId, data })),
+        { onSettled: () => void refetchAirdrop() },
       );
-      tx.recentBlockhash = value.blockhash;
-      tx.lastValidBlockHeight = context.slot;
-      return tx;
-    });
-
-    const signedTransactions = await signAllTransactions(
-      transactions.map((tx) => tx),
-    );
-
-    const mutationData = expiredTransactions.map((t, i) => ({
-      batchId: t.id,
-      data: {
-        ...value,
-        minContextSlot: context.slot,
-        txBase64: signedTransactions[i]!.serialize().toString("base64"),
-      },
-    }));
-
-    mutate(mutationData, {
-      onSettled: async () => {
-        await refetchAirdrop();
-      },
-    });
+    } catch (error) {
+      notify({
+        type: "error",
+        title: "Could not sign the transactions",
+        description: transactionErrorMessage(error),
+      });
+    } finally {
+      setIsSigning(false);
+    }
   };
 
   return (
     <button
-      onClick={handleRetryAll}
+      onClick={() => void handleRetryAll()}
+      disabled={!sign || isSigning}
       className={clsx(
         "rounded-md px-2 py-1 text-xs transition-colors",
         "border border-amber-200 bg-amber-100 text-amber-800",
+        "disabled:cursor-not-allowed disabled:opacity-50",
       )}
     >
-      Retry All
+      {isSigning ? "Signing…" : "Retry All"}
     </button>
   );
 }
