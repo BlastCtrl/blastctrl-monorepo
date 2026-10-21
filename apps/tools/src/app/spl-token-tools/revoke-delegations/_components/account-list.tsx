@@ -1,7 +1,7 @@
 import { notify } from "@/components";
 import { RotateCwIcon } from "@/components/icons/rotate-cw";
 import { transactionErrorMessage } from "@/connector/transaction-error";
-import { useKitClient } from "@/connector/use-kit-client";
+import { useKitClient, type KitClient } from "@/connector/use-kit-client";
 import { compress, normalizeTokenAmount } from "@/lib/solana";
 import { useAssetData } from "@/state/queries/use-asset-data";
 import {
@@ -23,8 +23,40 @@ import {
   address,
   flattenTransactionPlanResult,
   parallelInstructionPlan,
+  type TransactionSigner,
 } from "@solana/kit";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
+
+/** One `Revoke` per account, signed by `owner`, on each account's own token program. */
+function revokeInstructions(
+  accounts: ParsedDelegatedTokenAccount[],
+  owner: TransactionSigner,
+) {
+  return accounts.map((acc) =>
+    getRevokeInstruction(
+      { source: address(acc.token_account), owner },
+      { programAddress: address(acc.token_program) },
+    ),
+  );
+}
+
+/**
+ * Sends the `revokeInstructions`; resolves with the signatures of the
+ * transactions that landed.
+ */
+async function sendRevokeInstructions(
+  client: KitClient,
+  instructions: ReturnType<typeof revokeInstructions>,
+) {
+  // Revokes are independent, so the planner packs as many as fit into one
+  // transaction and sends any overflow as further transactions.
+  const result = await client.sendTransactions(
+    parallelInstructionPlan(instructions),
+  );
+  return flattenTransactionPlanResult(result)
+    .filter((r) => r.status === "successful")
+    .map((r) => r.context.signature);
+}
 
 type CheckboxState = "indeterminate" | "checked" | "empty";
 
@@ -291,23 +323,11 @@ function RevokeDelegationsButton({
   const handleRevokeDelegations = async () => {
     if (!client || selectedAccounts.length === 0) return;
 
-    const instructions = selectedAccounts.map((acc) =>
-      getRevokeInstruction(
-        { source: address(acc.token_account), owner: client.payer },
-        { programAddress: address(acc.token_program) },
-      ),
-    );
+    const instructions = revokeInstructions(selectedAccounts, client.payer);
 
     setIsConfirming(true);
     try {
-      // Revokes are independent, so the planner packs as many as fit into one
-      // transaction and sends any overflow as further transactions.
-      const result = await client.sendTransactions(
-        parallelInstructionPlan(instructions),
-      );
-      const signatures = flattenTransactionPlanResult(result)
-        .filter((r) => r.status === "successful")
-        .map((r) => r.context.signature);
+      const signatures = await sendRevokeInstructions(client, instructions);
 
       signatures.forEach((signature, index) => {
         notify({

@@ -16,7 +16,6 @@
  */
 import {
   findMetadataPda,
-  getCreateMetadataAccountV3InstructionAsync,
   getCreateV1InstructionAsync,
   getMetadataDecoder,
   getMintV1InstructionAsync,
@@ -33,6 +32,7 @@ import {
 import {
   fetchEncodedAccount,
   fetchEncodedAccounts,
+  none,
   unwrapOption,
   type Address,
   type GetAccountInfoApi,
@@ -67,28 +67,45 @@ export const findMetadataAddress = async (mint: Address): Promise<Address> =>
   (await findMetadataPda({ mint }))[0];
 
 /**
- * Creates the Metaplex metadata account for `mint`. `authority` must be the
- * mint authority; it pays for the account and becomes the update authority.
+ * Creates the Metaplex metadata account for an existing fungible `mint` of
+ * `tokenProgram` (Token or Token-2022). `authority` must be the mint
+ * authority; it pays for the account and becomes the update authority.
+ *
+ * `createV1` with the Fungible standard: the older `createMetadataAccountV3`
+ * refuses Token-2022 mints (InstructionNotSupported). No creators, as before;
+ * the generated builder would otherwise default to the authority, verified.
  */
 export async function createMetadataInstructions(
   authority: TransactionSigner,
   mint: Address,
   fields: Partial<TokenMetadataFields>,
+  tokenProgram: Address,
 ): Promise<Instruction[]> {
+  const { name, symbol, uri } = dataV2(fields);
   return [
-    await getCreateMetadataAccountV3InstructionAsync({
+    await getCreateV1InstructionAsync({
       mint,
-      mintAuthority: authority,
+      authority,
       payer: authority,
       updateAuthority: authority.address,
-      data: dataV2(fields),
+      splTokenProgram: tokenProgram,
+      tokenStandard: TokenStandard.Fungible,
+      name,
+      symbol,
+      uri,
+      sellerFeeBasisPoints: 0,
+      creators: none(),
       isMutable: true,
-      collectionDetails: null,
     }),
   ];
 }
 
-/** Rewrites the metadata of `mint`. `authority` must be the update authority. */
+/**
+ * Rewrites the metadata of `mint`. `authority` must be the update authority.
+ * The whole `Data` struct is replaced (creators, royalties, collection and
+ * uses go back to their defaults); the mutability and primary-sale flags are
+ * left as they are.
+ */
 export async function updateMetadataInstructions(
   authority: TransactionSigner,
   mint: Address,
@@ -99,8 +116,8 @@ export async function updateMetadataInstructions(
       metadata: await findMetadataAddress(mint),
       updateAuthority: authority,
       data: dataV2(fields),
-      isMutable: true,
-      primarySaleHappened: true,
+      isMutable: null,
+      primarySaleHappened: null,
     }),
   ];
 }
@@ -126,7 +143,11 @@ export type CreateNftFields = {
    */
   creators?: NftCreator[];
   isMutable: boolean;
-  /** Mark the NFT as a sized collection parent (`collectionDetails` is set). */
+  /**
+   * Mark the NFT as a collection parent: `collectionDetails` is set, as V2,
+   * which keeps no member count (the kit client's `resolveCollectionDetails`;
+   * sized V1 details are deprecated in the program).
+   */
   isCollection: boolean;
   /** Maximum number of print editions; 0 disallows printing. */
   maxSupply: number;
@@ -200,6 +221,7 @@ export type TokenMetadataData = {
 export type TokenMetadata = TokenMetadataData & {
   updateAuthority: Address;
   isMutable: boolean;
+  primarySaleHappened: boolean;
   /** Null on metadata from before token standards existed. */
   tokenStandard: TokenStandard | null;
   collection: NftCollection | null;
@@ -226,6 +248,7 @@ function decodeTokenMetadata(bytes: Uint8Array): TokenMetadata {
         verified: creator.verified,
       })) ?? null,
     isMutable: data.isMutable,
+    primarySaleHappened: data.primarySaleHappened,
     tokenStandard: unwrapOption(data.tokenStandard),
     collection: collection && {
       key: collection.key,

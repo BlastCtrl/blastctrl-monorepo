@@ -48,14 +48,10 @@ export function useReclaimableAccounts(owner: string) {
       if (!owner) throw Error("No address provided");
       if (!rpc) throw Error("RPC not available");
 
-      const tokenAccounts = await fetchTokenAccounts(rpc, address(owner));
-      const mints = await fetchControlledMints(rpc, owner, [
-        ...new Set(tokenAccounts.map((a) => a.mint)),
-      ]);
-      const accounts = [...tokenAccounts, ...mints];
-      const assets = await fetchAssets(
-        dasAvailable ? rpc : null,
-        accounts.map((a) => a.mint),
+      const { accounts, assets } = await fetchReclaimableAccounts(
+        rpc,
+        dasAvailable,
+        owner,
       );
 
       for (const asset of assets.values()) {
@@ -65,11 +61,37 @@ export function useReclaimableAccounts(owner: string) {
         );
       }
 
-      return accounts.map((a) => withAssetInfo(a, assets.get(a.mint)));
+      return accounts;
     },
     refetchOnWindowFocus: false,
     staleTime: 60_000,
   });
+}
+
+/**
+ * The scan behind {@link useReclaimableAccounts}, outside React: the
+ * wallet's token accounts and controlled mints, named from DAS when the
+ * cluster has it. Returns the DAS assets too, for the hook to cache.
+ */
+async function fetchReclaimableAccounts(
+  rpc: AppRpc,
+  dasAvailable: boolean,
+  owner: string,
+): Promise<{ accounts: ReclaimableAccount[]; assets: Map<string, DasAsset> }> {
+  const tokenAccounts = await fetchTokenAccounts(rpc, address(owner));
+  const mints = await fetchControlledMints(rpc, owner, [
+    ...new Set(tokenAccounts.map((a) => a.mint)),
+  ]);
+  const accounts = [...tokenAccounts, ...mints];
+  const assets = await fetchAssets(
+    dasAvailable ? rpc : null,
+    accounts.map((a) => a.mint),
+  );
+
+  return {
+    accounts: accounts.map((a) => withAssetInfo(a, assets.get(a.mint))),
+    assets,
+  };
 }
 
 /** Checks a single mint address for the paste box on the Mints tab. */

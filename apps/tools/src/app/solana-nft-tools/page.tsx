@@ -30,7 +30,6 @@ export default function Nfts() {
       href: "/solana-nft-tools/mint",
       query: {
         isCollection: true,
-        collectionIsSized: true,
       },
       description:
         "This process is the same as minting an NFT, but the collection flag is set as true.",

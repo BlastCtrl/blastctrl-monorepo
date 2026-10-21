@@ -1,7 +1,8 @@
 import { notify } from "@/components";
 import { transactionErrorMessage } from "@/connector/transaction-error";
-import { useKitClient } from "@/connector/use-kit-client";
+import { useKitClient, type KitClient } from "@/connector/use-kit-client";
 import { compress, normalizeTokenAmount } from "@/lib/solana";
+import { getTransferHookProgram } from "@/lib/solana/token-2022";
 import { useAssetData } from "@/state/queries/use-asset-data";
 import {
   ownerAssetsKey,
@@ -18,19 +19,24 @@ import {
   TableRow,
 } from "@blastctrl/ui/table";
 import {
+  decodeMint,
   findAssociatedTokenPda,
   getBurnInstruction,
   getCloseAccountInstruction,
   getCreateAssociatedTokenIdempotentInstruction,
-  getTransferInstruction,
+  getTransferCheckedInstruction,
 } from "@solana-program/token";
 import {
   address,
+  fetchEncodedAccounts,
   flattenTransactionPlanResult,
   nonDivisibleSequentialInstructionPlan,
   parallelInstructionPlan,
+  type Address,
+  type GetMultipleAccountsApi,
   type Instruction,
   type KeyPairSigner,
+  type Rpc,
   type TransactionSigner,
 } from "@solana/kit";
 import { useQueryClient } from "@tanstack/react-query";
@@ -38,15 +44,49 @@ import { useState } from "react";
 
 type TokenAction = "transfer" | "burn";
 
+type MintInfo = { decimals: number; transferHook: Address | null };
+
+/**
+ * What a transfer needs to know about each mint: its decimals, which
+ * `TransferChecked` carries, and whether its transfers must call a hook
+ * program.
+ */
+async function fetchMintInfo(
+  rpc: Rpc<GetMultipleAccountsApi>,
+  mints: Address[],
+): Promise<Map<Address, MintInfo>> {
+  const accounts = await fetchEncodedAccounts(rpc, mints);
+  return new Map(
+    accounts.map((account) => {
+      if (!account.exists) {
+        throw Error(`Mint ${compress(account.address, 4)} does not exist`);
+      }
+      return [
+        account.address,
+        {
+          decimals: decodeMint(account).data.decimals,
+          transferHook: getTransferHookProgram(account.data),
+        },
+      ];
+    }),
+  );
+}
+
 /**
  * Burns the whole balance, or moves it to `recipient`'s ATA (created if
  * missing), then closes the account so its rent goes to `recipient`.
+ *
+ * The transfer is a `TransferChecked`, which names the mint: Token-2022
+ * refuses a plain `Transfer` from an account carrying transfer-fee or
+ * transfer-hook state (every PYUSD account, for one), as it needs the mint
+ * to compute the fee or find the hook.
  */
 async function tokenInstructions(
   account: ParsedTokenAccount,
   action: TokenAction,
   source: KeyPairSigner,
   recipient: TransactionSigner,
+  decimals: number,
 ): Promise<Instruction[]> {
   const tokenAccount = address(account.token_account);
   const mint = address(account.mint);
@@ -80,12 +120,14 @@ async function tokenInstructions(
         mint,
         tokenProgram,
       }),
-      getTransferInstruction(
+      getTransferCheckedInstruction(
         {
           source: tokenAccount,
+          mint,
           destination,
           authority: source,
           amount: account.balance,
+          decimals,
         },
         config,
       ),
@@ -99,6 +141,57 @@ async function tokenInstructions(
     ),
   );
   return instructions;
+}
+
+/**
+ * Sends the selected burns and transfers, the connected wallet paying and
+ * receiving, and returns the signatures of the transactions that landed.
+ *
+ * A transfer of a mint with an active transfer hook is refused up front:
+ * the hook's extra accounts are not resolved here, and the program would
+ * reject the transfer without them. Burning such a token still works.
+ */
+async function sendTokenActions(
+  client: KitClient,
+  selected: { account: ParsedTokenAccount; action: TokenAction }[],
+  sourceWallet: KeyPairSigner,
+) {
+  const mints = await fetchMintInfo(client.rpc, [
+    ...new Set(selected.map(({ account }) => address(account.mint))),
+  ]);
+  for (const { account, action } of selected) {
+    const hook = mints.get(address(account.mint))?.transferHook;
+    if (action === "transfer" && hook) {
+      throw Error(
+        `Transfers of ${compress(account.mint, 4)} must call its transfer hook program (${compress(hook, 4)}), which this tool does not support. The token can be burnt instead.`,
+      );
+    }
+  }
+
+  const groups = await Promise.all(
+    selected.map(({ account, action }) =>
+      tokenInstructions(
+        account,
+        action,
+        sourceWallet,
+        client.payer,
+        mints.get(address(account.mint))!.decimals,
+      ),
+    ),
+  );
+  // Each token's instructions must land together (close after burn or
+  // transfer); the groups are independent, so the planner packs as many
+  // as fit into one transaction and sends any overflow as further ones.
+  // The source wallet's keypair is attached to its instructions, so the
+  // client signs with it after the connected wallet.
+  const result = await client.sendTransactions(
+    parallelInstructionPlan(
+      groups.map((group) => nonDivisibleSequentialInstructionPlan(group)),
+    ),
+  );
+  return flattenTransactionPlanResult(result)
+    .filter((r) => r.status === "successful")
+    .map((r) => r.context.signature);
 }
 
 export const TokenList = ({
@@ -144,24 +237,7 @@ export const TokenList = ({
 
     setIsProcessing(true);
     try {
-      const groups = await Promise.all(
-        selected.map(({ account, action }) =>
-          tokenInstructions(account, action, sourceWallet, client.payer),
-        ),
-      );
-      // Each token's instructions must land together (close after burn or
-      // transfer); the groups are independent, so the planner packs as many
-      // as fit into one transaction and sends any overflow as further ones.
-      // The source wallet's keypair is attached to its instructions, so the
-      // client signs with it after the connected wallet.
-      const result = await client.sendTransactions(
-        parallelInstructionPlan(
-          groups.map((group) => nonDivisibleSequentialInstructionPlan(group)),
-        ),
-      );
-      const signatures = flattenTransactionPlanResult(result)
-        .filter((r) => r.status === "successful")
-        .map((r) => r.context.signature);
+      const signatures = await sendTokenActions(client, selected, sourceWallet);
 
       signatures.forEach((signature, index) => {
         notify({

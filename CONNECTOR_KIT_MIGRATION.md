@@ -574,13 +574,17 @@ a `KeyPairSigner` (via `createKeyPairSignerFromBytes`). A `KeyPairSigner` also e
     costs a wallet prompt or fails a whole batch. The old API route let the
     program reject the batch instead.
 
-14. **Dependent transactions get an explicit compute budget.** The kit
+14. **A planned message is not sendable or simulable as is.** The kit
     client's planner leaves a provisory compute-limit instruction in every
-    message for the simulation to overwrite. A message that can't be
-    simulated (its predecessor hasn't landed) must not go out with that
-    placeholder, which is the 1.4M maximum: a wallet that adds a priority
-    fee would charge for all of it. `setTransactionMessageComputeUnitLimit`
-    replaces it in place; see `sendInOrder`.
+    message, and its value is **0** (`PROVISORY_COMPUTE_UNIT_LIMIT`); kit's
+    estimator swaps in the 1.4M maximum for its own simulation and then
+    writes the estimate. Anything that bypasses the estimator must set a
+    limit itself with `setTransactionMessageComputeUnitLimit`, or the
+    transaction fails with `ComputationalBudgetExceeded`: `sendInOrder`
+    sets an explicit budget for steps that can't be simulated (the
+    predecessor hasn't landed), and `simulateUnsigned` raises the limit to
+    `MAX_COMPUTE_UNIT_LIMIT` before compiling. Found on the surfnet when
+    the close-empty wizard's simulation step dropped every account.
 
 ## Checklist for a new tool
 

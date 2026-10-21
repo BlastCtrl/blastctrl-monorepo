@@ -5,10 +5,10 @@ import { useConnectorDialog } from "@/connector/connector-dialog";
 import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient } from "@/connector/use-kit-client";
 import { useLocalStorageState } from "@/lib/hooks/use-local-storage";
+import { maxBytes } from "@/lib/solana/metaplex-form-rules";
 import {
   fetchTokenMetadata,
   updateNftInstructions,
-  type NftCreator,
 } from "@/lib/solana/metaplex-token-metadata";
 import type { DasAsset } from "@/state/queries/types";
 import { useOwnerNfts } from "@/state/queries/use-owner-nfts";
@@ -27,6 +27,11 @@ import { address, isAddress } from "@solana/kit";
 import { useState } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { NftSelector } from "./nft-selector";
+import {
+  planUpdate,
+  updateRefusal,
+  type UpdateFormValues,
+} from "./update-plan";
 
 export type FormToken = {
   name: string;
@@ -35,20 +40,7 @@ export type FormToken = {
 
 const MAX_CREATORS = 5;
 
-export type FormInputs = {
-  mint: string;
-  name: string;
-  symbol: string;
-  uri: string;
-  updateAuthority: string;
-  isMutable: boolean;
-  primarySaleHappened: boolean;
-  creators: {
-    address: string;
-    share: number;
-  }[];
-  sellerFeeBasisPoints: number;
-};
+export type FormInputs = UpdateFormValues & { mint: string };
 
 const defaultValues = {
   mint: "",
@@ -75,7 +67,7 @@ export default function Update() {
   const {
     register,
     handleSubmit,
-    setValue,
+
     formState: { errors, dirtyFields },
     reset,
     setFocus,
@@ -85,7 +77,7 @@ export default function Update() {
     mode: "onSubmit",
     defaultValues,
   });
-  const { fields, append, remove, update } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "creators",
     rules: {
@@ -97,22 +89,26 @@ export default function Update() {
   const mint = watch("mint");
   const isCreatorAddable = fields.length < MAX_CREATORS;
 
+  /**
+   * Loads the NFT's values as the form's new defaults, so only what the user
+   * changes afterwards counts as touched (`dirtyFields`), and replaces the
+   * creator rows wholesale, so none from an earlier NFT stay.
+   */
   const setFormValues = (nft: DasAsset) => {
-    if (nft) {
-      setValue("name", nft.content?.metadata.name ?? "");
-      setValue("symbol", nft.content?.metadata.symbol ?? "");
-      setValue("uri", nft.content?.json_uri ?? "");
-      setValue("updateAuthority", nft.authorities?.[0]?.address ?? "");
-      setValue("isMutable", nft.mutable);
-      setValue(
-        "primarySaleHappened",
-        nft.royalty?.primary_sale_happened ?? false,
-      );
-      setValue("sellerFeeBasisPoints", nft.royalty?.basis_points ?? 0);
-      nft.creators?.forEach((creator, idx) => {
-        update(idx, { address: creator.address, share: creator.share });
-      });
-    }
+    const creators =
+      nft.creators?.map(({ address, share }) => ({ address, share })) ?? [];
+    reset({
+      mint: nft.id,
+      name: nft.content?.metadata.name ?? "",
+      symbol: nft.content?.metadata.symbol ?? "",
+      uri: nft.content?.json_uri ?? "",
+      updateAuthority: nft.authorities?.[0]?.address ?? "",
+      isMutable: nft.mutable,
+      primarySaleHappened: nft.royalty?.primary_sale_happened ?? false,
+      sellerFeeBasisPoints: nft.royalty?.basis_points ?? 0,
+      creators,
+    });
+    replace(creators);
   };
 
   const submit = async (data: FormInputs) => {
@@ -166,47 +162,20 @@ export default function Update() {
         return;
       }
 
-      // Verification is kept for creators already on the NFT and granted to
-      // the wallet, which signs; the program rejects anything else.
-      const creators: NftCreator[] | null = dirtyFields.creators
-        ? data.creators.map((creator) => ({
-            address: address(creator.address),
-            share: creator.share,
-            verified:
-              current.creators?.find((c) => c.address === creator.address)
-                ?.verified ?? creator.address === wallet,
-          }))
-        : current.creators;
-      const isDataDirty =
-        dirtyFields.name ||
-        dirtyFields.symbol ||
-        dirtyFields.uri ||
-        dirtyFields.creators ||
-        dirtyFields.sellerFeeBasisPoints;
+      // Only what the user changed, compared with the chain, is sent.
+      const plan = planUpdate(data, dirtyFields, current, wallet);
+      if (!plan) {
+        notify({ type: "info", description: "Nothing to update." });
+        return;
+      }
+      const refusal = updateRefusal(plan, current);
+      if (refusal) {
+        notify({ type: "error", title: "Not allowed", description: refusal });
+        return;
+      }
 
       const result = await client.sendTransaction(
-        await updateNftInstructions(client.payer, mint, {
-          // Immutable metadata rejects a data write, even an unchanged one.
-          data: isDataDirty
-            ? {
-                name: dirtyFields.name ? data.name : current.name,
-                symbol: dirtyFields.symbol ? data.symbol : current.symbol,
-                uri: dirtyFields.uri ? data.uri : current.uri,
-                sellerFeeBasisPoints: dirtyFields.sellerFeeBasisPoints
-                  ? data.sellerFeeBasisPoints
-                  : current.sellerFeeBasisPoints,
-                creators,
-              }
-            : undefined,
-          newUpdateAuthority:
-            dirtyFields.updateAuthority && data.updateAuthority
-              ? address(data.updateAuthority)
-              : undefined,
-          isMutable: dirtyFields.isMutable ? data.isMutable : undefined,
-          primarySaleHappened: dirtyFields.primarySaleHappened
-            ? data.primarySaleHappened
-            : undefined,
-        }),
+        await updateNftInstructions(client.payer, mint, plan),
       );
 
       notify({
@@ -299,36 +268,21 @@ export default function Update() {
             <InputGroup
               className="sm:col-span-4"
               label="Name"
-              {...register("name", {
-                maxLength: {
-                  value: 32,
-                  message: "Max name length is 32",
-                },
-              })}
+              {...register("name", { validate: maxBytes(32) })}
               error={errors?.name}
             />
 
             <InputGroup
               className="sm:col-span-2"
               label="Symbol"
-              {...register("symbol", {
-                maxLength: {
-                  value: 10,
-                  message: "Max symbol length is 10",
-                },
-              })}
+              {...register("symbol", { validate: maxBytes(10) })}
               error={errors?.symbol}
             />
 
             <InputGroup
               className="sm:col-span-6"
               label="URI"
-              {...register("uri", {
-                maxLength: {
-                  value: 200,
-                  message: "Max URI length is 200",
-                },
-              })}
+              {...register("uri", { validate: maxBytes(200) })}
               error={errors?.uri}
             />
           </div>
@@ -341,6 +295,8 @@ export default function Update() {
             </h3>
             <p className="mt-1 text-sm text-gray-500">
               There can be up to 5 creators. The shares must add up to 100.
+              Removing every creator clears the list. Your own address stays
+              verified; other creators can only verify themselves.
               <a
                 href="https://docs.metaplex.com/programs/token-metadata/accounts#creators"
                 rel="noreferrer"
@@ -382,6 +338,11 @@ export default function Update() {
                               required: true,
                               validate: {
                                 pubkey: isAddress,
+                                // The program refuses duplicate creators.
+                                unique: (value, form) =>
+                                  form.creators.filter(
+                                    (c) => c.address === value,
+                                  ).length === 1,
                               },
                             })}
                             defaultValue=""
@@ -493,7 +454,7 @@ export default function Update() {
                   className="mt-2 text-sm text-red-600"
                   id={errors.sellerFeeBasisPoints.type}
                 >
-                  Seller fee must be between 0 and 1000
+                  Seller fee must be between 0 and 10000
                 </p>
               )}
             </div>
@@ -545,8 +506,8 @@ export default function Update() {
               <SwitchField>
                 <Label>Primary sale happened</Label>
                 <Description>
-                  Indicates that the first sale of this token happened. This
-                  flag can be enabled only once and can affect royalty
+                  Indicates that the first sale of this token happened. Once on,
+                  it can&apos;t be turned off again; it can affect royalty
                   distribution.
                 </Description>
                 <Controller

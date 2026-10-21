@@ -70,6 +70,9 @@ export function planAddToCollection(
     );
   }
   return sortNfts(nfts, ({ mint, metadata }) => {
+    // The program would accept it and make the collection a verified
+    // member of itself.
+    if (mint === collection.mint) return "it is the collection itself";
     if (!metadata) return "no metadata account";
     if (metadata.updateAuthority !== wallet) return notYours(metadata);
     if (metadata.collection?.verified) {

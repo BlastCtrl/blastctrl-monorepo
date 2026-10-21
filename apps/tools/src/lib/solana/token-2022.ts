@@ -1,4 +1,10 @@
-import { address, getU16Decoder, type ReadonlyUint8Array } from "@solana/kit";
+import {
+  address,
+  getAddressDecoder,
+  getU16Decoder,
+  type Address,
+  type ReadonlyUint8Array,
+} from "@solana/kit";
 
 /**
  * What the app needs from Token-2022 without `@solana-program/token-2022`,
@@ -44,6 +50,13 @@ export function isMintAccountData(data: ReadonlyUint8Array): boolean {
  * TLV entries of `u16 type, u16 length, data`. A classic Token mint has none.
  */
 export function getMintExtensionTypes(data: ReadonlyUint8Array): number[] {
+  return getMintExtensions(data).map(({ type }) => type);
+}
+
+/** The TLV entries of a Token-2022 mint's data; empty for a classic mint. */
+function getMintExtensions(
+  data: ReadonlyUint8Array,
+): { type: number; offset: number; length: number }[] {
   if (
     data.length <= TLV_START ||
     data[TOKEN_ACCOUNT_SIZE] !== ACCOUNT_TYPE_MINT
@@ -52,13 +65,33 @@ export function getMintExtensionTypes(data: ReadonlyUint8Array): number[] {
   }
 
   const u16 = getU16Decoder();
-  const types: number[] = [];
+  const entries: { type: number; offset: number; length: number }[] = [];
   let offset = TLV_START;
   while (offset + 4 <= data.length) {
     const type = u16.decode(data, offset);
     if (type === 0) break; // Uninitialized: only padding follows.
-    types.push(type);
-    offset += 4 + u16.decode(data, offset + 2);
+    const length = u16.decode(data, offset + 2);
+    entries.push({ type, offset: offset + 4, length });
+    offset += 4 + length;
   }
-  return types;
+  return entries;
+}
+
+/**
+ * The program a transfer of this mint must call, or `null` when the mint has
+ * no transfer hook or the hook is unset (the extension present with an
+ * all-zero program id, as PYUSD has it). A `TransferChecked` of a hooked mint
+ * needs the hook's extra accounts appended, which the hook program lists.
+ */
+export function getTransferHookProgram(
+  data: ReadonlyUint8Array,
+): Address | null {
+  const hook = getMintExtensions(data).find(
+    ({ type }) => type === MINT_EXTENSION.TransferHook,
+  );
+  // Layout: authority (32 bytes), program id (32 bytes).
+  if (!hook || hook.length < 64) return null;
+  const programId = data.subarray(hook.offset + 32, hook.offset + 64);
+  if (programId.every((byte) => byte === 0)) return null;
+  return getAddressDecoder().decode(programId);
 }

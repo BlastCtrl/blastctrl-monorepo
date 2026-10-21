@@ -6,6 +6,7 @@ import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient } from "@/connector/use-kit-client";
 import { useArweaveUploader } from "@/lib/hooks/use-arweave-uploader";
 import { uploadNftMetadata } from "@/lib/solana/metaplex-json-metadata";
+import { maxBytes } from "@/lib/solana/metaplex-form-rules";
 import { createNftInstructions } from "@/lib/solana/metaplex-token-metadata";
 import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
 import { Switch } from "@headlessui/react";
@@ -44,7 +45,6 @@ export type CreateFormInputs = {
   }[];
   sellerFeePercentage: number;
   isCollection: boolean;
-  collectionIsSized: boolean;
   maxSupply: number;
 };
 
@@ -88,12 +88,9 @@ function MintForm() {
       creators: [],
       sellerFeePercentage: 0,
       isCollection: false,
-      collectionIsSized: false,
       maxSupply: 0,
     },
   });
-  const watchedIsCollection = watch("isCollection");
-
   const { fields, append, remove } = useFieldArray({
     control,
     name: "creators",
@@ -106,16 +103,10 @@ function MintForm() {
   const isCreatorAddable = fields.length < MAX_CREATORS;
 
   useEffect(() => {
-    const isCollection = params.get("isCollection");
-    const collectionIsSized = params.get("collectionIsSized");
-
-    if (isCollection) {
+    if (params.get("isCollection")) {
       setValue("isCollection", true);
       setFocus("isCollection");
       window.scrollBy(0, 200);
-    }
-    if (collectionIsSized) {
-      setValue("collectionIsSized", true);
     }
   }, [params, setValue, setFocus]);
 
@@ -146,7 +137,7 @@ function MintForm() {
 
       const wallet = client.payer.address;
       const mint = await generateKeyPairSigner();
-      const { name, symbol, isMutable, isCollection, collectionIsSized } = data;
+      const { name, symbol, isMutable, isCollection } = data;
       const sellerFeePercentage =
         dirtyFields.sellerFeePercentage &&
         Number.isFinite(data.sellerFeePercentage)
@@ -159,17 +150,19 @@ function MintForm() {
           symbol,
           uri,
           isMutable,
-          isCollection: isCollection && collectionIsSized,
+          isCollection,
           maxSupply: data.maxSupply,
           sellerFeeBasisPoints: Math.round(sellerFeePercentage * 100),
           // Only the wallet can vouch for itself; everyone else stays unverified.
-          creators: dirtyFields.creators
-            ? data.creators.map((creator) => ({
-                address: address(creator.address),
-                share: creator.share,
-                verified: creator.address === wallet,
-              }))
-            : undefined,
+          // An empty list must be left out: the program refuses `[]`.
+          creators:
+            data.creators.length > 0
+              ? data.creators.map((creator) => ({
+                  address: address(creator.address),
+                  share: creator.share,
+                  verified: creator.address === wallet,
+                }))
+              : undefined,
         }),
       );
 
@@ -244,10 +237,7 @@ function MintForm() {
                 label="Name"
                 type="text"
                 {...register("name", {
-                  maxLength: {
-                    value: 32,
-                    message: "Max name length is 32",
-                  },
+                  validate: maxBytes(32),
                   required: true,
                 })}
                 error={errors?.name}
@@ -258,12 +248,7 @@ function MintForm() {
               <InputGroup
                 label="Symbol"
                 type="text"
-                {...register("symbol", {
-                  maxLength: {
-                    value: 10,
-                    message: "Max symbol length is 10",
-                  },
-                })}
+                {...register("symbol", { validate: maxBytes(10) })}
                 error={errors?.symbol}
               />
             </div>
@@ -291,10 +276,7 @@ function MintForm() {
               description="Use an existing link to a metadata file"
               type="text"
               {...register("uri", {
-                maxLength: {
-                  value: 200,
-                  message: "Max URI length is 200",
-                },
+                validate: maxBytes(200),
                 shouldUnregister: createJson,
               })}
               error={errors?.uri}
@@ -417,6 +399,11 @@ function MintForm() {
                               required: true,
                               validate: {
                                 pubkey: isAddress,
+                                // The program refuses duplicate creators.
+                                unique: (value, form) =>
+                                  form.creators.filter(
+                                    (c) => c.address === value,
+                                  ).length === 1,
                               },
                             })}
                             defaultValue=""
@@ -587,7 +574,9 @@ function MintForm() {
                     as="span"
                     className="text-sm text-gray-500"
                   >
-                    Does this token represent a collection NFT?
+                    Marks this NFT as a collection parent, so other NFTs can be
+                    verified into it. The program keeps no member count
+                    (collection details V2).
                     <a
                       href="https://docs.metaplex.com/programs/token-metadata/certified-collections"
                       rel="noreferrer"
@@ -600,66 +589,9 @@ function MintForm() {
                 <Controller
                   control={control}
                   name="isCollection"
-                  rules={{
-                    onChange: (e) =>
-                      !e.target.value && setValue("collectionIsSized", false),
-                  }}
                   render={({ field: { value, ...rest } }) => (
                     <Switch
                       {...rest}
-                      className={cn(
-                        value ? "bg-indigo-600" : "bg-gray-200",
-                        "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden",
-                      )}
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          value ? "translate-x-5" : "translate-x-0",
-                          "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out",
-                        )}
-                      />
-                    </Switch>
-                  )}
-                />
-              </Switch.Group>
-            </div>
-
-            <div className="sm:col-span-5">
-              <Switch.Group
-                as="div"
-                className="flex items-center justify-between"
-              >
-                <span className="flex grow flex-col">
-                  <Switch.Label
-                    as="span"
-                    className="text-sm font-medium text-gray-900"
-                    passive
-                  >
-                    Is a sized collection
-                  </Switch.Label>
-                  <Switch.Description
-                    as="span"
-                    className="text-sm text-gray-500"
-                  >
-                    Is this a &quot;sized&quot; collection NFT?
-                    <a
-                      href="https://docs.metaplex.com/programs/token-metadata/certified-collections"
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      <QuestionMarkCircleIcon className="mb-0.5 ml-2 inline h-4 w-4 text-gray-400" />
-                    </a>
-                  </Switch.Description>
-                </span>
-
-                <Controller
-                  control={control}
-                  name="collectionIsSized"
-                  render={({ field: { value, ...rest } }) => (
-                    <Switch
-                      {...rest}
-                      disabled={!watchedIsCollection}
                       className={cn(
                         value ? "bg-indigo-600" : "bg-gray-200",
                         "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden",

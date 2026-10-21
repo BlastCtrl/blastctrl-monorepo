@@ -1,4 +1,5 @@
 import type { AppRpc } from "@/connector/app-rpc";
+import { TOKEN_2022_PROGRAM_ADDRESS } from "@/lib/solana/token-2022";
 import { sleep } from "@/lib/utils";
 import {
   decodeToken,
@@ -22,24 +23,34 @@ export type NestedPair = {
   parent: TokenAccount;
   /** A token account owned by `parent` instead of by a wallet. */
   nested: TokenAccount;
-  /** The ATA program can only recover nested *associated* token accounts. */
+  /**
+   * The ATA program can only recover a nested *associated* token account of
+   * the same token program as its parent (the instruction names one program
+   * and derives both ATAs with it).
+   */
   recoverable: boolean;
 };
 
-/** Decoded Token-program accounts owned by `owner`. */
+/**
+ * Decoded Token and Token-2022 accounts owned by `owner`. Token-2022
+ * accounts are decoded with the fixed-size layout; their extensions follow
+ * it and are not read.
+ */
 export async function fetchTokenAccountsByOwner(
   rpc: AppRpc,
   owner: Address,
 ): Promise<TokenAccount[]> {
-  const { value } = await rpc
-    .getTokenAccountsByOwner(
-      owner,
-      { programId: TOKEN_PROGRAM_ADDRESS },
-      { encoding: "base64" },
-    )
-    .send();
-  return value.map(({ pubkey, account }) =>
-    decodeToken(parseBase64RpcAccount(pubkey, account)),
+  const results = await Promise.all(
+    [TOKEN_PROGRAM_ADDRESS, TOKEN_2022_PROGRAM_ADDRESS].map((programId) =>
+      rpc
+        .getTokenAccountsByOwner(owner, { programId }, { encoding: "base64" })
+        .send(),
+    ),
+  );
+  return results.flatMap(({ value }) =>
+    value.map(({ pubkey, account }) =>
+      decodeToken(parseBase64RpcAccount(pubkey, account)),
+    ),
   );
 }
 
@@ -88,7 +99,9 @@ export async function findNestedAta({
       result.push({
         parent,
         nested,
-        recoverable: await isAssociatedTokenAccount(nested, parent.address),
+        recoverable:
+          nested.programAddress === parent.programAddress &&
+          (await isAssociatedTokenAccount(nested, parent.address)),
       });
     }
     onProgress?.(i);

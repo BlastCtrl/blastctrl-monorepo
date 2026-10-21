@@ -8,18 +8,32 @@ import {
   notifyPromise,
 } from "@/components";
 import { useConnectorDialog } from "@/connector/connector-dialog";
-import { simulateUnsigned } from "@/connector/simulate";
+import {
+  simulateUnsigned,
+  simulationFailureMessage,
+} from "@/connector/simulate";
 import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient } from "@/connector/use-kit-client";
 import { useArweaveUploader } from "@/lib/hooks/use-arweave-uploader";
 import { compress } from "@/lib/solana/common";
+import { maxBytes } from "@/lib/solana/metaplex-form-rules";
 import {
   createMetadataInstructions,
+  fetchTokenMetadata,
   updateMetadataInstructions,
+  type TokenMetadata,
+  type TokenMetadataFields,
 } from "@/lib/solana/metaplex-token-metadata";
-import { cn } from "@blastctrl/ui";
+import { isMintAccountData } from "@/lib/solana/token-2022";
+import { Button, cn } from "@blastctrl/ui";
+import {
+  Dialog,
+  DialogBackdrop,
+  DialogPanel,
+  DialogTitle,
+} from "@headlessui/react";
 import { ChevronUpDownIcon } from "@heroicons/react/20/solid";
-import { address, isAddress } from "@solana/kit";
+import { address, fetchEncodedAccount, isAddress } from "@solana/kit";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { UploadFile } from "./_components/upload-file";
@@ -36,12 +50,49 @@ type TokenData = {
 const actions = ["Add", "Update"] as const;
 type Actions = (typeof actions)[number];
 
+/**
+ * What an update resets: `updateMetadataAccountV2` replaces the whole data
+ * struct, and this form only has name, symbol and URI, so the rest goes back
+ * to its defaults. Human-readable, for the warning; empty when nothing is
+ * lost.
+ */
+function wipedByUpdate(current: TokenMetadata): string[] {
+  const wiped: string[] = [];
+  if (current.creators?.length) {
+    wiped.push(
+      `${current.creators.length} creator${current.creators.length > 1 ? "s" : ""}`,
+    );
+  }
+  if (current.sellerFeeBasisPoints > 0) {
+    wiped.push(`royalties of ${current.sellerFeeBasisPoints / 100}%`);
+  }
+  if (current.collection) {
+    wiped.push(`the collection ${compress(current.collection.key, 4)}`);
+  }
+  return wiped;
+}
+
 export default function CreateToken() {
   const { client } = useKitClient();
   const upload = useArweaveUploader();
   const { setOpen } = useConnectorDialog();
   const [isConfirming, setIsConfirming] = useState(false);
   const [selectedAction, setSelectedAction] = useState<Actions>(actions[0]);
+  const [wipeWarning, setWipeWarning] = useState<{
+    fields: string[];
+    answer: (proceed: boolean) => void;
+  } | null>(null);
+  /** Opens the warning and resolves with the user's choice. */
+  const confirmWipe = (fields: string[]) =>
+    new Promise<boolean>((resolve) => {
+      setWipeWarning({
+        fields,
+        answer: (proceed) => {
+          setWipeWarning(null);
+          resolve(proceed);
+        },
+      });
+    });
   const {
     register,
     formState: { errors },
@@ -59,17 +110,30 @@ export default function CreateToken() {
     try {
       const owner = client.payer;
       const mint = address(data.mint);
-      const build =
+
+      // The mint's program (Token or Token-2022) goes into the instruction.
+      const mintAccount = await fetchEncodedAccount(client.rpc, mint);
+      if (!mintAccount.exists || !isMintAccountData(mintAccount.data)) {
+        notify({
+          type: "error",
+          title: "Not a token mint",
+          description: `${compress(data.mint, 4)} is not a token mint account.`,
+        });
+        return;
+      }
+      const build = (fields: Partial<TokenMetadataFields>) =>
         selectedAction === "Add"
-          ? createMetadataInstructions
-          : updateMetadataInstructions;
+          ? createMetadataInstructions(
+              owner,
+              mint,
+              fields,
+              mintAccount.programAddress,
+            )
+          : updateMetadataInstructions(owner, mint, fields);
 
       // Simulate with empty fields first: this fails fast when the wallet is
       // not the authority, before anything is uploaded.
-      const simulation = await simulateUnsigned(
-        client,
-        await build(owner, mint, {}),
-      );
+      const simulation = await simulateUnsigned(client, await build({}));
       if (simulation.err) {
         notify({
           type: "error",
@@ -81,12 +145,19 @@ export default function CreateToken() {
                 this token is not possible due to the error:{" "}
               </p>
               <code className="py-6 break-all">
-                {JSON.stringify(simulation.err)}
+                {simulationFailureMessage(simulation)}
               </code>
             </>
           ),
         });
         return;
+      }
+
+      // An update rewrites the whole data struct; say what that resets.
+      if (selectedAction === "Update") {
+        const current = await fetchTokenMetadata(client.rpc, mint);
+        const wiped = current ? wipedByUpdate(current) : [];
+        if (wiped.length > 0 && !(await confirmWipe(wiped))) return;
       }
 
       // The uploader's toasts report failures; stop quietly after one.
@@ -113,7 +184,7 @@ export default function CreateToken() {
 
       await notifyPromise(
         client.sendTransaction(
-          await build(owner, mint, {
+          await build({
             name: data.name,
             symbol: data.symbol,
             uri: metadataUri,
@@ -175,7 +246,9 @@ export default function CreateToken() {
               Basic Information
             </h3>
             <p className="text-sm text-gray-500">
-              You need to have the mint authority over the token.
+              {selectedAction === "Add"
+                ? "You need to be the mint authority of the token."
+                : "You need to be the update authority of the token's metadata."}
             </p>
           </div>
 
@@ -214,10 +287,7 @@ export default function CreateToken() {
               type="text"
               {...register("name", {
                 required: true,
-                maxLength: {
-                  value: 32,
-                  message: "Max name length is 32",
-                },
+                validate: maxBytes(32),
               })}
               error={errors?.name}
             />
@@ -227,10 +297,7 @@ export default function CreateToken() {
               type="text"
               {...register("symbol", {
                 required: true,
-                maxLength: {
-                  value: 10,
-                  message: "Max symbol length is 10",
-                },
+                validate: maxBytes(10),
               })}
               error={errors?.symbol}
             />
@@ -328,6 +395,45 @@ export default function CreateToken() {
           </div>
         </div>
       </form>
+      <Dialog
+        open={wipeWarning !== null}
+        onClose={() => wipeWarning?.answer(false)}
+        className="relative z-50"
+      >
+        <DialogBackdrop
+          transition
+          className="fixed inset-0 bg-black/50 transition duration-300 data-closed:opacity-0"
+        />
+        <div className="fixed inset-0 flex w-screen items-center justify-center p-4">
+          <DialogPanel
+            transition
+            className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl transition data-closed:scale-95 data-closed:opacity-0"
+          >
+            <DialogTitle className="text-lg font-medium text-gray-900">
+              This update resets other fields
+            </DialogTitle>
+            <p className="mt-2 text-sm text-gray-600">
+              Updating writes the whole metadata, and this form only sets the
+              name, symbol and URI. The token currently has{" "}
+              {formatList(wipeWarning?.fields ?? [])}, which will be removed.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <Button outline onClick={() => wipeWarning?.answer(false)}>
+                Cancel
+              </Button>
+              <Button color="red" onClick={() => wipeWarning?.answer(true)}>
+                Update anyway
+              </Button>
+            </div>
+          </DialogPanel>
+        </div>
+      </Dialog>
     </div>
   );
 }
+
+/** "a", "a and b", "a, b and c". */
+const formatList = (items: string[]) =>
+  items.length <= 1
+    ? (items[0] ?? "")
+    : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;

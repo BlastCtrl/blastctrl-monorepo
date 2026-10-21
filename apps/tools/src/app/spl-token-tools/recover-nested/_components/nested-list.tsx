@@ -176,7 +176,7 @@ export const NestedInfo = ({
             😥 Unrecoverable
             <Tooltip
               content={
-                "Currently, only nested associated token accounts can be recovered. It isn't possible to recover regular token accounts."
+                "Only a nested associated token account of the same token program as its parent can be recovered. Regular token accounts, and a Token-2022 account nested in a Token account (or the other way round), can't be."
               }
             >
               <QuestionMarkCircleIcon className="ml-2 size-5 text-gray-400 hover:cursor-pointer" />

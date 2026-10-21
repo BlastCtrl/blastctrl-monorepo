@@ -1,5 +1,5 @@
 import { notify } from "@/components";
-import { useAppRpc } from "@/connector/app-rpc";
+import { useAppRpc, type AppRpc } from "@/connector/app-rpc";
 import { useConnectorDialog } from "@/connector/connector-dialog";
 import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient } from "@/connector/use-kit-client";
@@ -59,6 +59,84 @@ type Preview = {
 /** Base fee of the single-signature recover transaction. */
 const TRANSACTION_FEE = 5000n;
 
+/**
+ * What the form's submit loads and checks before the confirmation dialog
+ * opens: both accounts, the parent/nested relation, the mint's decimals and
+ * the wallet's destination ATA. Throws the message the form toasts.
+ */
+async function loadRecoverPreview(
+  rpc: AppRpc,
+  account: Address,
+  parentAta: string,
+  nestedAta: string,
+): Promise<Preview> {
+  const parentAddress = address(parentAta);
+  const nestedAddress = address(nestedAta);
+
+  let accounts: MaybeAccount<Token>[];
+  try {
+    accounts = await fetchAllMaybeToken(rpc, [parentAddress, nestedAddress]);
+  } catch {
+    throw new Error(
+      "Could not decode the accounts. Have you entered valid token accounts?",
+    );
+  }
+  const [parent, nested] = accounts;
+  if (!parent?.exists) {
+    throw new Error(`Parent account ${compress(parentAddress, 4)} not found`);
+  }
+  if (!nested?.exists) {
+    throw new Error(`Nested account ${compress(nestedAddress, 4)} not found`);
+  }
+
+  if (!(await isAssociatedTokenAccount(parent, parent.data.owner))) {
+    throw new Error("The parent account is not an associated token account");
+  }
+  if (nested.data.owner !== parent.address) {
+    throw new Error(
+      `The nested account is owned by ${compress(nested.data.owner, 4)}, not by the parent account`,
+    );
+  }
+  if (!(await isAssociatedTokenAccount(nested, parent.address))) {
+    throw new Error(
+      "The nested account is not an associated token account of the parent, so it cannot be recovered",
+    );
+  }
+
+  const mint = await fetchMint(rpc, nested.data.mint);
+  const [destinationAddress] = await findAssociatedTokenPda({
+    owner: account,
+    mint: nested.data.mint,
+    tokenProgram: nested.programAddress,
+  });
+  const destination = await fetchMaybeToken(rpc, destinationAddress);
+  const destinationRent = destination.exists
+    ? 0n
+    : await rpc
+        .getMinimumBalanceForRentExemption(BigInt(getTokenSize()))
+        .send();
+
+  return {
+    parent,
+    nested,
+    decimals: mint.data.decimals,
+    destination: {
+      address: destinationAddress,
+      amount: destination.exists ? destination.data.amount : 0n,
+      exists: destination.exists,
+    },
+    destinationRent,
+  };
+}
+
+/**
+ * What the wallet nets: the nested account's rent, minus the fee and the
+ * rent of the destination ATA if it has to be created.
+ */
+function previewSolChange(preview: Preview): bigint {
+  return preview.nested.lamports - TRANSACTION_FEE - preview.destinationRent;
+}
+
 export const ManualInput = () => {
   const { account } = useConnector();
   const { rpc } = useAppRpc();
@@ -93,72 +171,9 @@ export const ManualInput = () => {
     setIsProcessing(true);
     setPreview(null);
     try {
-      const parentAddress = address(data.parentAta);
-      const nestedAddress = address(data.nestedAta);
-
-      let accounts: MaybeAccount<Token>[];
-      try {
-        accounts = await fetchAllMaybeToken(rpc, [
-          parentAddress,
-          nestedAddress,
-        ]);
-      } catch {
-        throw new Error(
-          "Could not decode the accounts. Have you entered valid token accounts?",
-        );
-      }
-      const [parent, nested] = accounts;
-      if (!parent?.exists) {
-        throw new Error(
-          `Parent account ${compress(parentAddress, 4)} not found`,
-        );
-      }
-      if (!nested?.exists) {
-        throw new Error(
-          `Nested account ${compress(nestedAddress, 4)} not found`,
-        );
-      }
-
-      if (!(await isAssociatedTokenAccount(parent, parent.data.owner))) {
-        throw new Error(
-          "The parent account is not an associated token account",
-        );
-      }
-      if (nested.data.owner !== parent.address) {
-        throw new Error(
-          `The nested account is owned by ${compress(nested.data.owner, 4)}, not by the parent account`,
-        );
-      }
-      if (!(await isAssociatedTokenAccount(nested, parent.address))) {
-        throw new Error(
-          "The nested account is not an associated token account of the parent, so it cannot be recovered",
-        );
-      }
-
-      const mint = await fetchMint(rpc, nested.data.mint);
-      const [destinationAddress] = await findAssociatedTokenPda({
-        owner: account,
-        mint: nested.data.mint,
-        tokenProgram: nested.programAddress,
-      });
-      const destination = await fetchMaybeToken(rpc, destinationAddress);
-      const destinationRent = destination.exists
-        ? 0n
-        : await rpc
-            .getMinimumBalanceForRentExemption(BigInt(getTokenSize()))
-            .send();
-
-      setPreview({
-        parent,
-        nested,
-        decimals: mint.data.decimals,
-        destination: {
-          address: destinationAddress,
-          amount: destination.exists ? destination.data.amount : 0n,
-          exists: destination.exists,
-        },
-        destinationRent,
-      });
+      setPreview(
+        await loadRecoverPreview(rpc, account, data.parentAta, data.nestedAta),
+      );
       setOpenDialog(true);
     } catch (error) {
       notify({
@@ -225,11 +240,7 @@ export const ManualInput = () => {
     }
   };
 
-  // What the wallet nets: the nested account's rent, minus the fee and the
-  // rent of the destination ATA if it has to be created.
-  const solChange = preview
-    ? preview.nested.lamports - TRANSACTION_FEE - preview.destinationRent
-    : 0n;
+  const solChange = preview ? previewSolChange(preview) : 0n;
   const solChangeAbs = solChange < 0n ? -solChange : solChange;
   const solChangeSol =
     (solChange < 0n ? -1 : 1) *

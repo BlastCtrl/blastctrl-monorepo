@@ -48,6 +48,7 @@ const metadata = (fields: Partial<TokenMetadata> = {}): TokenMetadata => ({
   sellerFeeBasisPoints: 0,
   creators: null,
   isMutable: true,
+  primarySaleHappened: false,
   tokenStandard: TokenStandard.NonFungible,
   collection: null,
   ...fields,
@@ -104,6 +105,7 @@ describe("planAddToCollection", () => {
       notMine,
       alreadyIn,
       elsewhere,
+      into,
     ]);
 
     expect(plan.items).toEqual([
@@ -119,6 +121,7 @@ describe("planAddToCollection", () => {
         reason:
           "in another collection, So11...1112; remove it from there first",
       },
+      { mint: collection, reason: "it is the collection itself" },
     ]);
   });
 });

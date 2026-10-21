@@ -3,7 +3,8 @@ import { mimeTypeToCategory } from "@/lib/utils";
 /** The off-chain fields of an NFT, as the mint forms collect them. */
 export type NftMetadataInput = {
   name: string;
-  symbol: string;
+  /** Token Metadata NFTs have one; Core assets don't. */
+  symbol?: string;
   description?: string;
   external_url?: string;
   image?: File | null;
@@ -37,7 +38,7 @@ export function buildNftMetadata(
 
   return {
     name,
-    symbol,
+    ...(symbol !== undefined && { symbol }),
     description,
     external_url,
     ...(attributes && { attributes }),

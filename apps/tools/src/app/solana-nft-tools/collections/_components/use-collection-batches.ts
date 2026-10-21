@@ -35,57 +35,70 @@ export function useCollectionBatches(
 ) {
   const [batches, setBatches] = useState<CollectionBatch[] | null>(null);
 
-  const send = async (client: KitClient, items: CollectionItem[]) => {
-    const groups = chunk(items, perTransaction);
-    // Built up front: deriving the PDAs is async, `sendBatches` builds sync.
-    const instructions = await Promise.all(
-      groups.map(async (group) =>
-        (
-          await Promise.all(group.map((item) => build(client.payer, item)))
-        ).flat(),
-      ),
-    );
-    const current: CollectionBatch[] = groups.map((items) => ({
-      items,
-      status: "waiting",
-    }));
-    const update = (index: number, patch: Partial<CollectionBatch>) => {
-      current[index] = { ...current[index]!, ...patch };
-      setBatches([...current]);
-    };
-    setBatches([...current]);
-
-    try {
-      await sendBatches(
-        groups.map((items, index) => ({ index, items })),
-        {
-          sender: kitBatchSender(client),
-          build: (batch) => instructions[batch.index]!,
-        },
-        {
-          onStage: (index, stage) => update(index, { status: stage }),
-          onBatchResult: (result) =>
-            update(
-              result.index,
-              result.status === "confirmed"
-                ? { status: "confirmed", signature: result.signature }
-                : { status: "failed", error: result.error },
-            ),
-        },
-      );
-    } catch (err) {
-      // Whatever hasn't reported by now was never sent.
-      current.forEach((batch, index) => {
-        if (batch.status !== "confirmed" && batch.status !== "failed") {
-          update(index, { status: "failed", error: "Not sent" });
-        }
-      });
-      throw err;
-    }
-    return current;
-  };
+  const send = (client: KitClient, items: CollectionItem[]) =>
+    sendCollectionBatches(client, items, build, perTransaction, setBatches);
 
   return { batches, send, reset: () => setBatches(null) };
+}
+
+/** The body of `useCollectionBatches`' `send`; `onChange` gets each new list. */
+async function sendCollectionBatches(
+  client: KitClient,
+  items: CollectionItem[],
+  build: (
+    wallet: TransactionSigner,
+    item: CollectionItem,
+  ) => Promise<Instruction[]>,
+  perTransaction: number,
+  onChange: (batches: CollectionBatch[]) => void,
+): Promise<CollectionBatch[]> {
+  const groups = chunk(items, perTransaction);
+  // Built up front: deriving the PDAs is async, `sendBatches` builds sync.
+  const instructions = await Promise.all(
+    groups.map(async (group) =>
+      (
+        await Promise.all(group.map((item) => build(client.payer, item)))
+      ).flat(),
+    ),
+  );
+  const current: CollectionBatch[] = groups.map((items) => ({
+    items,
+    status: "waiting",
+  }));
+  const update = (index: number, patch: Partial<CollectionBatch>) => {
+    current[index] = { ...current[index]!, ...patch };
+    onChange([...current]);
+  };
+  onChange([...current]);
+
+  try {
+    await sendBatches(
+      groups.map((items, index) => ({ index, items })),
+      {
+        sender: kitBatchSender(client),
+        build: (batch) => instructions[batch.index]!,
+      },
+      {
+        onStage: (index, stage) => update(index, { status: stage }),
+        onBatchResult: (result) =>
+          update(
+            result.index,
+            result.status === "confirmed"
+              ? { status: "confirmed", signature: result.signature }
+              : { status: "failed", error: result.error },
+          ),
+      },
+    );
+  } catch (err) {
+    // Whatever hasn't reported by now was never sent.
+    current.forEach((batch, index) => {
+      if (batch.status !== "confirmed" && batch.status !== "failed") {
+        update(index, { status: "failed", error: "Not sent" });
+      }
+    });
+    throw err;
+  }
+  return current;
 }
 
 /** How many of the items in `batches` confirmed. */

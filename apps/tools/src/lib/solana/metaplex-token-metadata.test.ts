@@ -1,5 +1,6 @@
 import {
   getCreateV1InstructionDataDecoder,
+  getUpdateMetadataAccountV2InstructionDataDecoder,
   getMetadataEncoder,
   getUnverifyCollectionV1InstructionDataEncoder,
   getUpdateV1InstructionDataDecoder,
@@ -75,38 +76,50 @@ describe("findMetadataAddress", () => {
 });
 
 describe("createMetadataInstructions", () => {
-  it("has the wallet sign as mint authority and payer, and become the update authority", async () => {
+  it("is a fungible createV1 on the given token program, the wallet as mint authority, payer and update authority, no creators", async () => {
+    const tokenProgram = address("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
     const [instruction, ...rest] = await createMetadataInstructions(
       walletSigner,
       mint,
       { name: "Test", symbol: "TST", uri: "https://arweave.net/x" },
+      tokenProgram,
     );
 
     expect(rest).toEqual([]);
     expect(instruction?.programAddress).toBe(TOKEN_METADATA_PROGRAM);
-    expect(instruction?.data?.length).toBeGreaterThan(0);
-    // createMetadataAccountV3: metadata, mint, mintAuthority, payer, updateAuthority, …
-    expect(instruction?.accounts?.slice(0, 5)).toEqual([
+    const byAddress = (a: Address) =>
+      instruction?.accounts?.filter((account) => account.address === a);
+    expect(byAddress(await findMetadataAddress(mint))).toEqual([
       { address: await findMetadataAddress(mint), role: AccountRole.WRITABLE },
-      // The mint is only read.
-      { address: mint, role: AccountRole.READONLY },
-      {
-        address: wallet,
-        role: AccountRole.READONLY_SIGNER,
-        signer: walletSigner,
-      },
-      {
-        address: wallet,
-        role: AccountRole.WRITABLE_SIGNER,
-        signer: walletSigner,
-      },
-      { address: wallet, role: AccountRole.READONLY },
     ]);
+    // createV1 marks the mint writable (it would create it if it didn't exist).
+    expect(byAddress(mint)).toEqual([
+      { address: mint, role: AccountRole.WRITABLE },
+    ]);
+    // Authority and payer sign with the wallet's own signer object.
+    expect(
+      byAddress(wallet)?.map((a) => ({
+        role: a.role,
+        signer: (a as { signer?: unknown }).signer,
+      })),
+    ).toEqual([
+      { role: AccountRole.READONLY_SIGNER, signer: walletSigner },
+      { role: AccountRole.WRITABLE_SIGNER, signer: walletSigner },
+      { role: AccountRole.READONLY, signer: undefined },
+    ]);
+    expect(byAddress(tokenProgram)).toHaveLength(1);
+
+    const data = getCreateV1InstructionDataDecoder().decode(instruction!.data!);
+    expect(data.tokenStandard).toBe(TokenStandard.Fungible);
+    expect(data.name).toBe("Test");
+    expect(data.creators.__option).toBe("None");
+    expect(data.collectionDetails.__option).toBe("None");
+    expect(data.isMutable).toBe(true);
   });
 });
 
 describe("updateMetadataInstructions", () => {
-  it("targets the metadata PDA with the wallet as update authority", async () => {
+  it("targets the metadata PDA with the wallet as update authority, leaving the flags alone", async () => {
     const [update, ...rest] = await updateMetadataInstructions(
       walletSigner,
       mint,
@@ -114,6 +127,11 @@ describe("updateMetadataInstructions", () => {
     );
 
     expect(rest).toEqual([]);
+    const data = getUpdateMetadataAccountV2InstructionDataDecoder().decode(
+      update!.data!,
+    );
+    expect(data.isMutable.__option).toBe("None");
+    expect(data.primarySaleHappened.__option).toBe("None");
     expect(update?.programAddress).toBe(TOKEN_METADATA_PROGRAM);
     // updateMetadataAccountV2: metadata, updateAuthority
     expect(update?.accounts).toEqual([
@@ -205,7 +223,7 @@ describe("createNftInstructions", () => {
     });
   });
 
-  it("encodes custom creators, a sized collection and a print limit", async () => {
+  it("encodes custom creators, a collection parent and a print limit", async () => {
     const mintSigner = await generateKeyPairSigner();
     const [create] = await createNftInstructions(walletSigner, mintSigner, {
       ...nftFields,
@@ -369,6 +387,7 @@ describe("fetchTokenMetadata", () => {
       sellerFeeBasisPoints: 550,
       creators: [{ address: wallet, share: 100, verified: true }],
       isMutable: true,
+      primarySaleHappened: false,
       tokenStandard: TokenStandard.NonFungible,
       collection: null,
     });

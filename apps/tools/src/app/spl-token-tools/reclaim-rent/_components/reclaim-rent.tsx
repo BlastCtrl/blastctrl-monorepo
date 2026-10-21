@@ -68,6 +68,37 @@ type Snapshot = Pick<
 const wait = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
 /**
+ * What a scan ticks: everything with excess, and the empty accounts, so
+ * turning closing on finds them ticked.
+ */
+const tickedAfterScan = (a: ReclaimableAccount) =>
+  excessLamports(a) > 0 || closes(a, true);
+
+/**
+ * What the results block shows for a selection: what it returns before
+ * fees, the transactions it takes, the service fee and what's left.
+ */
+function reclaimTotals(
+  selected: ReclaimableAccount[],
+  closeEmpty: boolean,
+) {
+  const lamports = selected.reduce(
+    (sum, a) => sum + reclaimLamports(a, closeEmpty),
+    0,
+  );
+  const transactions = Math.ceil(selected.length / ACCOUNTS_PER_TRANSACTION);
+  const serviceFee = serviceFeeLamports(feeBase(selected));
+  const networkFee = transactions * FEE_PER_TRANSACTION;
+  return {
+    lamports,
+    transactions,
+    serviceFee,
+    networkFee,
+    net: lamports - serviceFee - networkFee,
+  };
+}
+
+/**
  * The whole tool: the intro, the stage with the results block, and the
  * drawer below it. It talks to the chain only through the connector's RPC
  * and wallet.
@@ -176,11 +207,12 @@ export function ReclaimRent({
   const open = all.filter(isOpen);
   const selected = open.filter((a) => selectedIds.has(a.id));
   const reclaimed = all.filter((a) => reclaimedIds.has(a.id));
-  const selectedLamports = selected.reduce((sum, a) => sum + worth(a), 0);
-  const transactions = Math.ceil(selected.length / ACCOUNTS_PER_TRANSACTION);
-  const serviceFee = serviceFeeLamports(feeBase(selected));
-  const networkFee = transactions * FEE_PER_TRANSACTION;
-  const net = selectedLamports - serviceFee - networkFee;
+  const {
+    lamports: selectedLamports,
+    transactions,
+    serviceFee,
+    net,
+  } = reclaimTotals(selected, closeEmpty);
   // Whatever the switch says, so its description can say what it would do.
   const emptyCount = scanned.filter(
     (a) => !reclaimedIds.has(a.id) && closes(a, true),
@@ -333,13 +365,7 @@ export function ReclaimRent({
       return;
     }
     // Empty accounts too, so turning closing on finds them ticked.
-    setSelectedIds(
-      new Set(
-        data
-          .filter((a) => excessLamports(a) > 0 || closes(a, true))
-          .map((a) => a.id),
-      ),
-    );
+    setSelectedIds(new Set(data.filter(tickedAfterScan).map((a) => a.id)));
     setRun((r) => r + 1);
     setPhase("shown");
   };

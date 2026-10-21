@@ -27,6 +27,7 @@ export function metadata(
     sellerFeeBasisPoints: 500,
     creators: [],
     isMutable: true,
+    primarySaleHappened: false,
     tokenStandard: TokenStandard.NonFungible,
     collection: null,
     ...overrides,

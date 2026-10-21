@@ -15,7 +15,6 @@ import { MediaFiles } from "./_components/media-files";
 
 export type CreateFormInputs = {
   name: string;
-  symbol: string;
   description: string;
   external_url: string;
   uri: string;
@@ -41,7 +40,6 @@ export default function Mint() {
     mode: "onSubmit",
     defaultValues: {
       name: "",
-      symbol: "",
       uri: "",
     },
   });
@@ -137,32 +135,12 @@ export default function Mint() {
           </div>
 
           <div className="mt-6 grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-6">
-            <div className="sm:col-span-4">
+            <div className="sm:col-span-6">
               <InputGroup
                 label="Name"
                 type="text"
-                {...register("name", {
-                  maxLength: {
-                    value: 32,
-                    message: "Max name length is 32",
-                  },
-                  required: true,
-                })}
+                {...register("name", { required: true })}
                 error={errors?.name}
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <InputGroup
-                label="Symbol"
-                type="text"
-                {...register("symbol", {
-                  maxLength: {
-                    value: 10,
-                    message: "Max symbol length is 10",
-                  },
-                })}
-                error={errors?.symbol}
               />
             </div>
 
@@ -188,13 +166,7 @@ export default function Mint() {
               label="URI"
               description="Use an existing link to a metadata file"
               type="text"
-              {...register("uri", {
-                maxLength: {
-                  value: 200,
-                  message: "Max URI length is 200",
-                },
-                shouldUnregister: createJson,
-              })}
+              {...register("uri", { shouldUnregister: createJson })}
               error={errors?.uri}
             />
           </div>

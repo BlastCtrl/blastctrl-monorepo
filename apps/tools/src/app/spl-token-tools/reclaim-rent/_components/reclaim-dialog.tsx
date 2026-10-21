@@ -55,6 +55,7 @@ type Props = {
 const afterFees = (batch: Batch) =>
   batch.lamports - batch.fee - FEE_PER_TRANSACTION;
 
+/** The review dialog's batches: what each returns and its service fee. */
 function toBatches(
   accounts: ReclaimableAccount[],
   closeEmpty: boolean,
