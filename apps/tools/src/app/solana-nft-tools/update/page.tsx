@@ -185,7 +185,7 @@ export default function Update() {
         dirtyFields.sellerFeeBasisPoints;
 
       const result = await client.sendTransaction(
-        updateNftInstructions(wallet, mint, {
+        await updateNftInstructions(client.payer, mint, {
           // Immutable metadata rejects a data write, even an unchanged one.
           data: isDataDirty
             ? {

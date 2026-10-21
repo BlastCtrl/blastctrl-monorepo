@@ -10,9 +10,10 @@ Versions this was written against: `@solana/connector` 0.3.0,
 `@solana/kit` 8.5.0 (with `@solana/fixed-points` 8.5.0),
 `@solana/kit-plugin-rpc` / `kit-plugin-signer` 0.19.0,
 `@solana-program/stake` 0.11.0, `@solana-program/system` 0.16.0,
-`@solana-program/token` 0.18.0; Metaplex `umi` 1.6.0 (with
-`umi-program-repository` 1.6.0), `mpl-token-metadata` 3.4.0, `mpl-core`
-1.10.0; `@sqds/multisig` 2.1.4.
+`@solana-program/token` 0.18.0; the workspace's own Metaplex clients
+`@blastctrl/mpl-token-metadata` and `@blastctrl/mpl-core` (Codama 1.11,
+`@codama/renderers-js` 2.7, from the programs' IDLs at the commits in their
+`idl/source.json`); `@sqds/multisig` 2.1.4.
 
 ## Where things live
 
@@ -28,8 +29,8 @@ Reference implementations, by area:
 | Permanent storage file upload (Turbo SDK via `@solana/connector/compat`)                                                                                                                                                           | `apps/tools/src/app/permanent-storage-tools/file-upload/**`, `lib/turbo.ts`                                                                                                       |
 | DAS-extended RPC + token-account scans                                                                                                                                                                                             | `src/connector/app-rpc.ts`, `src/state/queries/{use-asset-data,use-owner-assets,use-delegated-assets,use-reclaimable-accounts,use-owner-nfts,use-jup-tokens}.ts`                  |
 | Shared reads on Kit RPC                                                                                                                                                                                                            | `src/state/queries/use-stake-account.ts`, `use-user-stake-accounts.ts`, `use-epoch.ts`, `use-rent.ts`                                                                             |
-| Metaplex via builder-only Umi (create-token is the reference); the synchronous PDA derivation Umi's interface needs                                                                                                                | `src/lib/solana/metaplex-{umi,token-metadata}.ts`, `src/lib/solana/program-derived-address.ts`                                                                                    |
-| NFT tools: mint (Token Metadata `createV1` + `mintV1`), mint-core (Core `createV1`), update (`updateV1` after reading the metadata account); Arweave uploads of media and JSON                                                     | `src/app/solana-nft-tools/{mint,mint-core,update}/**`, `src/lib/solana/metaplex-{token-metadata,core,json-metadata}.ts`, `src/lib/hooks/use-arweave-uploader.tsx`                 |
+| Metaplex through the generated kit clients (create-token is the reference)                                                                                                                                                         | `src/lib/solana/metaplex-token-metadata.ts`, `packages/mpl-token-metadata/**`, `packages/mpl-core/**`                                                                             |
+| NFT tools: mint (Token Metadata `createV1` + `mintV1`), mint-core (Core `createV1`), update (`updateV1` after reading the metadata account); Arweave uploads of media and JSON                                                     | `src/app/solana-nft-tools/{mint,mint-core,update}/**`, `src/lib/solana/metaplex-{token-metadata,json-metadata}.ts`, `src/lib/hooks/use-arweave-uploader.tsx`                      |
 | Reclaim-rent and reclaim-sol: token-account and mint scan on the kit RPC, close / withdraw-excess / fee instructions from the program clients, batches signed in one wallet prompt                                                 | `src/app/spl-token-tools/reclaim-rent/**`, `src/app/reclaim-sol/**`, `src/connector/send-batches.ts`, `src/state/queries/use-reclaimable-accounts.ts`                             |
 | NFT collections: add (`updateV1` Set + `verifyCollectionV1`) and remove (`unverifyCollectionV1`) built in the browser, metadata read first so only what can work is sent, batches in one prompt                                    | `src/app/solana-nft-tools/collections/**`, `src/lib/solana/metaplex-token-metadata.ts` (`fetchTokenMetadatas`, the collection builders)                                           |
 | Transfer-authority: metadata through the shared `useTokenMetadata` query, transfer and verify-creator through the Metaplex builders, batches packed by kit size, Squads proposals through the Squads module and the ordered sender | `src/app/solana-nft-tools/transfer-authority/**`, `src/lib/solana/squads-multisig.ts`, `src/connector/send-batches.ts` (`sendInOrder`), `src/state/queries/use-token-metadata.ts` |
@@ -46,11 +47,10 @@ SDK is built on it (see its section); nothing else does, and `grep -rl
 means the transfer-authority route and, through `@ardrive/turbo-sdk` and
 the connector's compat bridge, the file-upload, mint, mint-core and
 create-token routes (about 140 KB, 38 KB gzipped). It used to be in
-sixteen routes through `@metaplex-foundation/umi-bundle-defaults`, whose
-RPC, keypair and transaction plugins pulled all of web3.js 1 (300 KB, 83 KB
-gzipped) into every route that builds a Metaplex instruction for the sake
-of one PDA derivation; the Umi is built without that bundle now (see its
-section). `pnpm exec next build --analyze` writes per-route client sizes
+sixteen routes through Metaplex Umi (`umi-bundle-defaults`, whose RPC,
+keypair and transaction plugins pulled all of web3.js 1, 300 KB, 83 KB
+gzipped, into every route that builds a Metaplex instruction); Umi is gone
+from the app, replaced by the generated kit clients (see their section). `pnpm exec next build --analyze` writes per-route client sizes
 to `.next/diagnostics/analyze/data/route-summaries.json`, and grepping
 `.next/static/chunks` for a string only web3.js 1 has (`"Max seed length
 exceeded"`) tells which routes carry it. Upgrading to web3.js 3 was tried
@@ -197,54 +197,69 @@ sets the given limit instead of simulating; `runtimeDefaultComputeUnits` is
 what the runtime would give a transaction with no limit of its own, and the
 transfer-authority tool asks for 400,000 when it executes a Squads batch.
 
-### Metaplex programs through Umi
+### Metaplex programs through the generated kit clients
 
-`src/lib/solana/metaplex-umi.ts` is the only module that imports Umi. It holds
-a builder-only Umi singleton and maps what Umi builds to kit. The singleton is
-`createBaseUmi()` plus the program repository, a null RPC that only answers
-`getCluster` (the repository asks it when a builder resolves a program id),
-an `eddsa` that derives PDAs with kit and throws for everything else, and the
-Token Metadata and Core plugins. It is deliberately not
-`umi-bundle-defaults`' `createUmi`: that bundle's RPC, keypair and
-transaction plugins are built on web3.js 1 and put all of it in every route
-that builds a Metaplex instruction. Umi's `findPda` is synchronous, and kit's
-`getProgramDerivedAddress` is not (Web Crypto), so
-`src/lib/solana/program-derived-address.ts` has `findProgramDerivedAddressSync`,
-the same derivation over `@noble/hashes`; it is for Umi only, everything else
-awaits kit's. `toKitInstructions(builder)`
-turns `{ programId, keys, data }` into `{ programAddress, accounts, data }`,
-and `toUmiSigner(address)` is a no-op Umi signer that only marks the account
-as a signer. The wallet needs nothing more, since the fee payer signs for its
-own address; an account that must be signed by a keypair gets its kit signer
-through the optional second argument, so `client.sendTransaction` signs with
-it. Program-specific builders live next to it: `metaplex-token-metadata.ts` (fungible
-metadata create/update; `createNftInstructions` = `createV1` + `mintV1` with
-the mint keypair attached; `updateNftInstructions`; and
-`fetchTokenMetadata(rpc, mint)`, which reads the metadata PDA with kit's
-`fetchEncodedAccount` and decodes it with the program's serializer, with
-`fetchTokenMetadatas(rpc, mints)` doing a hundred per request; and the
-collection pair `addToCollectionInstructions` / `removeFromCollectionInstructions`)
-and `metaplex-core.ts` (`createCoreAssetInstructions`). The create-token and
-NFT mint tools are the references. Unsigned simulation of such instructions is
+`packages/mpl-token-metadata` (`@blastctrl/mpl-token-metadata`) and
+`packages/mpl-core` (`@blastctrl/mpl-core`) are `@solana/kit` clients
+generated with Codama from the programs' own Shank IDLs; each package's
+README says how to refetch the IDL (`pnpm idl:fetch`) and regenerate
+(`pnpm generate`), and what was ported from upstream's generator configs.
+Token Metadata ports the program repository's own Codama config and its
+hand-written `hooked` helpers (resolvers, PDAs, `fetchDigitalAsset`); Core
+ports its kinobi config, and does not parse plugins off accounts (the
+generated `AssetV1` decoder reads the base fields only), which is the
+documented follow-up if a tool ever reads a Core account instead of DAS.
+The generated code imports only `@solana/kit`, so nothing of Umi, its
+serializers or web3.js comes along.
+
+The app wraps them in `src/lib/solana/metaplex-token-metadata.ts`
+(fungible metadata create/update; `createNftInstructions` = `createV1` +
+`mintV1` with the mint keypair as its own signer; `updateNftInstructions`;
+`fetchTokenMetadata(s)`, which read the metadata PDA with kit's
+`fetchEncodedAccount(s)`, a hundred per request, check the owner and decode
+with the generated `getMetadataDecoder`; the collection pair
+`addToCollectionInstructions` / `removeFromCollectionInstructions`;
+`verifyCreatorInstructions`). Core needs no wrapper: the mint-core page calls
+the generated `getCreateV1Instruction` directly. The create-token and NFT
+mint tools are the references. Unsigned simulation of such instructions is
 `simulateUnsigned(client, instructions)` from `src/connector/simulate.ts`.
-`TokenMetadata` also carries `isMutable` and `tokenStandard`, which the
-transfer-authority tool checks before touching an NFT, and
-`verifyCreatorInstructions` is that tool's second step. Nothing builds a Umi
-with a wallet identity anymore.
+`TokenMetadata` carries `isMutable` and `tokenStandard`, which the
+transfer-authority tool checks before touching an NFT.
 
-Things to know about the builder-only Umi:
+Things to know about the generated builders:
 
-- Its identity and payer are Umi's null signer, whose public key is all
-  zeroes, and the generated builders fall back to them silently (`authority`,
-  `payer`, `updateAuthority`, `tokenOwner`, …). Pass every such account
-  explicitly; the unit tests pin the account lists.
-- The program null-pads metadata strings on chain, but Umi's utf8 decoder
+- **Signers travel with the instruction.** A generated builder takes a
+  `TransactionSigner` for every account that signs, and kit signs the
+  transaction with the signers it finds on the instructions. Kit also
+  refuses two different signer objects for one address
+  (`SOLANA_ERROR__SIGNER__ADDRESS_CANNOT_HAVE_MULTIPLE_SIGNERS`), and the
+  client sets `client.payer` as fee payer, so the app's builders take the
+  wallet as that very `TransactionSigner` (`client.payer`), never as an
+  address wrapped in `createNoopSigner`. The one place a noop signer is
+  right is an account that signs elsewhere: the transfer-authority tool
+  passes `createNoopSigner(vault)` when a Squads vault is the authority,
+  since the program signs for it when the proposal executes. A keypair that
+  must sign (a new mint) is passed as its own signer the same way.
+- **The builders are async**, because kit derives PDAs (metadata, master
+  edition, token record, ATA) asynchronously; `findMetadataAddress` is
+  async too. Components that build instructions for display memoize the
+  promise and read it through `useResolved` (transfer-authority), or build
+  everything up front before `sendBatches` (collections).
+- The `*Async` builders derive the PDAs and apply upstream's defaults
+  (`isCollection` → `CollectionDetails::V2`, no creators → the authority as
+  the sole verified creator, decimals and print supply from the token
+  standard); the sync builders exist for instructions with no PDA to derive.
+  Optional arguments take `null`; the encoders turn that into `None`.
+- The program null-pads metadata strings on chain and kit's UTF-8 decoder
   strips the nulls, so decoded names and URIs need no trimming.
 - Token Metadata accepts `verified: true` only on a creator that signs (the
   wallet's own entry) and refuses to unverify another creator's existing
   verified entry, so the update tool carries existing `verified` flags over.
-- `toUmiBasisPoints` / `fromUmiOption` in `metaplex-umi.ts` convert royalties
-  and `Option`s at the boundary, so callers never import Umi.
+- `sellerFeeBasisPoints` is a plain number in the generated types; there is
+  no percent `Amount` to convert any more.
+- The generated `fetchAllMaybeMetadata` / `decodeMetadata` neither check the
+  owner nor tolerate undecodable bytes; the app reads arbitrary mints, so
+  `fetchTokenMetadatas` keeps its own owner check and per-account `try`.
 
 Arweave uploads (media files first, then the Metaplex JSON) go through
 `useArweaveUploader()` (`lib/hooks/use-arweave-uploader.tsx`: Turbo over the
@@ -258,8 +273,8 @@ price queries. The SDK is bundled only into the routes that import these.
 ### Squads through its web3 SDK
 
 `src/lib/solana/squads-multisig.ts` is the only module that imports
-`@sqds/multisig`, which is built on web3.js, and the same pattern as the Umi
-module: the SDK is used for what it knows (PDAs, account decoders, instruction
+`@sqds/multisig`, which is built on web3.js, and the same pattern as the
+Metaplex wrappers: the SDK is used for what it knows (PDAs, account decoders, instruction
 builders, the Squads message format), and everything crosses the boundary as
 kit types. Reads go through the kit RPC (`fetchEncodedAccount(s)`) and the
 SDK's `Account.deserialize(Buffer.from(data))`; web3 instructions are mapped to
@@ -374,7 +389,7 @@ pinning versions that peer with Kit 8.5). `@solana-program/token-2022` is
 deliberately not installed (it peers on `@solana/zk-sdk`): the `token` client's
 builders take the Token-2022 program address via `programAddress`, and
 `lib/solana/token-2022.ts` holds that address plus the mint-extension parser.
-Metaplex programs go through Umi as described above.
+Metaplex programs go through the generated kit clients as described above.
 Account inputs accept an `Address` **or** a signer object; pass the signer
 when the account must sign.
 
@@ -550,8 +565,9 @@ a `KeyPairSigner` (via `createKeyPairSignerFromBytes`). A `KeyPairSigner` also e
    `useConnectorDialog`; never from the connector's byte-oriented signer.
 2. Addresses are `Address` (`isAddress` / `address`), keypairs come from
    `generateKeyPairSigner`, lamports are `bigint`.
-3. Instructions come from `@solana-program/*`, Metaplex ones from the Umi
-   builders, Squads ones from the Squads module. No hand-built compute budget,
+3. Instructions come from `@solana-program/*`, Metaplex ones from the
+   app's wrappers over `@blastctrl/mpl-token-metadata` and
+   `@blastctrl/mpl-core`, Squads ones from the Squads module. No hand-built compute budget,
    blockhash fetching, raw sends or confirmation loops.
 4. Send with `client.sendTransaction` (or `sendTransactions` + a plan) for
    one transaction, `sendBatches` / `sendInOrder` for several; read
@@ -581,7 +597,10 @@ docs for this work:
 - `node_modules/.pnpm/node_modules/@solana/plugin-interfaces/dist/types/instruction-plans.d.ts`
   (`planTransaction` / `sendTransaction` signatures).
 - `apps/tools/node_modules/@solana-program/<program>/dist/types/generated/`
-  (instruction inputs, account decoders, program plugin).
+  (instruction inputs, account decoders, program plugin), and
+  `packages/mpl-{token-metadata,core}/src/generated/` for the Metaplex
+  programs (the source itself; `src/hooked/` for Token Metadata's resolvers
+  and PDAs).
 - `apps/tools/node_modules/@solana/fixed-points/dist/types/` (the `Sol`
   shape and its conversions) and `@solana/rpc-types/dist/types/sol.d.ts`.
 - `apps/tools/node_modules/@solana/connector/dist/chunk-*.mjs` when a

@@ -2,7 +2,9 @@
 
 A [`@solana/kit`](https://github.com/anza-xyz/kit) client for the Metaplex
 Core program, generated with [Codama](https://github.com/codama-idl/codama)
-from the program's own IDL. Nothing in the tools app uses it yet.
+from the program's own IDL. The tools app's mint-core page calls its
+`getCreateV1Instruction` directly; see "Metaplex programs through the
+generated kit clients" in `CONNECTOR_KIT_MIGRATION.md`.
 
 - `idl/mpl_core.json`: the program's Shank IDL, with `idl/source.json`
   recording the commit it was fetched from. `pnpm idl:fetch [--ref <ref>]`

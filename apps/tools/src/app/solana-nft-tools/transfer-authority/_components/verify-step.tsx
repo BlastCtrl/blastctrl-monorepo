@@ -1,8 +1,9 @@
 import { useConnectorDialog } from "@/connector/connector-dialog";
+import { useKitClient } from "@/connector/use-kit-client";
 import { useTokenMetadata } from "@/state/queries/use-token-metadata";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { useConnector } from "@solana/connector/react";
-import type { Address } from "@solana/kit";
+import { createNoopSigner, type Address } from "@solana/kit";
 import { useMemo, useState } from "react";
 import { NftTable } from "./nft-table";
 import { planVerify } from "./plan";
@@ -15,8 +16,11 @@ import {
 } from "./signer-choice";
 import { MAX_VERIFICATIONS_PER_SQUADS_TRANSACTION } from "./squads";
 import { SquadsPanel } from "./squads-panel";
-import type { ReadyVerify } from "./transactions";
-import { packBatches, verifyInstruction } from "./transactions";
+import type { Batch, ReadyVerify } from "./transactions";
+import { verifyBatches } from "./transactions";
+import { useResolved } from "./use-resolved";
+
+const NO_BATCHES: Batch[] = [];
 
 const MODES = {
   wallet: {
@@ -37,6 +41,7 @@ type Props = {
 
 export function VerifyStep({ mints, onBusyChange }: Props) {
   const { account } = useConnector();
+  const { client } = useKitClient();
   const { setOpen } = useConnectorDialog();
 
   const [mode, setMode] = useState<SignerMode>("wallet");
@@ -50,6 +55,20 @@ export function VerifyStep({ mints, onBusyChange }: Props) {
 
   /** The creator whose verification gets built, null until it's known. */
   const creator = mode === "wallet" ? account : (multisig?.vault ?? null);
+  /**
+   * Who signs the instructions: the kit client's wallet signer, or a noop
+   * signer for the vault, which signs through the Squads proposal.
+   */
+  const vault = multisig?.vault;
+  const creatorSigner = useMemo(
+    () =>
+      mode === "wallet"
+        ? (client?.payer ?? null)
+        : vault
+          ? createNoopSigner(vault)
+          : null,
+    [mode, client, vault],
+  );
 
   const plans = useMemo(() => {
     if (!metadata.data || !creator) return null;
@@ -58,21 +77,17 @@ export function VerifyStep({ mints, onBusyChange }: Props) {
     );
   }, [metadata.data, checked, creator]);
 
-  const batches = useMemo(() => {
-    if (!plans || !creator) return [];
-    return packBatches(
-      plans
-        .filter((p): p is ReadyVerify => p.status === "ready")
-        .map((plan) => ({
-          mint: plan.mint,
-          instruction: verifyInstruction(plan, creator),
-        })),
-      creator,
+  const pendingBatches = useMemo(() => {
+    if (!plans || !creatorSigner) return null;
+    return verifyBatches(
+      plans.filter((p): p is ReadyVerify => p.status === "ready"),
+      creatorSigner,
       mode === "squads"
         ? { maxPerTransaction: MAX_VERIFICATIONS_PER_SQUADS_TRANSACTION }
         : undefined,
     );
-  }, [plans, creator, mode]);
+  }, [plans, creatorSigner, mode]);
+  const batches = useResolved(pendingBatches) ?? NO_BATCHES;
 
   const listChanged =
     checked.length > 0 &&

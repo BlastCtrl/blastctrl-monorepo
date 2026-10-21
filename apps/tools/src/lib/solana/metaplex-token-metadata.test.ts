@@ -1,16 +1,17 @@
 import {
-  getCreateV1InstructionDataSerializer,
-  getMetadataAccountDataSerializer,
-  getUnverifyCollectionV1InstructionDataSerializer,
-  getUpdateV1InstructionDataSerializer,
-  getVerifyCollectionV1InstructionDataSerializer,
-  getVerifyCreatorV1InstructionDataSerializer,
+  getCreateV1InstructionDataDecoder,
+  getMetadataEncoder,
+  getUnverifyCollectionV1InstructionDataEncoder,
+  getUpdateV1InstructionDataDecoder,
+  getVerifyCollectionV1InstructionDataEncoder,
+  getVerifyCreatorV1InstructionDataEncoder,
   TokenStandard,
-  type MetadataAccountDataArgs,
-} from "@metaplex-foundation/mpl-token-metadata";
+  type MetadataArgs,
+} from "@blastctrl/mpl-token-metadata";
 import {
   AccountRole,
   address,
+  createNoopSigner,
   generateKeyPairSigner,
   getAddressDecoder,
   getAddressEncoder,
@@ -19,17 +20,19 @@ import {
   type Address,
   type GetAccountInfoApi,
   type GetMultipleAccountsApi,
+  type ReadonlyUint8Array,
   type Rpc,
 } from "@solana/kit";
 import { describe, expect, it } from "vitest";
-import { toUmiPublicKey } from "./metaplex-umi";
 import {
   addToCollectionInstructions,
+  createMetadataInstructions,
   createNftInstructions,
   fetchTokenMetadata,
   fetchTokenMetadatas,
   findMetadataAddress,
   removeFromCollectionInstructions,
+  updateMetadataInstructions,
   updateNftInstructions,
   verifyCreatorInstructions,
 } from "./metaplex-token-metadata";
@@ -40,6 +43,11 @@ const TOKEN_METADATA_PROGRAM = address(
 const wallet = address("BWia4unXYeEZAeZeTQFQ2sKoeQQmeGhGmVQ7z4GZJJnx");
 const mint = address("jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL");
 const other = address("So11111111111111111111111111111111111111112");
+/**
+ * Stands in for the wallet's signer (`client.payer` in the app); the builders
+ * must attach this very object wherever the wallet signs.
+ */
+const walletSigner = createNoopSigner(wallet);
 
 const nftFields = {
   name: "Test",
@@ -62,15 +70,68 @@ describe("findMetadataAddress", () => {
         encoder.encode(mint),
       ],
     });
-    expect(findMetadataAddress(mint)).toBe(expected);
+    expect(await findMetadataAddress(mint)).toBe(expected);
+  });
+});
+
+describe("createMetadataInstructions", () => {
+  it("has the wallet sign as mint authority and payer, and become the update authority", async () => {
+    const [instruction, ...rest] = await createMetadataInstructions(
+      walletSigner,
+      mint,
+      { name: "Test", symbol: "TST", uri: "https://arweave.net/x" },
+    );
+
+    expect(rest).toEqual([]);
+    expect(instruction?.programAddress).toBe(TOKEN_METADATA_PROGRAM);
+    expect(instruction?.data?.length).toBeGreaterThan(0);
+    // createMetadataAccountV3: metadata, mint, mintAuthority, payer, updateAuthority, …
+    expect(instruction?.accounts?.slice(0, 5)).toEqual([
+      { address: await findMetadataAddress(mint), role: AccountRole.WRITABLE },
+      // The mint is only read.
+      { address: mint, role: AccountRole.READONLY },
+      {
+        address: wallet,
+        role: AccountRole.READONLY_SIGNER,
+        signer: walletSigner,
+      },
+      {
+        address: wallet,
+        role: AccountRole.WRITABLE_SIGNER,
+        signer: walletSigner,
+      },
+      { address: wallet, role: AccountRole.READONLY },
+    ]);
+  });
+});
+
+describe("updateMetadataInstructions", () => {
+  it("targets the metadata PDA with the wallet as update authority", async () => {
+    const [update, ...rest] = await updateMetadataInstructions(
+      walletSigner,
+      mint,
+      {},
+    );
+
+    expect(rest).toEqual([]);
+    expect(update?.programAddress).toBe(TOKEN_METADATA_PROGRAM);
+    // updateMetadataAccountV2: metadata, updateAuthority
+    expect(update?.accounts).toEqual([
+      { address: await findMetadataAddress(mint), role: AccountRole.WRITABLE },
+      {
+        address: wallet,
+        role: AccountRole.READONLY_SIGNER,
+        signer: walletSigner,
+      },
+    ]);
   });
 });
 
 describe("createNftInstructions", () => {
   it("creates then mints, with the mint keypair attached as a signer", async () => {
     const mintSigner = await generateKeyPairSigner();
-    const [create, mintTo, ...rest] = createNftInstructions(
-      wallet,
+    const [create, mintTo, ...rest] = await createNftInstructions(
+      walletSigner,
       mintSigner,
       nftFields,
     );
@@ -81,7 +142,7 @@ describe("createNftInstructions", () => {
 
     // createV1: metadata, masterEdition, mint, authority, payer, updateAuthority, …
     expect(create?.accounts?.[0]?.address).toBe(
-      findMetadataAddress(mintSigner.address),
+      await findMetadataAddress(mintSigner.address),
     );
     expect(create?.accounts?.[2]).toMatchObject({
       address: mintSigner.address,
@@ -89,8 +150,16 @@ describe("createNftInstructions", () => {
       signer: mintSigner,
     });
     expect(create?.accounts?.slice(3, 6)).toEqual([
-      { address: wallet, role: AccountRole.READONLY_SIGNER },
-      { address: wallet, role: AccountRole.WRITABLE_SIGNER },
+      {
+        address: wallet,
+        role: AccountRole.READONLY_SIGNER,
+        signer: walletSigner,
+      },
+      {
+        address: wallet,
+        role: AccountRole.WRITABLE_SIGNER,
+        signer: walletSigner,
+      },
       { address: wallet, role: AccountRole.READONLY },
     ]);
 
@@ -106,20 +175,23 @@ describe("createNftInstructions", () => {
     expect(mintTo?.accounts?.[6]).toEqual({
       address: wallet,
       role: AccountRole.READONLY_SIGNER,
+      signer: walletSigner,
     });
   });
 
   it("encodes the fields, defaulting creators to the verified wallet", async () => {
     const mintSigner = await generateKeyPairSigner();
-    const [create] = createNftInstructions(wallet, mintSigner, nftFields);
-    const [data] = getCreateV1InstructionDataSerializer().deserialize(
-      new Uint8Array(create!.data!),
+    const [create] = await createNftInstructions(
+      walletSigner,
+      mintSigner,
+      nftFields,
     );
+    const data = getCreateV1InstructionDataDecoder().decode(create!.data!);
 
     expect(data.name).toBe("Test");
     expect(data.symbol).toBe("TST");
     expect(data.uri).toBe("https://arweave.net/x");
-    expect(data.sellerFeeBasisPoints.basisPoints).toBe(550n);
+    expect(data.sellerFeeBasisPoints).toBe(550);
     expect(data.tokenStandard).toBe(TokenStandard.NonFungible);
     expect(data.isMutable).toBe(true);
     expect(data.creators).toEqual({
@@ -135,7 +207,7 @@ describe("createNftInstructions", () => {
 
   it("encodes custom creators, a sized collection and a print limit", async () => {
     const mintSigner = await generateKeyPairSigner();
-    const [create] = createNftInstructions(wallet, mintSigner, {
+    const [create] = await createNftInstructions(walletSigner, mintSigner, {
       ...nftFields,
       isMutable: false,
       isCollection: true,
@@ -145,9 +217,7 @@ describe("createNftInstructions", () => {
         { address: other, share: 40, verified: false },
       ],
     });
-    const [data] = getCreateV1InstructionDataSerializer().deserialize(
-      new Uint8Array(create!.data!),
-    );
+    const data = getCreateV1InstructionDataDecoder().decode(create!.data!);
 
     expect(data.isMutable).toBe(false);
     expect(data.creators).toEqual({
@@ -166,8 +236,12 @@ describe("createNftInstructions", () => {
 });
 
 describe("updateNftInstructions", () => {
-  it("targets the metadata PDA with the wallet as authority and payer", () => {
-    const [update, ...rest] = updateNftInstructions(wallet, mint, {});
+  it("targets the metadata PDA with the wallet as authority and payer", async () => {
+    const [update, ...rest] = await updateNftInstructions(
+      walletSigner,
+      mint,
+      {},
+    );
 
     expect(rest).toEqual([]);
     expect(update?.programAddress).toBe(TOKEN_METADATA_PROGRAM);
@@ -175,34 +249,38 @@ describe("updateNftInstructions", () => {
     expect(update?.accounts?.[0]).toEqual({
       address: wallet,
       role: AccountRole.READONLY_SIGNER,
+      signer: walletSigner,
     });
     expect(update?.accounts?.[3]).toEqual({
       address: mint,
       role: AccountRole.READONLY,
     });
     expect(update?.accounts?.[4]).toEqual({
-      address: findMetadataAddress(mint),
+      address: await findMetadataAddress(mint),
       role: AccountRole.WRITABLE,
     });
     expect(update?.accounts?.[6]).toEqual({
       address: wallet,
       role: AccountRole.WRITABLE_SIGNER,
+      signer: walletSigner,
     });
   });
 
-  it("leaves omitted fields untouched and encodes the given ones", () => {
-    const deserialize = (fields: Parameters<typeof updateNftInstructions>[2]) =>
-      getUpdateV1InstructionDataSerializer().deserialize(
-        new Uint8Array(updateNftInstructions(wallet, mint, fields)[0]!.data!),
-      )[0];
+  it("leaves omitted fields untouched and encodes the given ones", async () => {
+    const decode = async (
+      fields: Parameters<typeof updateNftInstructions>[2],
+    ) =>
+      getUpdateV1InstructionDataDecoder().decode(
+        (await updateNftInstructions(walletSigner, mint, fields))[0]!.data!,
+      );
 
-    const untouched = deserialize({});
+    const untouched = await decode({});
     expect(untouched.data).toEqual({ __option: "None" });
     expect(untouched.newUpdateAuthority).toEqual({ __option: "None" });
     expect(untouched.isMutable).toEqual({ __option: "None" });
     expect(untouched.primarySaleHappened).toEqual({ __option: "None" });
 
-    const changed = deserialize({
+    const changed = await decode({
       data: {
         name: "New",
         symbol: "NEW",
@@ -237,7 +315,7 @@ describe("updateNftInstructions", () => {
 });
 
 /** An account's RPC shape, as `getAccountInfo` and `getMultipleAccounts` give it. */
-const rpcAccount = (data: Uint8Array) => ({
+const rpcAccount = (data: ReadonlyUint8Array) => ({
   data: [getBase64Decoder().decode(data), "base64"] as const,
   executable: false,
   lamports: 1n,
@@ -247,15 +325,15 @@ const rpcAccount = (data: Uint8Array) => ({
 });
 
 /** A metadata account as the program stores it, null-padded strings and all. */
-const metadataAccount = (fields: Partial<MetadataAccountDataArgs> = {}) =>
-  getMetadataAccountDataSerializer().serialize({
-    updateAuthority: toUmiPublicKey(wallet),
-    mint: toUmiPublicKey(mint),
+const metadataAccount = (fields: Partial<MetadataArgs> = {}) =>
+  getMetadataEncoder().encode({
+    updateAuthority: wallet,
+    mint,
     name: "Test".padEnd(32, "\0"),
     symbol: "TST".padEnd(10, "\0"),
     uri: "https://arweave.net/x".padEnd(200, "\0"),
     sellerFeeBasisPoints: 550,
-    creators: [{ address: toUmiPublicKey(wallet), share: 100, verified: true }],
+    creators: [{ address: wallet, share: 100, verified: true }],
     primarySaleHappened: false,
     isMutable: true,
     editionNonce: null,
@@ -268,7 +346,7 @@ const metadataAccount = (fields: Partial<MetadataAccountDataArgs> = {}) =>
   });
 
 describe("fetchTokenMetadata", () => {
-  const rpcWith = (data: Uint8Array | null) =>
+  const rpcWith = (data: ReadonlyUint8Array | null) =>
     ({
       getAccountInfo: () => ({
         send: async () => ({
@@ -282,7 +360,7 @@ describe("fetchTokenMetadata", () => {
     expect(await fetchTokenMetadata(rpcWith(null), mint)).toBeNull();
   });
 
-  it("decodes the account; Umi strips the program's null padding", async () => {
+  it("decodes the account; kit strips the program's null padding", async () => {
     expect(await fetchTokenMetadata(rpcWith(metadataAccount()), mint)).toEqual({
       updateAuthority: wallet,
       name: "Test",
@@ -298,7 +376,7 @@ describe("fetchTokenMetadata", () => {
 
   it("reads the collection link", async () => {
     const encoded = metadataAccount({
-      collection: { key: toUmiPublicKey(other), verified: true },
+      collection: { key: other, verified: true },
     });
     expect(await fetchTokenMetadata(rpcWith(encoded), mint)).toMatchObject({
       collection: { key: other, verified: true },
@@ -308,6 +386,7 @@ describe("fetchTokenMetadata", () => {
 
 describe("fetchTokenMetadatas", () => {
   it("asks a hundred accounts per request, in order, null for the missing", async () => {
+    const metadataAddress = await findMetadataAddress(mint);
     const requests: number[] = [];
     const rpc = {
       getMultipleAccounts: (addresses: Address[]) => ({
@@ -316,7 +395,7 @@ describe("fetchTokenMetadatas", () => {
           return {
             context: { slot: 0n },
             value: addresses.map((account) =>
-              account === findMetadataAddress(mint)
+              account === metadataAddress
                 ? rpcAccount(metadataAccount())
                 : null,
             ),
@@ -345,47 +424,45 @@ describe("fetchTokenMetadatas", () => {
 
 describe("addToCollectionInstructions", () => {
   const collection = other;
-  const [update, verify, ...rest] = addToCollectionInstructions(
-    wallet,
-    mint,
-    collection,
-  );
+  const built = addToCollectionInstructions(walletSigner, mint, collection);
 
-  it("sets the collection, unverified, then verifies it", () => {
+  it("sets the collection, unverified, then verifies it", async () => {
+    const [update, verify, ...rest] = await built;
     expect(rest).toEqual([]);
     expect(update?.programAddress).toBe(TOKEN_METADATA_PROGRAM);
     expect(verify?.programAddress).toBe(TOKEN_METADATA_PROGRAM);
 
-    const [data] = getUpdateV1InstructionDataSerializer().deserialize(
-      new Uint8Array(update!.data!),
-    );
+    const data = getUpdateV1InstructionDataDecoder().decode(update!.data!);
     expect(data.collection).toEqual({
       __kind: "Set",
       fields: [{ key: collection, verified: false }],
     });
     expect(data.data).toEqual({ __option: "None" });
     expect(verify?.data).toEqual(
-      getVerifyCollectionV1InstructionDataSerializer().serialize({}),
+      getVerifyCollectionV1InstructionDataEncoder().encode({}),
     );
   });
 
   it("has the wallet sign both, as the NFT's and then the collection's authority", async () => {
+    const [update, verify] = await built;
     // updateV1: authority, delegateRecord, token, mint, metadata, edition, payer, …
     expect(update?.accounts?.[0]).toEqual({
       address: wallet,
       role: AccountRole.READONLY_SIGNER,
+      signer: walletSigner,
     });
     expect(update?.accounts?.[3]).toEqual({
       address: mint,
       role: AccountRole.READONLY,
     });
     expect(update?.accounts?.[4]).toEqual({
-      address: findMetadataAddress(mint),
+      address: await findMetadataAddress(mint),
       role: AccountRole.WRITABLE,
     });
     expect(update?.accounts?.[6]).toEqual({
       address: wallet,
       role: AccountRole.WRITABLE_SIGNER,
+      signer: walletSigner,
     });
 
     // verifyCollectionV1: authority, delegateRecord, metadata, collectionMint,
@@ -401,20 +478,27 @@ describe("addToCollectionInstructions", () => {
       ],
     });
     expect(verify?.accounts?.slice(0, 6)).toEqual([
-      { address: wallet, role: AccountRole.READONLY_SIGNER },
+      {
+        address: wallet,
+        role: AccountRole.READONLY_SIGNER,
+        signer: walletSigner,
+      },
       { address: TOKEN_METADATA_PROGRAM, role: AccountRole.READONLY },
-      { address: findMetadataAddress(mint), role: AccountRole.WRITABLE },
+      { address: await findMetadataAddress(mint), role: AccountRole.WRITABLE },
       { address: collection, role: AccountRole.READONLY },
-      { address: findMetadataAddress(collection), role: AccountRole.WRITABLE },
+      {
+        address: await findMetadataAddress(collection),
+        role: AccountRole.WRITABLE,
+      },
       { address: masterEdition, role: AccountRole.READONLY },
     ]);
   });
 });
 
 describe("removeFromCollectionInstructions", () => {
-  it("unverifies the link, with the wallet as the collection's authority", () => {
-    const [unverify, ...rest] = removeFromCollectionInstructions(
-      wallet,
+  it("unverifies the link, with the wallet as the collection's authority", async () => {
+    const [unverify, ...rest] = await removeFromCollectionInstructions(
+      walletSigner,
       mint,
       other,
     );
@@ -422,35 +506,43 @@ describe("removeFromCollectionInstructions", () => {
     expect(rest).toEqual([]);
     expect(unverify?.programAddress).toBe(TOKEN_METADATA_PROGRAM);
     expect(unverify?.data).toEqual(
-      getUnverifyCollectionV1InstructionDataSerializer().serialize({}),
+      getUnverifyCollectionV1InstructionDataEncoder().encode({}),
     );
     // unverifyCollectionV1: authority, delegateRecord, metadata, collectionMint, collectionMetadata, …
     expect(unverify?.accounts?.slice(0, 5)).toEqual([
-      { address: wallet, role: AccountRole.READONLY_SIGNER },
+      {
+        address: wallet,
+        role: AccountRole.READONLY_SIGNER,
+        signer: walletSigner,
+      },
       { address: TOKEN_METADATA_PROGRAM, role: AccountRole.READONLY },
-      { address: findMetadataAddress(mint), role: AccountRole.WRITABLE },
+      { address: await findMetadataAddress(mint), role: AccountRole.WRITABLE },
       { address: other, role: AccountRole.READONLY },
-      { address: findMetadataAddress(other), role: AccountRole.WRITABLE },
+      { address: await findMetadataAddress(other), role: AccountRole.WRITABLE },
     ]);
   });
 });
 
 describe("verifyCreatorInstructions", () => {
-  it("has the creator sign for the NFT's metadata account", () => {
-    const [verify, ...rest] = verifyCreatorInstructions(wallet, mint);
+  it("has the creator sign for the NFT's metadata account", async () => {
+    const [verify, ...rest] = await verifyCreatorInstructions(
+      walletSigner,
+      mint,
+    );
 
     expect(rest).toEqual([]);
     expect(verify?.programAddress).toBe(TOKEN_METADATA_PROGRAM);
     expect(verify?.data).toEqual(
-      getVerifyCreatorV1InstructionDataSerializer().serialize({}),
+      getVerifyCreatorV1InstructionDataEncoder().encode({}),
     );
     // verifyCreatorV1: authority, delegateRecord, metadata, …
     expect(verify?.accounts?.[0]).toEqual({
       address: wallet,
       role: AccountRole.READONLY_SIGNER,
+      signer: walletSigner,
     });
     expect(verify?.accounts?.[2]).toEqual({
-      address: findMetadataAddress(mint),
+      address: await findMetadataAddress(mint),
       role: AccountRole.WRITABLE,
     });
   });

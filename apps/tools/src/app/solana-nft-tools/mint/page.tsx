@@ -154,7 +154,7 @@ function MintForm() {
           : 0;
 
       const result = await client.sendTransaction(
-        createNftInstructions(wallet, mint, {
+        await createNftInstructions(client.payer, mint, {
           name,
           symbol,
           uri,
