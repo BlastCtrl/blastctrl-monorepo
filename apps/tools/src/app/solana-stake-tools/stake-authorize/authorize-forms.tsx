@@ -102,6 +102,7 @@ export function AuthorizeFormsContainer() {
           <AuthorizeTransactionBuilder
             reset={reset}
             stakeAddress={address(stakeAccAddr)}
+            stakeData={data}
           />
         </>
       )}
@@ -157,9 +158,11 @@ function StakeAccountDescription({
 
 function AuthorizeTransactionBuilder({
   stakeAddress,
+  stakeData,
   reset,
 }: {
   stakeAddress: Address;
+  stakeData: StakeAccountType;
   reset: () => void;
 }) {
   const { client } = useKitClient();
@@ -192,6 +195,11 @@ function AuthorizeTransactionBuilder({
     }
     const newAuthority = address(authority);
 
+    // Changing the withdrawer while a lockup is in force needs the custodian's
+    // signature too; when the wallet is the custodian it signs for both.
+    // Ignored by the program when no lockup is in force.
+    const isCustodian = stakeData.meta.lockup.custodian === owner.address;
+
     // The connected wallet signs as the current authority for each type.
     const instructions = [
       ...(withdrawCheckbox
@@ -199,6 +207,7 @@ function AuthorizeTransactionBuilder({
             getAuthorizeInstruction({
               stake: stakeAddress,
               authority: owner,
+              lockupAuthority: isCustodian ? owner : undefined,
               arg0: newAuthority,
               arg1: StakeAuthorize.Withdrawer,
             }),

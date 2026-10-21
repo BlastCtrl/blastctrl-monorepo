@@ -1,11 +1,16 @@
 import { isSolanaError } from "@solana/kit";
 
-/** Human-readable message for a failed kit transaction. */
+/**
+ * Human-readable message for a failed kit transaction.
+ *
+ * Kit wraps the program's error: a failed send carries the simulation
+ * failure as its `cause`, which carries the program error as its own
+ * `cause`. The innermost one is what the user needs to read.
+ */
 export const transactionErrorMessage = (error: unknown) => {
-  if (isSolanaError(error)) {
-    // Program errors (e.g. insufficient funds) are wrapped; surface the inner one.
-    const cause = error.cause;
-    return cause instanceof Error ? cause.message : error.message;
+  let current = error;
+  while (isSolanaError(current) && current.cause instanceof Error) {
+    current = current.cause;
   }
-  return error instanceof Error ? error.message : String(error);
+  return current instanceof Error ? current.message : String(current);
 };

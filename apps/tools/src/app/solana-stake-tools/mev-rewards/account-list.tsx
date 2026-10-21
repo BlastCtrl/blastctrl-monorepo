@@ -115,6 +115,10 @@ function AccountListForm({
           stake: acc.address,
           recipient: recipientAddress,
           withdrawAuthority: owner,
+          // A withdrawal under an active lockup needs the custodian's
+          // signature; the wallet gives it when it is the custodian.
+          lockupAuthority:
+            acc.meta.lockup.custodian === owner.address ? owner : undefined,
           args: lamports,
         }),
       );
