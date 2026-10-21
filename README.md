@@ -12,6 +12,8 @@ This monorepo currently hosts the Blast Tools Nextjs application, but it could b
 │   ├── prettier-config : shared Prettier configuration
 │   ├── tailwind-config : Tailwind v4 theme and PostCSS configuration
 │   ├── typescript-config : TypeScript 6 base, Next.js, React and bundler presets
+│   ├── mpl-core : Codama-generated @solana/kit client for Metaplex Core (see its README)
+│   ├── mpl-token-metadata : Codama-generated @solana/kit client for Metaplex Token Metadata (see its README)
 │   ├── octane-core : fork of Octane used by the gasless-swap tool
 │   ├── solace-sdk : Orval-generated Blast API client (see its README)
 │   ├── ui : React components consumed directly from source

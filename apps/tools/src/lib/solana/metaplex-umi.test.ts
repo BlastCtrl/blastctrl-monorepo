@@ -1,6 +1,18 @@
-import { AccountRole, address, generateKeyPairSigner } from "@solana/kit";
+import { findMetadataPda } from "@metaplex-foundation/mpl-token-metadata";
+import {
+  AccountRole,
+  address,
+  generateKeyPairSigner,
+  getAddressEncoder,
+  getProgramDerivedAddress,
+} from "@solana/kit";
 import { describe, expect, it } from "vitest";
-import { getUmi, toKitInstruction, toUmiSigner } from "./metaplex-umi";
+import {
+  getUmi,
+  toKitInstruction,
+  toUmiPublicKey,
+  toUmiSigner,
+} from "./metaplex-umi";
 import {
   createMetadataInstructions,
   updateMetadataInstructions,
@@ -13,6 +25,24 @@ const mint = address("jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL");
 describe("metaplex-umi", () => {
   it("builds without touching an RPC and reuses one Umi", () => {
     expect(getUmi()).toBe(getUmi());
+    expect(() => getUmi().rpc.getEndpoint()).toThrow();
+    expect(() => getUmi().eddsa.generateKeypair()).toThrow("builder-only");
+  });
+
+  it("derives PDAs like kit, synchronously", async () => {
+    const umi = getUmi();
+    const program = address(TOKEN_METADATA_PROGRAM);
+    const encoder = getAddressEncoder();
+    const [expected, bump] = await getProgramDerivedAddress({
+      programAddress: program,
+      seeds: ["metadata", encoder.encode(program), encoder.encode(mint)],
+    });
+    expect(findMetadataPda(umi, { mint: toUmiPublicKey(mint) })).toEqual([
+      expected,
+      bump,
+    ]);
+    expect(umi.eddsa.isOnCurve(toUmiPublicKey(wallet))).toBe(true);
+    expect(umi.eddsa.isOnCurve(toUmiPublicKey(expected))).toBe(false);
   });
 
   it("maps a Umi instruction field for field", () => {
