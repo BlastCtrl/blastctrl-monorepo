@@ -33,6 +33,14 @@ overrides:
   "ws@<7.5.10": "^7.5.10"
   "secp256k1@5.0.0": "^5.0.1"
   "shell-quote@<1.8.4": "^1.8.4"
+packageExtensions:
+  # The connector's compat bridge (file uploads through the Turbo SDK) turns
+  # signed bytes back into a web3.js 1 transaction with whatever web3.js it
+  # resolves. web3.js is only an optional peer of the connector and the app
+  # doesn't depend on it, so give the connector its own web3.js 1.
+  "@solana/connector":
+    dependencies:
+      "@solana/web3.js": "^1.99.0"
 allowBuilds:
   bigint-buffer: true
   bufferutil: true

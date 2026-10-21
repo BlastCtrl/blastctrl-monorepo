@@ -19,6 +19,7 @@ const nextConfig = {
     "@blastctrl/solace-sdk",
     "@blastctrl/mpl-core",
     "@blastctrl/mpl-token-metadata",
+    "@blastctrl/squads",
   ],
   images: {
     remotePatterns: [

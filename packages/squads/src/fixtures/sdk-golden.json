@@ -1,0 +1,142 @@
+{
+  "single": {
+    "vault": "6sZRZTsJwGdkSh47FqGGm7MBfkYWEpb9f9jFi7QSAZhG",
+    "instructions": [
+      {
+        "programId": "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s",
+        "keys": [
+          {
+            "pubkey": "6sZRZTsJwGdkSh47FqGGm7MBfkYWEpb9f9jFi7QSAZhG",
+            "isSigner": true,
+            "isWritable": false
+          },
+          {
+            "pubkey": "BWia4unXYeEZAeZeTQFQ2sKoeQQmeGhGmVQ7z4GZJJnx",
+            "isSigner": false,
+            "isWritable": true
+          }
+        ],
+        "data": "3400"
+      }
+    ],
+    "bytes": "01010103573e22ea6fd04ab52439d8e5afc26321e34bf350a1e05cb3aca37da6ca7646f79c31b75a337803dba6b3d3090fd0b0ca53de01476597bb6979908f9ae7a472150b7065b1e3d17c45389d527f6b04c3cd58b86c731aa0fdb549b6d1bc03f8294601020200010200340000"
+  },
+  "mixed": {
+    "vault": "6sZRZTsJwGdkSh47FqGGm7MBfkYWEpb9f9jFi7QSAZhG",
+    "instructions": [
+      {
+        "programId": "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s",
+        "keys": [
+          {
+            "pubkey": "6sZRZTsJwGdkSh47FqGGm7MBfkYWEpb9f9jFi7QSAZhG",
+            "isSigner": true,
+            "isWritable": false
+          },
+          {
+            "pubkey": "BWia4unXYeEZAeZeTQFQ2sKoeQQmeGhGmVQ7z4GZJJnx",
+            "isSigner": false,
+            "isWritable": false
+          },
+          {
+            "pubkey": "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL",
+            "isSigner": false,
+            "isWritable": false
+          },
+          {
+            "pubkey": "11111111111111111111111111111111",
+            "isSigner": false,
+            "isWritable": false
+          }
+        ],
+        "data": "010203"
+      },
+      {
+        "programId": "11111111111111111111111111111111",
+        "keys": [
+          {
+            "pubkey": "6sZRZTsJwGdkSh47FqGGm7MBfkYWEpb9f9jFi7QSAZhG",
+            "isSigner": true,
+            "isWritable": true
+          },
+          {
+            "pubkey": "BWia4unXYeEZAeZeTQFQ2sKoeQQmeGhGmVQ7z4GZJJnx",
+            "isSigner": false,
+            "isWritable": true
+          }
+        ],
+        "data": "070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707"
+      }
+    ],
+    "bytes": "01010105573e22ea6fd04ab52439d8e5afc26321e34bf350a1e05cb3aca37da6ca7646f79c31b75a337803dba6b3d3090fd0b0ca53de01476597bb6979908f9ae7a472150b7065b1e3d17c45389d527f6b04c3cd58b86c731aa0fdb549b6d1bc03f829460afcf8968b8dab88481e2d2ae689c952c757aeba643e3919e89f2e55795c76c10000000000000000000000000000000000000000000000000000000000000000020204000103040300010203040200012c0107070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070700"
+  },
+  "batchAddTransaction": {
+    "multisig": "Bf48pLxRT9urwqwnnDtTqaCTNHTi8oQGoVN6mBdqctVx",
+    "member": "HJ8iBFuu3Eo8ux6aNHyoAmCB1CLqZMBd1dSgQ7ibsfvG",
+    "batchIndex": 8,
+    "transactionIndex": 1,
+    "keys": [
+      {
+        "pubkey": "Bf48pLxRT9urwqwnnDtTqaCTNHTi8oQGoVN6mBdqctVx",
+        "isSigner": false,
+        "isWritable": false
+      },
+      {
+        "pubkey": "6XhaGQtuU5GKiHdKbLybmRuEcxTST5eeoh9Q6Brfx3JH",
+        "isSigner": false,
+        "isWritable": false
+      },
+      {
+        "pubkey": "76XUkHPRvTMSZ35M8b3kj6hf1hDcQwYEduY1s98Xnmmq",
+        "isSigner": false,
+        "isWritable": true
+      },
+      {
+        "pubkey": "6zJCDKvrgGX5vkwENtADSncanCC8XcjFZnheRgGadbwZ",
+        "isSigner": false,
+        "isWritable": true
+      },
+      {
+        "pubkey": "HJ8iBFuu3Eo8ux6aNHyoAmCB1CLqZMBd1dSgQ7ibsfvG",
+        "isSigner": true,
+        "isWritable": false
+      },
+      {
+        "pubkey": "HJ8iBFuu3Eo8ux6aNHyoAmCB1CLqZMBd1dSgQ7ibsfvG",
+        "isSigner": true,
+        "isWritable": true
+      },
+      {
+        "pubkey": "11111111111111111111111111111111",
+        "isSigner": false,
+        "isWritable": false
+      }
+    ],
+    "data": "5964e0124546364c006e00000001010103573e22ea6fd04ab52439d8e5afc26321e34bf350a1e05cb3aca37da6ca7646f79c31b75a337803dba6b3d3090fd0b0ca53de01476597bb6979908f9ae7a472150b7065b1e3d17c45389d527f6b04c3cd58b86c731aa0fdb549b6d1bc03f8294601020200010200340000"
+  },
+  "batchCreate": {
+    "keys": [
+      "Bf48pLxRT9urwqwnnDtTqaCTNHTi8oQGoVN6mBdqctVx",
+      "76XUkHPRvTMSZ35M8b3kj6hf1hDcQwYEduY1s98Xnmmq",
+      "HJ8iBFuu3Eo8ux6aNHyoAmCB1CLqZMBd1dSgQ7ibsfvG",
+      "HJ8iBFuu3Eo8ux6aNHyoAmCB1CLqZMBd1dSgQ7ibsfvG",
+      "11111111111111111111111111111111"
+    ],
+    "data": "c28e8d1137b914f80000"
+  },
+  "proposalCreate": {
+    "keys": [
+      "Bf48pLxRT9urwqwnnDtTqaCTNHTi8oQGoVN6mBdqctVx",
+      "6XhaGQtuU5GKiHdKbLybmRuEcxTST5eeoh9Q6Brfx3JH",
+      "HJ8iBFuu3Eo8ux6aNHyoAmCB1CLqZMBd1dSgQ7ibsfvG",
+      "HJ8iBFuu3Eo8ux6aNHyoAmCB1CLqZMBd1dSgQ7ibsfvG",
+      "11111111111111111111111111111111"
+    ],
+    "data": "dc3c49e01e6c4f9f080000000000000001"
+  },
+  "proposalActivate": {
+    "data": "0b225cf89a1b336a"
+  },
+  "proposalApprove": {
+    "data": "9025a488bcd82af800"
+  }
+}

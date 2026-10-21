@@ -16,6 +16,7 @@ This monorepo currently hosts the Blast Tools Nextjs application, but it could b
 │   ├── mpl-token-metadata : Codama-generated @solana/kit client for Metaplex Token Metadata (see its README)
 │   ├── octane-core : fork of Octane used by the gasless-swap tool
 │   ├── solace-sdk : Orval-generated Blast API client (see its README)
+│   ├── squads : Codama-generated @solana/kit client for Squads v4 multisigs (see its README)
 │   ├── ui : React components consumed directly from source
 ├── e2e-tests : Playwright tests and Node.js scripts
 ```

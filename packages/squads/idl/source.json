@@ -1,0 +1,8 @@
+{
+  "repository": "https://github.com/Squads-Protocol/v4",
+  "path": "sdk/multisig/idl/squads_multisig_program.json",
+  "ref": "main",
+  "commit": "af94153ff77a28b6effe46b9c94baaa93742b48c",
+  "committedAt": "2026-08-20T14:53:22Z",
+  "fetchedAt": "2026-10-21T14:18:17.873Z"
+}

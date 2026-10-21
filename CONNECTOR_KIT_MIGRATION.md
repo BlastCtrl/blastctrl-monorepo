@@ -13,59 +13,70 @@ Versions this was written against: `@solana/connector` 0.3.0,
 `@solana-program/token` 0.18.0; the workspace's own Metaplex clients
 `@blastctrl/mpl-token-metadata` and `@blastctrl/mpl-core` (Codama 1.11,
 `@codama/renderers-js` 2.7, from the programs' IDLs at the commits in their
-`idl/source.json`); `@sqds/multisig` 2.1.4.
+`idl/source.json`) and `@blastctrl/squads` (same toolchain, from the Squads v4
+IDL).
 
 ## Where things live
 
 Reference implementations, by area:
 
-| Area                                                                                                                                                                                                                               | Files                                                                                                                                                                             |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Wallet UI (button, menu, connect dialog incl. WalletConnect)                                                                                                                                                                       | `apps/tools/src/connector/`                                                                                                                                                       |
-| Kit client hook                                                                                                                                                                                                                    | `apps/tools/src/connector/use-kit-client.ts`                                                                                                                                      |
-| Shared error helper                                                                                                                                                                                                                | `apps/tools/src/connector/transaction-error.ts`                                                                                                                                   |
-| Stake tools (create UI + CSV, set-lockup, authorize, merge, split, MEV rewards)                                                                                                                                                    | `apps/tools/src/app/solana-stake-tools/**`                                                                                                                                        |
-| SPL token tools: close-empty, revoke-delegations, recover-nested, token-hoover, distributor (Solace airdrops, incl. `packages/solace-sdk`), create-token                                                                           | `apps/tools/src/app/spl-token-tools/{close-empty,revoke-delegations,recover-nested,token-hoover,distributor,create-token}/**`                                                     |
-| Permanent storage file upload (Turbo SDK via `@solana/connector/compat`)                                                                                                                                                           | `apps/tools/src/app/permanent-storage-tools/file-upload/**`, `lib/turbo.ts`                                                                                                       |
-| DAS-extended RPC + token-account scans                                                                                                                                                                                             | `src/connector/app-rpc.ts`, `src/state/queries/{use-asset-data,use-owner-assets,use-delegated-assets,use-reclaimable-accounts,use-owner-nfts,use-jup-tokens}.ts`                  |
-| Shared reads on Kit RPC                                                                                                                                                                                                            | `src/state/queries/use-stake-account.ts`, `use-user-stake-accounts.ts`, `use-epoch.ts`, `use-rent.ts`                                                                             |
-| Metaplex through the generated kit clients (create-token is the reference)                                                                                                                                                         | `src/lib/solana/metaplex-token-metadata.ts`, `packages/mpl-token-metadata/**`, `packages/mpl-core/**`                                                                             |
-| NFT tools: mint (Token Metadata `createV1` + `mintV1`), mint-core (Core `createV1`), update (`updateV1` after reading the metadata account); Arweave uploads of media and JSON                                                     | `src/app/solana-nft-tools/{mint,mint-core,update}/**`, `src/lib/solana/metaplex-{token-metadata,json-metadata}.ts`, `src/lib/hooks/use-arweave-uploader.tsx`                      |
-| Reclaim-rent and reclaim-sol: token-account and mint scan on the kit RPC, close / withdraw-excess / fee instructions from the program clients, batches signed in one wallet prompt                                                 | `src/app/spl-token-tools/reclaim-rent/**`, `src/app/reclaim-sol/**`, `src/connector/send-batches.ts`, `src/state/queries/use-reclaimable-accounts.ts`                             |
-| NFT collections: add (`updateV1` Set + `verifyCollectionV1`) and remove (`unverifyCollectionV1`) built in the browser, metadata read first so only what can work is sent, batches in one prompt                                    | `src/app/solana-nft-tools/collections/**`, `src/lib/solana/metaplex-token-metadata.ts` (`fetchTokenMetadatas`, the collection builders)                                           |
-| Transfer-authority: metadata through the shared `useTokenMetadata` query, transfer and verify-creator through the Metaplex builders, batches packed by kit size, Squads proposals through the Squads module and the ordered sender | `src/app/solana-nft-tools/transfer-authority/**`, `src/lib/solana/squads-multisig.ts`, `src/connector/send-batches.ts` (`sendInOrder`), `src/state/queries/use-token-metadata.ts` |
-| Octane backend (gasless swaps): `packages/octane-core` builds the fee-payer-signed swap on kit; the build route serves it base64-encoded                                                                                           | `packages/octane-core/src/**`, `apps/tools/src/app/api/octane/{build-jup-swap,price}/route.ts`                                                                                    |
-| Gasless swap and gasless BONK swap: the backend's fee-payer-signed transaction decoded with kit, signed by the wallet through the kit signer, sent and confirmed with kit's factory                                                | `src/app/{gasless-swap,gasless-bonk-swap}/**`, `src/lib/octane.ts`, `src/lib/hooks/use-gasless-swap.ts`, `src/state/queries/use-token-balance.ts`                                 |
-| Shared helpers: unsigned simulation, compute headroom, Token-2022 parsing, mint/SOL-balance/token-account queries                                                                                                                  | `src/connector/{simulate,resource-limits}.ts`, `src/lib/solana/token-2022.ts`, `src/state/queries/{use-mint,use-sol-balance,use-token-account-existence}.ts`                      |
-| Explorer links by connector cluster                                                                                                                                                                                                | `src/state/use-query-context.ts`                                                                                                                                                  |
+| Area                                                                                                                                                                                                                               | Files                                                                                                                                                                                                   |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Wallet UI (button, menu, connect dialog incl. WalletConnect)                                                                                                                                                                       | `apps/tools/src/connector/`                                                                                                                                                                             |
+| Kit client hook                                                                                                                                                                                                                    | `apps/tools/src/connector/use-kit-client.ts`                                                                                                                                                            |
+| Shared error helper                                                                                                                                                                                                                | `apps/tools/src/connector/transaction-error.ts`                                                                                                                                                         |
+| Stake tools (create UI + CSV, set-lockup, authorize, merge, split, MEV rewards)                                                                                                                                                    | `apps/tools/src/app/solana-stake-tools/**`                                                                                                                                                              |
+| SPL token tools: close-empty, revoke-delegations, recover-nested, token-hoover, distributor (Solace airdrops, incl. `packages/solace-sdk`), create-token                                                                           | `apps/tools/src/app/spl-token-tools/{close-empty,revoke-delegations,recover-nested,token-hoover,distributor,create-token}/**`                                                                           |
+| Permanent storage file upload (Turbo SDK via `@solana/connector/compat`)                                                                                                                                                           | `apps/tools/src/app/permanent-storage-tools/file-upload/**`, `lib/turbo.ts`                                                                                                                             |
+| DAS-extended RPC + token-account scans                                                                                                                                                                                             | `src/connector/app-rpc.ts`, `src/state/queries/{use-asset-data,use-owner-assets,use-delegated-assets,use-reclaimable-accounts,use-owner-nfts,use-jup-tokens}.ts`                                        |
+| Shared reads on Kit RPC                                                                                                                                                                                                            | `src/state/queries/use-stake-account.ts`, `use-user-stake-accounts.ts`, `use-epoch.ts`, `use-rent.ts`                                                                                                   |
+| Metaplex through the generated kit clients (create-token is the reference)                                                                                                                                                         | `src/lib/solana/metaplex-token-metadata.ts`, `packages/mpl-token-metadata/**`, `packages/mpl-core/**`                                                                                                   |
+| NFT tools: mint (Token Metadata `createV1` + `mintV1`), mint-core (Core `createV1`), update (`updateV1` after reading the metadata account); Arweave uploads of media and JSON                                                     | `src/app/solana-nft-tools/{mint,mint-core,update}/**`, `src/lib/solana/metaplex-{token-metadata,json-metadata}.ts`, `src/lib/hooks/use-arweave-uploader.tsx`                                            |
+| Reclaim-rent and reclaim-sol: token-account and mint scan on the kit RPC, close / withdraw-excess / fee instructions from the program clients, batches signed in one wallet prompt                                                 | `src/app/spl-token-tools/reclaim-rent/**`, `src/app/reclaim-sol/**`, `src/connector/send-batches.ts`, `src/state/queries/use-reclaimable-accounts.ts`                                                   |
+| NFT collections: add (`updateV1` Set + `verifyCollectionV1`) and remove (`unverifyCollectionV1`) built in the browser, metadata read first so only what can work is sent, batches in one prompt                                    | `src/app/solana-nft-tools/collections/**`, `src/lib/solana/metaplex-token-metadata.ts` (`fetchTokenMetadatas`, the collection builders)                                                                 |
+| Transfer-authority: metadata through the shared `useTokenMetadata` query, transfer and verify-creator through the Metaplex builders, batches packed by kit size, Squads proposals through the Squads module and the ordered sender | `src/app/solana-nft-tools/transfer-authority/**`, `src/lib/solana/squads-multisig.ts`, `packages/squads/**`, `src/connector/send-batches.ts` (`sendInOrder`), `src/state/queries/use-token-metadata.ts` |
+| Octane backend (gasless swaps): `packages/octane-core` builds the fee-payer-signed swap on kit; the build route serves it base64-encoded                                                                                           | `packages/octane-core/src/**`, `apps/tools/src/app/api/octane/{build-jup-swap,price}/route.ts`                                                                                                          |
+| Gasless swap and gasless BONK swap: the backend's fee-payer-signed transaction decoded with kit, signed by the wallet through the kit signer, sent and confirmed with kit's factory                                                | `src/app/{gasless-swap,gasless-bonk-swap}/**`, `src/lib/octane.ts`, `src/lib/hooks/use-gasless-swap.ts`, `src/state/queries/use-token-balance.ts`                                                       |
+| Shared helpers: unsigned simulation, compute headroom, Token-2022 parsing, mint/SOL-balance/token-account queries                                                                                                                  | `src/connector/{simulate,resource-limits}.ts`, `src/lib/solana/token-2022.ts`, `src/state/queries/{use-mint,use-sol-balance,use-token-account-existence}.ts`                                            |
+| Explorer links by connector cluster                                                                                                                                                                                                | `src/state/use-query-context.ts`                                                                                                                                                                        |
 
 ## What is left of web3.js
 
-`lib/solana/squads-multisig.ts` imports it on purpose, because the Squads
-SDK is built on it (see its section); nothing else does, and `grep -rl
-"@solana/web3.js" apps/tools/src` is the live list. In the bundle that
-means the transfer-authority route and, through `@ardrive/turbo-sdk` and
-the connector's compat bridge, the file-upload, mint, mint-core and
-create-token routes (about 140 KB, 38 KB gzipped). It used to be in
-sixteen routes through Metaplex Umi (`umi-bundle-defaults`, whose RPC,
-keypair and transaction plugins pulled all of web3.js 1, 300 KB, 83 KB
-gzipped, into every route that builds a Metaplex instruction); Umi is gone
-from the app, replaced by the generated kit clients (see their section). `pnpm exec next build --analyze` writes per-route client sizes
-to `.next/diagnostics/analyze/data/route-summaries.json`, and grepping
-`.next/static/chunks` for a string only web3.js 1 has (`"Max seed length
-exceeded"`) tells which routes carry it. Upgrading to web3.js 3 was tried
-and backed out on 2026-10-21: the Squads SDK calls
-`PublicKey.findProgramAddressSync`, which 3 dropped, and the Turbo SDK and
-the connector's compat bridge need 1, so the SDK had to move to a
-workspace package with its own PDAs; and 3 is one 392 KB file that
-Turbopack can't tree-shake (a `sideEffects: false` patch changed nothing),
-which made the transfer-authority route 88 KB gzipped heavier. The
-`@solana/wallet-adapter-*` packages, `@solana/spl-token`, `bs58`, `bn.js`
-and `bignumber.js` are gone from `apps/tools/package.json`; the adapter
-provider, its network store, the old wallet menus and the web3 batch sender
-are deleted. `@solana-program/token-2022` is deliberately not installed (it
-peers on `@solana/zk-sdk`); `lib/solana/token-2022.ts` holds what the app
-needs from that program.
+Nothing in `apps/tools` imports it, and the app doesn't depend on it:
+`grep -rl "@solana/web3.js" apps/tools/src` should stay empty. The last
+in-app user was the Squads SDK (`@sqds/multisig`, built on web3.js 1),
+replaced on 2026-10-21 by `@blastctrl/squads`, a Codama-generated kit client
+with the SDK's message format and execution-account logic ported into
+hooked helpers (see "Squads through the generated kit client"). Before that
+the Metaplex Umi bundle had pulled web3.js 1 into sixteen routes; the
+generated Metaplex clients replaced Umi the same day.
+
+web3.js 1 is still in `node_modules`, on purpose, under two packages the
+app can't change: `@ardrive/turbo-sdk` builds its SOL top-up transactions
+with it, and the connector's compat bridge turns the signed bytes back into
+whatever web3.js it resolves, which must be the same 1 Turbo expects, so the
+`packageExtensions` entry in `pnpm-workspace.yaml` gives the connector its
+own web3.js 1 (it is only an optional peer, and the app no longer provides
+one). That is the file-upload, mint, mint-core and create-token routes,
+where the Turbo SDK itself is the weight (about 140 KB raw, 38 KB gzipped
+of it web3.js). Upgrading to web3.js 3 was tried and backed out earlier
+that day: 3 is one 392 KB file that Turbopack can't tree-shake (a
+`sideEffects: false` patch changed nothing), which made the transfer-authority
+route 88 KB gzipped heavier, and the Turbo path needs 1 anyway.
+
+The `@solana/wallet-adapter-*` packages, `@solana/spl-token`, `bs58`,
+`bn.js` and `bignumber.js` are gone from `apps/tools/package.json`; the
+adapter provider, its network store, the old wallet menus and the web3
+batch sender are deleted. `@solana-program/token-2022` is deliberately not
+installed (it peers on `@solana/zk-sdk`); `lib/solana/token-2022.ts` holds
+what the app needs from that program.
+
+To see what a route ships, `pnpm exec next build --analyze` in `apps/tools`
+writes per-route client sizes to
+`.next/diagnostics/analyze/data/route-summaries.json` and the chunk list per
+route to `.next/diagnostics/route-bundle-stats.json`; grepping the chunks in
+`.next/static/chunks` for a string only one library has (web3.js 1 has
+`"Max seed length exceeded"`) tells which routes carry it.
 
 Peer declarations the workspace knowingly overrides are listed with their
 source in `pnpm-workspace.yaml` (`peerDependencyRules.allowedVersions`): all
@@ -270,23 +281,36 @@ pure and unit-tested). create-token uses the same uploader with its own JSON;
 only file-upload still holds a `TurboStorage` directly, for its balance and
 price queries. The SDK is bundled only into the routes that import these.
 
-### Squads through its web3 SDK
+### Squads through the generated kit client
 
-`src/lib/solana/squads-multisig.ts` is the only module that imports
-`@sqds/multisig`, which is built on web3.js, and the same pattern as the
-Metaplex wrappers: the SDK is used for what it knows (PDAs, account decoders, instruction
-builders, the Squads message format), and everything crosses the boundary as
-kit types. Reads go through the kit RPC (`fetchEncodedAccount(s)`) and the
-SDK's `Account.deserialize(Buffer.from(data))`; web3 instructions are mapped to
-kit's `{ programAddress, accounts, data }`, and the instructions a vault will
-run are mapped the other way into the web3 `TransactionMessage` that
-`batchAddTransaction` wants. `batchProposalSteps` gives the steps of one batch
+`packages/squads` (`@blastctrl/squads`) is a kit client for Squads v4
+generated with Codama from the program's Anchor IDL (`pnpm idl:fetch`,
+`pnpm generate`, like the Metaplex packages), plus hooked helpers ported
+from the SDK: the PDAs the IDL doesn't declare (`findVaultPda`,
+`findTransactionPda`, `findProposalPda`, `findBatchTransactionPda`,
+`findEphemeralSignerPda`, …, added in `codama.mjs`), the compact
+`TransactionMessage` the program takes as `batchAddTransaction` /
+`vaultTransactionCreate` bytes (`encodeVaultTransactionMessage({ vault,
+instructions })`, which compiles kit instructions in the SDK's
+first-appearance key order so the bytes match what the SDK produced;
+pinned against SDK goldens), `vaultTransactionExecutionAccounts` (the
+accounts an execute instruction must list, the vault and ephemeral signers
+never as signers, lookup tables read through the kit RPC) and the
+`Permission` bits. Stored accounts (`Multisig`, `Batch`, `Proposal`,
+`VaultBatchTransaction`) decode with the generated decoders, since the
+program stores them as plain Borsh.
+
+`src/lib/solana/squads-multisig.ts` wraps that for the transfer-authority
+tool: `fetchSquadsMultisig` / `fetchBatchProposal` read through
+`fetchEncodedAccount(s)`, `batchProposalSteps` gives the steps of one batch
 proposal (create draft, add each transaction, activate, approve) as kit
-instruction lists; the member is a plain signer account, which the kit client
-signs as fee payer. Executing is the one call that still needs a web3
-`Connection`, since the SDK reads the stored transaction through it to list the
-accounts execution touches: `executeSteps(rpcUrl, …)` makes one from the
-connector's RPC URL for that call only.
+instruction lists, `approveInstruction` one approval, and `executeSteps`
+one execute per stored transaction that hasn't run, reading the batch and
+its transactions in one request and appending the execution accounts to
+the generated instruction (the builders have no remaining-accounts input).
+The member signs and pays for every step, so the wrappers take the member
+as the kit client's `TransactionSigner` (`client.payer`), the same signer
+rule as the Metaplex wrappers. Everything is async because the PDAs are.
 
 ### Server side: the Octane backend
 
@@ -567,7 +591,7 @@ a `KeyPairSigner` (via `createKeyPairSignerFromBytes`). A `KeyPairSigner` also e
    `generateKeyPairSigner`, lamports are `bigint`.
 3. Instructions come from `@solana-program/*`, Metaplex ones from the
    app's wrappers over `@blastctrl/mpl-token-metadata` and
-   `@blastctrl/mpl-core`, Squads ones from the Squads module. No hand-built compute budget,
+   `@blastctrl/mpl-core`, Squads ones from the Squads module over `@blastctrl/squads`. No hand-built compute budget,
    blockhash fetching, raw sends or confirmation loops.
 4. Send with `client.sendTransaction` (or `sendTransactions` + a plan) for
    one transaction, `sendBatches` / `sendInOrder` for several; read
@@ -598,9 +622,10 @@ docs for this work:
   (`planTransaction` / `sendTransaction` signatures).
 - `apps/tools/node_modules/@solana-program/<program>/dist/types/generated/`
   (instruction inputs, account decoders, program plugin), and
-  `packages/mpl-{token-metadata,core}/src/generated/` for the Metaplex
-  programs (the source itself; `src/hooked/` for Token Metadata's resolvers
-  and PDAs).
+  `packages/mpl-{token-metadata,core}/src/generated/` and
+  `packages/squads/src/generated/` for the Metaplex and Squads programs (the
+  source itself; `src/hooked/` for Token Metadata's resolvers and PDAs and
+  for Squads' message format and execution accounts).
 - `apps/tools/node_modules/@solana/fixed-points/dist/types/` (the `Sol`
   shape and its conversions) and `@solana/rpc-types/dist/types/sol.d.ts`.
 - `apps/tools/node_modules/@solana/connector/dist/chunk-*.mjs` when a

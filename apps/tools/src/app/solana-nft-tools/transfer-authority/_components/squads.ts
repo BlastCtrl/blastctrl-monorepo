@@ -41,7 +41,7 @@ export function useSquadsMultisig(candidate: string) {
       const multisigAddress = address(candidate);
       const account = await fetchEncodedAccount(rpc, multisigAddress);
       return account.exists && isSquadsMultisigAccount(account)
-        ? { vault: squadsVault(multisigAddress) }
+        ? { vault: await squadsVault(multisigAddress) }
         : null;
     },
     staleTime: Infinity,
