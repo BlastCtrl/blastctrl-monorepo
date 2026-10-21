@@ -14,6 +14,7 @@ import {
   type Address,
   type Blockhash,
   type Instruction,
+  type TransactionSigner,
 } from "@solana/kit";
 import type { TransferPlan, VerifyPlan } from "./plan";
 
@@ -34,14 +35,18 @@ export const MAX_NFTS_PER_TRANSACTION = 10;
 export type ReadyTransfer = Extract<TransferPlan, { status: "ready" }>;
 export type ReadyVerify = Extract<VerifyPlan, { status: "ready" }>;
 
-/** Step 1: one `UpdateV1` signed and paid for by the current authority. */
-export function transferInstruction(
+/**
+ * Step 1: one `UpdateV1` signed and paid for by the current authority: the
+ * wallet's signer, or a noop signer for a Squads vault, which signs through
+ * the proposal.
+ */
+export async function transferInstruction(
   plan: ReadyTransfer,
-  wallet: Address,
+  authority: TransactionSigner,
   newAuthority: Address,
-): Instruction {
+): Promise<Instruction> {
   const { metadata, creators } = plan;
-  const [instruction] = updateNftInstructions(wallet, plan.mint, {
+  const [instruction] = await updateNftInstructions(authority, plan.mint, {
     newUpdateAuthority: newAuthority,
     // `data` is all or nothing, so changing the creators means sending the
     // rest of it unchanged.
@@ -59,8 +64,12 @@ export function transferInstruction(
 }
 
 /** Step 2: one `VerifyCreatorV1` signed by the creator. */
-export function verifyInstruction(plan: ReadyVerify, wallet: Address) {
-  return verifyCreatorInstructions(wallet, plan.mint)[0]!;
+export async function verifyInstruction(
+  plan: ReadyVerify,
+  creator: TransactionSigner,
+): Promise<Instruction> {
+  const [instruction] = await verifyCreatorInstructions(creator, plan.mint);
+  return instruction!;
 }
 
 export type Batch = {
@@ -97,6 +106,8 @@ export function transactionSize(
   );
 }
 
+export type PackOptions = { maxBytes?: number; maxPerTransaction?: number };
+
 /**
  * Packs one instruction per NFT into as few transactions as fit under
  * `maxBytes` and `maxPerTransaction`. An instruction too big to share a
@@ -108,7 +119,7 @@ export function packBatches(
   {
     maxBytes = MAX_TRANSACTION_BYTES,
     maxPerTransaction = MAX_NFTS_PER_TRANSACTION,
-  } = {},
+  }: PackOptions = {},
 ): Batch[] {
   const batches: Batch[] = [];
   let current: Batch | null = null;
@@ -131,4 +142,35 @@ export function packBatches(
     batches.push(current);
   }
   return batches;
+}
+
+/** Step 1 for every ready NFT, packed with {@link packBatches}. */
+export async function transferBatches(
+  plans: ReadyTransfer[],
+  authority: TransactionSigner,
+  newAuthority: Address,
+  options?: PackOptions,
+): Promise<Batch[]> {
+  const items = await Promise.all(
+    plans.map(async (plan) => ({
+      mint: plan.mint,
+      instruction: await transferInstruction(plan, authority, newAuthority),
+    })),
+  );
+  return packBatches(items, authority.address, options);
+}
+
+/** Step 2 for every ready NFT, packed with {@link packBatches}. */
+export async function verifyBatches(
+  plans: ReadyVerify[],
+  creator: TransactionSigner,
+  options?: PackOptions,
+): Promise<Batch[]> {
+  const items = await Promise.all(
+    plans.map(async (plan) => ({
+      mint: plan.mint,
+      instruction: await verifyInstruction(plan, creator),
+    })),
+  );
+  return packBatches(items, creator.address, options);
 }

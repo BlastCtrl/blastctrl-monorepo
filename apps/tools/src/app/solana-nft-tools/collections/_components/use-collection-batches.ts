@@ -8,7 +8,7 @@ import {
 import { transactionErrorMessage } from "@/connector/transaction-error";
 import type { KitClient } from "@/connector/use-kit-client";
 import { chunk } from "@/lib/utils";
-import type { Address, Instruction, Signature } from "@solana/kit";
+import type { Instruction, Signature, TransactionSigner } from "@solana/kit";
 import { useState } from "react";
 import type { CollectionItem } from "./collection-plan";
 
@@ -21,18 +21,30 @@ export type CollectionBatch = {
 
 /**
  * Sends `items` as transactions of `perTransaction`, each built with
- * `build`, in one wallet prompt, and keeps every transaction's progress for
- * the status list. `send` resolves with the final list and throws what
- * `sendBatches` throws: a refusal, or an error meaning nothing was sent.
+ * `build` and the wallet's signer, in one wallet prompt, and keeps every
+ * transaction's progress for the status list. `send` resolves with the final
+ * list and throws what `sendBatches` throws: a refusal, or an error meaning
+ * nothing was sent.
  */
 export function useCollectionBatches(
-  build: (wallet: Address, item: CollectionItem) => Instruction[],
+  build: (
+    wallet: TransactionSigner,
+    item: CollectionItem,
+  ) => Promise<Instruction[]>,
   perTransaction: number,
 ) {
   const [batches, setBatches] = useState<CollectionBatch[] | null>(null);
 
   const send = async (client: KitClient, items: CollectionItem[]) => {
     const groups = chunk(items, perTransaction);
+    // Built up front: deriving the PDAs is async, `sendBatches` builds sync.
+    const instructions = await Promise.all(
+      groups.map(async (group) =>
+        (
+          await Promise.all(group.map((item) => build(client.payer, item)))
+        ).flat(),
+      ),
+    );
     const current: CollectionBatch[] = groups.map((items) => ({
       items,
       status: "waiting",
@@ -48,8 +60,7 @@ export function useCollectionBatches(
         groups.map((items, index) => ({ index, items })),
         {
           sender: kitBatchSender(client),
-          build: (batch) =>
-            batch.items.flatMap((item) => build(client.payer.address, item)),
+          build: (batch) => instructions[batch.index]!,
         },
         {
           onStage: (index, stage) => update(index, { status: stage }),

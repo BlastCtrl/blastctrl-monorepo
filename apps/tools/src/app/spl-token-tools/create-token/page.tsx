@@ -57,7 +57,7 @@ export default function CreateToken() {
 
     setIsConfirming(true);
     try {
-      const owner = client.payer.address;
+      const owner = client.payer;
       const mint = address(data.mint);
       const build =
         selectedAction === "Add"
@@ -66,7 +66,10 @@ export default function CreateToken() {
 
       // Simulate with empty fields first: this fails fast when the wallet is
       // not the authority, before anything is uploaded.
-      const simulation = await simulateUnsigned(client, build(owner, mint, {}));
+      const simulation = await simulateUnsigned(
+        client,
+        await build(owner, mint, {}),
+      );
       if (simulation.err) {
         notify({
           type: "error",
@@ -110,7 +113,7 @@ export default function CreateToken() {
 
       await notifyPromise(
         client.sendTransaction(
-          build(owner, mint, {
+          await build(owner, mint, {
             name: data.name,
             symbol: data.symbol,
             uri: metadataUri,

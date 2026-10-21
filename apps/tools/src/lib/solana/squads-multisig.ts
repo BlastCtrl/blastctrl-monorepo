@@ -1,87 +1,94 @@
 import {
-  AccountRole,
-  address,
+  decodeBatch,
+  decodeMultisig,
+  decodeProposal,
+  decodeVaultBatchTransaction,
+  encodeVaultTransactionMessage,
+  findBatchTransactionPda,
+  findProposalPda,
+  findTransactionPda,
+  findVaultPda,
+  getBatchAddTransactionInstruction,
+  getBatchCreateInstruction,
+  getBatchExecuteTransactionInstruction,
+  getProposalActivateInstruction,
+  getProposalApproveInstruction,
+  getProposalCreateInstruction,
+  hasPermission,
+  MULTISIG_DISCRIMINATOR,
+  Permission,
+  SQUADS_MULTISIG_PROGRAM_ADDRESS,
+  vaultTransactionExecutionAccounts,
+} from "@blastctrl/squads";
+import {
+  containsBytes,
   fetchEncodedAccount,
   fetchEncodedAccounts,
-  isSignerRole,
-  isWritableRole,
   type Address,
   type GetAccountInfoApi,
   type GetMultipleAccountsApi,
   type Instruction,
   type ReadonlyUint8Array,
   type Rpc,
+  type TransactionSigner,
 } from "@solana/kit";
-import {
-  Connection,
-  PublicKey,
-  TransactionInstruction,
-  TransactionMessage,
-} from "@solana/web3.js";
-import * as multisig from "@sqds/multisig";
 
 /**
- * This is the only module that touches the Squads SDK, which is built on
- * web3.js: it takes `PublicKey`s and a web3 `TransactionMessage` for the
- * transactions a vault will run, and hands back web3 instructions. Reads go
- * through the kit RPC and the SDK's own account decoders; instructions are
- * mapped to kit at the boundary, so the kit client signs and sends them.
- * Executing is the one step that still needs a web3 `Connection`, because
- * the SDK reads the stored transaction through it.
+ * Squads v4 batch proposals on the kit program client `@blastctrl/squads`
+ * (Codama-generated from the program's IDL, with the Squads message format
+ * and execution-account logic ported into its hooked helpers). Reads go
+ * through the kit RPC and the generated decoders; PDAs are derived with kit,
+ * so everything here is async.
+ *
+ * The member is passed as a `TransactionSigner`, the kit client's wallet
+ * signer, so the instructions carry the signer the client signs with (kit
+ * refuses two different signers for one address). A vault never signs
+ * client-side: the instructions it will run are compiled into the stored
+ * message, and the program signs for it when the batch executes.
  */
 
-const { Permission, Permissions } = multisig.types;
-
 /** Squads v4, the program behind app.squads.so. */
-export const SQUADS_PROGRAM_ADDRESS = address(multisig.PROGRAM_ID.toBase58());
-
-const toPublicKey = (account: Address) => new PublicKey(account);
-const toAddress = (key: PublicKey): Address => address(key.toBase58());
-
-/** A web3 instruction as kit's `{ programAddress, accounts, data }`. */
-function toKitInstruction(instruction: TransactionInstruction): Instruction {
-  return {
-    programAddress: toAddress(instruction.programId),
-    accounts: instruction.keys.map((key) => ({
-      address: toAddress(key.pubkey),
-      role: key.isSigner
-        ? key.isWritable
-          ? AccountRole.WRITABLE_SIGNER
-          : AccountRole.READONLY_SIGNER
-        : key.isWritable
-          ? AccountRole.WRITABLE
-          : AccountRole.READONLY,
-    })),
-    data: new Uint8Array(instruction.data),
-  };
-}
-
-/** A kit instruction as web3's, for the message a vault will run. */
-function toWeb3Instruction(instruction: Instruction): TransactionInstruction {
-  return new TransactionInstruction({
-    programId: toPublicKey(instruction.programAddress),
-    keys: (instruction.accounts ?? []).map((account) => ({
-      pubkey: toPublicKey(account.address),
-      isSigner: isSignerRole(account.role),
-      isWritable: isWritableRole(account.role),
-    })),
-    data: Buffer.from(instruction.data ?? new Uint8Array()),
-  });
-}
+export const SQUADS_PROGRAM_ADDRESS: Address = SQUADS_MULTISIG_PROGRAM_ADDRESS;
 
 /**
  * A multisig's vault, the address that holds its assets and signs for it.
  * The multisig account itself can never sign, so anything handed to it
  * instead of the vault is stuck for good.
  */
-export function squadsVault(multisigAddress: Address, index = 0): Address {
-  return toAddress(
-    multisig.getVaultPda({
-      multisigPda: toPublicKey(multisigAddress),
-      index,
-    })[0],
-  );
+export async function squadsVault(
+  multisigAddress: Address,
+  index = 0,
+): Promise<Address> {
+  const [vault] = await findVaultPda({ multisig: multisigAddress, index });
+  return vault;
 }
+
+/** The account of a multisig's transaction or batch at `index`. */
+const transactionAddress = async (multisigAddress: Address, index: bigint) =>
+  (await findTransactionPda({ multisig: multisigAddress, index }))[0];
+
+/** The proposal that goes with the transaction or batch at `index`. */
+const proposalAddress = async (multisigAddress: Address, index: bigint) =>
+  (
+    await findProposalPda({
+      multisig: multisigAddress,
+      transactionIndex: index,
+    })
+  )[0];
+
+/** Transaction `transactionIndex` (1-based) of the batch at `batchIndex`. */
+const batchTransactionAddress = async (
+  multisigAddress: Address,
+  batchIndex: bigint,
+  transactionIndex: number,
+) =>
+  (
+    await findBatchTransactionPda({
+      multisig: multisigAddress,
+      batchIndex,
+      transactionIndex,
+    })
+  )[0];
 
 /** Whether an account is a Squads multisig, by its owner and discriminator. */
 export function isSquadsMultisigAccount(
@@ -90,9 +97,7 @@ export function isSquadsMultisigAccount(
   return (
     !!account &&
     account.programAddress === SQUADS_PROGRAM_ADDRESS &&
-    multisig.accounts.multisigDiscriminator.every(
-      (byte, i) => account.data[i] === byte,
-    )
+    containsBytes(account.data, MULTISIG_DISCRIMINATOR, 0)
   );
 }
 
@@ -122,21 +127,19 @@ export async function fetchSquadsMultisig(
     commitment: "confirmed",
   });
   if (!account.exists || !isSquadsMultisigAccount(account)) return null;
-  const [info] = multisig.accounts.Multisig.deserialize(
-    Buffer.from(account.data),
-  );
+  const { data: info } = decodeMultisig(account);
   return {
     address: multisigAddress,
-    vault: squadsVault(multisigAddress),
+    vault: await squadsVault(multisigAddress),
     threshold: info.threshold,
     timeLock: info.timeLock,
     members: info.members.map(({ key, permissions }) => ({
-      address: toAddress(key),
-      initiate: Permissions.has(permissions, Permission.Initiate),
-      vote: Permissions.has(permissions, Permission.Vote),
-      execute: Permissions.has(permissions, Permission.Execute),
+      address: key,
+      initiate: hasPermission(permissions, Permission.Initiate),
+      vote: hasPermission(permissions, Permission.Vote),
+      execute: hasPermission(permissions, Permission.Execute),
     })),
-    transactionIndex: BigInt(info.transactionIndex.toString()),
+    transactionIndex: info.transactionIndex,
   };
 }
 
@@ -163,29 +166,22 @@ export async function fetchBatchProposal(
   multisigAddress: Address,
   index: bigint,
 ): Promise<BatchProposal | null> {
-  const multisigPda = toPublicKey(multisigAddress);
-  const [batchPda] = multisig.getTransactionPda({ multisigPda, index });
-  const [proposalPda] = multisig.getProposalPda({
-    multisigPda,
-    transactionIndex: index,
-  });
   const [batchAccount, proposalAccount] = await fetchEncodedAccounts(
     rpc,
-    [toAddress(batchPda), toAddress(proposalPda)],
+    [
+      await transactionAddress(multisigAddress, index),
+      await proposalAddress(multisigAddress, index),
+    ],
     { commitment: "confirmed" },
   );
   if (!batchAccount?.exists || !proposalAccount?.exists) return null;
   try {
-    const [batch] = multisig.accounts.Batch.deserialize(
-      Buffer.from(batchAccount.data),
-    );
-    const [proposal] = multisig.accounts.Proposal.deserialize(
-      Buffer.from(proposalAccount.data),
-    );
+    const { data: batch } = decodeBatch(batchAccount);
+    const { data: proposal } = decodeProposal(proposalAccount);
     return {
       index,
       status: proposal.status.__kind,
-      approved: proposal.approved.map(toAddress),
+      approved: proposal.approved,
       size: batch.size,
       executed: batch.executedTransactionIndex,
     };
@@ -204,118 +200,147 @@ export type Steps = Instruction[][];
  * at a time from `from` (1-based) on, then activated, and approved by the
  * creator when they can vote. Starting `from` past 1 finishes a draft whose
  * filling was interrupted. Each transaction is what the vault will run, as
- * kit instructions; the member signs and pays for every step.
+ * kit instructions; `signer` is the member's wallet, which signs and pays
+ * for every step.
  */
-export function batchProposalSteps({
+export async function batchProposalSteps({
   multisig: info,
   member,
+  signer,
   index,
   transactions,
   from = 1,
 }: {
   multisig: SquadsMultisig;
   member: SquadsMember;
+  signer: TransactionSigner;
   index: bigint;
   transactions: Instruction[][];
   from?: number;
-}): Steps {
-  const multisigPda = toPublicKey(info.address);
-  const memberKey = toPublicKey(member.address);
-  const vault = toPublicKey(info.vault);
+}): Promise<Steps> {
+  const multisig = info.address;
+  const batch = await transactionAddress(multisig, index);
+  const proposal = await proposalAddress(multisig, index);
   const steps: Steps = [];
   if (from === 1) {
     steps.push([
-      toKitInstruction(
-        multisig.instructions.batchCreate({
-          multisigPda,
-          creator: memberKey,
-          batchIndex: index,
-          vaultIndex: 0,
-        }),
-      ),
-      toKitInstruction(
-        multisig.instructions.proposalCreate({
-          multisigPda,
-          creator: memberKey,
-          transactionIndex: index,
-          isDraft: true,
-        }),
-      ),
+      getBatchCreateInstruction({
+        multisig,
+        batch,
+        creator: signer,
+        vaultIndex: 0,
+        memo: null,
+      }),
+      getProposalCreateInstruction({
+        multisig,
+        proposal,
+        creator: signer,
+        transactionIndex: index,
+        draft: true,
+      }),
     ]);
   }
-  transactions.slice(from - 1).forEach((instructions, i) => {
+  for (const [i, instructions] of transactions.slice(from - 1).entries()) {
     steps.push([
-      toKitInstruction(
-        multisig.instructions.batchAddTransaction({
-          multisigPda,
-          member: memberKey,
-          vaultIndex: 0,
-          batchIndex: index,
-          transactionIndex: from + i,
-          ephemeralSigners: 0,
-          transactionMessage: new TransactionMessage({
-            payerKey: vault,
-            // Squads stores the message without a blockhash.
-            recentBlockhash: PublicKey.default.toBase58(),
-            instructions: instructions.map(toWeb3Instruction),
-          }),
+      getBatchAddTransactionInstruction({
+        multisig,
+        proposal,
+        batch,
+        transaction: await batchTransactionAddress(multisig, index, from + i),
+        member: signer,
+        ephemeralSigners: 0,
+        transactionMessage: encodeVaultTransactionMessage({
+          vault: info.vault,
+          instructions,
         }),
-      ),
-    ]);
-  });
-  steps.push([
-    toKitInstruction(
-      multisig.instructions.proposalActivate({
-        multisigPda,
-        member: memberKey,
-        transactionIndex: index,
       }),
-    ),
-    ...(member.vote
-      ? [approveInstruction(info.address, member.address, index)]
-      : []),
+    ]);
+  }
+  steps.push([
+    getProposalActivateInstruction({ multisig, proposal, member: signer }),
+    ...(member.vote ? [await approveInstruction(multisig, signer, index)] : []),
   ]);
   return steps;
 }
 
-export function approveInstruction(
+export async function approveInstruction(
   multisigAddress: Address,
-  member: Address,
+  member: TransactionSigner,
   index: bigint,
-): Instruction {
-  return toKitInstruction(
-    multisig.instructions.proposalApprove({
-      multisigPda: toPublicKey(multisigAddress),
-      member: toPublicKey(member),
-      transactionIndex: index,
-    }),
-  );
+): Promise<Instruction> {
+  return getProposalApproveInstruction({
+    multisig: multisigAddress,
+    member,
+    proposal: await proposalAddress(multisigAddress, index),
+    args: { memo: null },
+  });
 }
 
 /**
  * One transaction per batch transaction that hasn't run yet, in order. The
- * SDK reads each stored transaction for the accounts its execution touches,
- * through a web3 `Connection` on `rpcUrl`.
+ * batch and its stored transactions are read in one request, and each
+ * execute instruction gets the accounts its stored transaction touches.
  */
 export async function executeSteps(
-  rpcUrl: string,
+  rpc: Rpc<GetMultipleAccountsApi>,
   info: SquadsMultisig,
-  member: SquadsMember,
+  member: TransactionSigner,
   proposal: BatchProposal,
 ): Promise<Steps> {
-  const connection = new Connection(rpcUrl, "confirmed");
+  const multisig = info.address;
+  const batch = await transactionAddress(multisig, proposal.index);
+  const pending = Array.from(
+    { length: proposal.size - proposal.executed },
+    (_, i) => proposal.executed + 1 + i,
+  );
+  const [batchAccount, ...transactionAccounts] = await fetchEncodedAccounts(
+    rpc,
+    [
+      batch,
+      ...(await Promise.all(
+        pending.map((i) =>
+          batchTransactionAddress(multisig, proposal.index, i),
+        ),
+      )),
+    ],
+    { commitment: "confirmed" },
+  );
+  if (!batchAccount?.exists) {
+    throw Error(`Batch ${proposal.index} of ${multisig} doesn't exist`);
+  }
+  const { data: batchInfo } = decodeBatch(batchAccount);
+  const vault = await squadsVault(multisig, batchInfo.vaultIndex);
+  const proposalPda = await proposalAddress(multisig, proposal.index);
   const steps: Steps = [];
-  for (let i = proposal.executed + 1; i <= proposal.size; i++) {
-    const { instruction } = await multisig.instructions.batchExecuteTransaction(
+  for (const [i, account] of transactionAccounts.entries()) {
+    if (!account?.exists) {
+      throw Error(
+        `Transaction ${pending[i]} of batch ${proposal.index} doesn't exist`,
+      );
+    }
+    const { data: transaction } = decodeVaultBatchTransaction(account);
+    const execute = getBatchExecuteTransactionInstruction({
+      multisig,
+      member,
+      proposal: proposalPda,
+      batch,
+      transaction: account.address,
+    });
+    // The accounts the stored transaction touches go after the fixed ones.
+    steps.push([
       {
-        connection,
-        multisigPda: toPublicKey(info.address),
-        member: toPublicKey(member.address),
-        batchIndex: proposal.index,
-        transactionIndex: i,
+        ...execute,
+        accounts: [
+          ...execute.accounts,
+          ...(await vaultTransactionExecutionAccounts(rpc, {
+            message: transaction.message,
+            ephemeralSignerBumps: transaction.ephemeralSignerBumps,
+            vault,
+            transaction: batch,
+          })),
+        ],
       },
-    );
-    steps.push([toKitInstruction(instruction)]);
+    ]);
   }
   return steps;
 }

@@ -1,0 +1,8 @@
+{
+  "repository": "https://github.com/metaplex-foundation/mpl-core",
+  "path": "idls/mpl_core.json",
+  "ref": "main",
+  "commit": "4e67f526746073586ed40d1f581ce74bcca6a224",
+  "committedAt": "2026-10-10T17:20:59Z",
+  "fetchedAt": "2026-10-21T12:29:26.760Z"
+}

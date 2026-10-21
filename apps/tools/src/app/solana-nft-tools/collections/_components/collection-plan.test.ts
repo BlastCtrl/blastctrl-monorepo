@@ -181,6 +181,8 @@ describe("planRemoveFromCollection", () => {
 });
 
 describe("NFTs per transaction", () => {
+  // The wallet's signer, as the fee payer and in the instructions.
+  const walletSigner = createNoopSigner(wallet);
   const lifetime = {
     blockhash: "11111111111111111111111111111111" as Blockhash,
     lastValidBlockHeight: 1n,
@@ -189,7 +191,7 @@ describe("NFTs per transaction", () => {
   const message = (instructions: Instruction[]) =>
     pipe(
       createTransactionMessage({ version: 0 }),
-      (m) => setTransactionMessageFeePayerSigner(createNoopSigner(wallet), m),
+      (m) => setTransactionMessageFeePayerSigner(walletSigner, m),
       (m) => setTransactionMessageLifetimeUsingBlockhash(lifetime, m),
       (m) => appendTransactionMessageInstructions(instructions, m),
       fillTransactionMessageProvisoryResourceLimits,
@@ -202,27 +204,48 @@ describe("NFTs per transaction", () => {
     programAddress: address("ComputeBudget111111111111111111111111111111"),
     data: new Uint8Array([3, 16, 39, 0, 0, 0, 0, 0, 0]),
   };
-  const adds = (n: number) =>
-    Array.from({ length: n }, () =>
-      addToCollectionInstructions(wallet, freshAddress(), collection),
+  const adds = async (n: number) =>
+    (
+      await Promise.all(
+        Array.from({ length: n }, () =>
+          addToCollectionInstructions(walletSigner, freshAddress(), collection),
+        ),
+      )
     ).flat();
-  const removes = (n: number) =>
-    Array.from({ length: n }, () =>
-      removeFromCollectionInstructions(wallet, freshAddress(), collection),
+  const removes = async (n: number) =>
+    (
+      await Promise.all(
+        Array.from({ length: n }, () =>
+          removeFromCollectionInstructions(
+            walletSigner,
+            freshAddress(),
+            collection,
+          ),
+        ),
+      )
     ).flat();
 
-  it("adds as many as fit in a packet next to a wallet's priority fee", () => {
+  it("adds as many as fit in a packet next to a wallet's priority fee", async () => {
     expect(
-      wireSize([...adds(NFTS_PER_ADD_TRANSACTION), setComputeUnitPrice]),
+      wireSize([
+        ...(await adds(NFTS_PER_ADD_TRANSACTION)),
+        setComputeUnitPrice,
+      ]),
     ).toBeLessThanOrEqual(PACKET_SIZE);
     expect(
-      wireSize([...adds(NFTS_PER_ADD_TRANSACTION + 1), setComputeUnitPrice]),
+      wireSize([
+        ...(await adds(NFTS_PER_ADD_TRANSACTION + 1)),
+        setComputeUnitPrice,
+      ]),
     ).toBeGreaterThan(PACKET_SIZE);
   });
 
-  it("removes well within a packet", () => {
+  it("removes well within a packet", async () => {
     expect(
-      wireSize([...removes(NFTS_PER_REMOVE_TRANSACTION), setComputeUnitPrice]),
+      wireSize([
+        ...(await removes(NFTS_PER_REMOVE_TRANSACTION)),
+        setComputeUnitPrice,
+      ]),
     ).toBeLessThanOrEqual(PACKET_SIZE);
   });
 });

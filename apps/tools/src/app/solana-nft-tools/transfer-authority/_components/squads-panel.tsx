@@ -20,7 +20,7 @@ import {
   type Steps,
 } from "@/lib/solana/squads-multisig";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
-import { useConnector, useConnectorClient } from "@solana/connector/react";
+import { useConnector } from "@solana/connector/react";
 import type { Address, Instruction } from "@solana/kit";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -53,7 +53,6 @@ export function SquadsPanel({
   const { client } = useKitClient();
   const { account } = useConnector();
   const { rpc, network } = useAppRpc();
-  const rpcUrl = useConnectorClient()?.getRpcUrl() ?? null;
   const { setOpen } = useConnectorDialog();
   const [index, setIndex] = useState<bigint | null>(null);
   const [indexInput, setIndexInput] = useState("");
@@ -122,13 +121,16 @@ export function SquadsPanel({
     run("Creating the proposal", async () => {
       // Read the multisig again for the index the batch will get.
       const fresh = rpc && (await fetchSquadsMultisig(rpc, info.address));
-      if (!fresh || !member) throw Error("Couldn't read the multisig");
+      if (!fresh || !member || !client) {
+        throw Error("Couldn't read the multisig");
+      }
       const next = fresh.transactionIndex + 1n;
       setIndex(next);
       setIndexInput(next.toString());
       return batchProposalSteps({
         multisig: fresh,
         member,
+        signer: client.payer,
         index: next,
         transactions: batches.map((b) => b.instructions),
       });
@@ -139,6 +141,7 @@ export function SquadsPanel({
       batchProposalSteps({
         multisig: info,
         member: member!,
+        signer: client!.payer,
         index: draft.index,
         transactions: batches.map((b) => b.instructions),
         from: draft.size + 1,
@@ -147,15 +150,15 @@ export function SquadsPanel({
 
   const approve = (active: BatchProposal) =>
     run("Approving", async () => [
-      [approveInstruction(info.address, member!.address, active.index)],
+      [await approveInstruction(info.address, client!.payer, active.index)],
     ]);
 
   const execute = (approved: BatchProposal) =>
     run(
       "Executing",
       () => {
-        if (!rpcUrl) throw Error("RPC not available");
-        return executeSteps(rpcUrl, info, member!, approved);
+        if (!rpc) throw Error("RPC not available");
+        return executeSteps(rpc, info, client!.payer, approved);
       },
       () => EXECUTE_COMPUTE_UNITS,
     );

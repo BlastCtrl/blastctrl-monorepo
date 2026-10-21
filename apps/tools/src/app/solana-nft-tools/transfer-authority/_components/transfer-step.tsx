@@ -1,8 +1,14 @@
 import { useConnectorDialog } from "@/connector/connector-dialog";
+import { useKitClient } from "@/connector/use-kit-client";
 import { useTokenMetadata } from "@/state/queries/use-token-metadata";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { useConnector } from "@solana/connector/react";
-import { address, isAddress, type Address } from "@solana/kit";
+import {
+  address,
+  createNoopSigner,
+  isAddress,
+  type Address,
+} from "@solana/kit";
 import { useMemo, useState } from "react";
 import { AddressInput, Label } from "./address-input";
 import { NftTable } from "./nft-table";
@@ -20,8 +26,11 @@ import {
   useSquadsMultisig,
 } from "./squads";
 import { SquadsPanel } from "./squads-panel";
-import type { ReadyTransfer } from "./transactions";
-import { packBatches, transferInstruction } from "./transactions";
+import type { Batch, ReadyTransfer } from "./transactions";
+import { transferBatches } from "./transactions";
+import { useResolved } from "./use-resolved";
+
+const NO_BATCHES: Batch[] = [];
 
 const CREATOR_MODES: {
   value: CreatorMode;
@@ -66,6 +75,7 @@ type Props = {
 
 export function TransferStep({ mints, onBusyChange }: Props) {
   const { account } = useConnector();
+  const { client } = useKitClient();
   const { setOpen } = useConnectorDialog();
   const [mode, setMode] = useState<SignerMode>("wallet");
   const [multisigAddress, setMultisigAddress] = useState("");
@@ -75,6 +85,20 @@ export function TransferStep({ mints, onBusyChange }: Props) {
   );
   /** The current update authority, null until it's known. */
   const authority = mode === "wallet" ? account : (multisig?.vault ?? null);
+  /**
+   * Who signs the instructions: the kit client's wallet signer, or a noop
+   * signer for the vault, which signs through the Squads proposal.
+   */
+  const vault = multisig?.vault;
+  const authoritySigner = useMemo(
+    () =>
+      mode === "wallet"
+        ? (client?.payer ?? null)
+        : vault
+          ? createNoopSigner(vault)
+          : null,
+    [mode, client, vault],
+  );
 
   const [checked, setChecked] = useState<Address[]>([]);
   const [newAuthority, setNewAuthority] = useState("");
@@ -140,24 +164,18 @@ export function TransferStep({ mints, onBusyChange }: Props) {
     creatorMode,
   ]);
 
-  const batches = useMemo(() => {
-    if (!plans || !authority) return [];
-    const ready = plans.filter((p): p is ReadyTransfer => p.status === "ready");
-    return packBatches(
-      ready.map((plan) => ({
-        mint: plan.mint,
-        instruction: transferInstruction(
-          plan,
-          authority,
-          address(newAuthority),
-        ),
-      })),
-      authority,
+  const pendingBatches = useMemo(() => {
+    if (!plans || !authoritySigner) return null;
+    return transferBatches(
+      plans.filter((p): p is ReadyTransfer => p.status === "ready"),
+      authoritySigner,
+      address(newAuthority),
       mode === "squads"
         ? { maxPerTransaction: MAX_TRANSFERS_PER_SQUADS_TRANSACTION }
         : undefined,
     );
-  }, [plans, authority, newAuthority, mode]);
+  }, [plans, authoritySigner, newAuthority, mode]);
+  const batches = useResolved(pendingBatches) ?? NO_BATCHES;
 
   const readyCount = batches.reduce((sum, b) => sum + b.mints.length, 0);
   const listChanged =

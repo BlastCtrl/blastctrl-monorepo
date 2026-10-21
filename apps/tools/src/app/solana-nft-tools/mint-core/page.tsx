@@ -5,8 +5,8 @@ import { useConnectorDialog } from "@/connector/connector-dialog";
 import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient } from "@/connector/use-kit-client";
 import { useArweaveUploader } from "@/lib/hooks/use-arweave-uploader";
-import { createCoreAssetInstructions } from "@/lib/solana/metaplex-core";
 import { uploadNftMetadata } from "@/lib/solana/metaplex-json-metadata";
+import { getCreateV1Instruction } from "@blastctrl/mpl-core";
 import { Button, Checkbox, SpinnerIcon } from "@blastctrl/ui";
 import { generateKeyPairSigner } from "@solana/kit";
 import { useState } from "react";
@@ -60,13 +60,17 @@ export default function Mint() {
         : data.uri;
       if (uri === null) return;
 
+      // The wallet pays and, by the program's defaults, owns the asset and
+      // is its update authority. The asset keypair signs with the wallet.
       const asset = await generateKeyPairSigner();
-      const result = await client.sendTransaction(
-        createCoreAssetInstructions(client.payer.address, asset, {
+      const result = await client.sendTransaction([
+        getCreateV1Instruction({
+          asset,
+          payer: client.payer,
           name: data.name,
           uri,
         }),
-      );
+      ]);
 
       notify({
         title: "NFT mint successful",

@@ -1,24 +1,39 @@
+/**
+ * Token Metadata on the kit program client `@blastctrl/mpl-token-metadata`
+ * (Codama-generated). The builders return kit instructions for the kit client
+ * to plan, sign and send.
+ *
+ * Every builder takes the signing authority as a `TransactionSigner` and
+ * passes that very object into the generated builders, so the instructions
+ * carry the signer the client signs with: `client.payer` for the connected
+ * wallet (kit refuses two different signers for one address, so don't wrap
+ * the wallet's address in a noop signer), or `createNoopSigner(vault)` for an
+ * account that signs elsewhere, such as a Squads vault. A keypair that must
+ * sign, like a new mint, is passed as its own signer the same way.
+ *
+ * The builders are async because kit derives PDAs (the metadata and master
+ * edition accounts) asynchronously.
+ */
 import {
-  createMetadataAccountV3,
-  createV1,
   findMetadataPda,
-  getMetadataAccountDataSerializer,
-  mintV1,
-  MPL_TOKEN_METADATA_PROGRAM_ID,
+  getCreateMetadataAccountV3InstructionAsync,
+  getCreateV1InstructionAsync,
+  getMetadataDecoder,
+  getMintV1InstructionAsync,
+  getUnverifyCollectionV1InstructionAsync,
+  getUpdateMetadataAccountV2Instruction,
+  getUpdateV1InstructionAsync,
+  getVerifyCollectionV1InstructionAsync,
+  getVerifyCreatorV1Instruction,
+  MPL_TOKEN_METADATA_PROGRAM_ADDRESS,
   printSupply,
   TokenStandard,
-  unverifyCollectionV1,
-  updateMetadataAccountV2,
-  updateV1,
-  verifyCollectionV1,
-  verifyCreatorV1,
-  type CreatorArgs,
   type DataV2Args,
-} from "@metaplex-foundation/mpl-token-metadata";
+} from "@blastctrl/mpl-token-metadata";
 import {
-  address,
   fetchEncodedAccount,
   fetchEncodedAccounts,
+  unwrapOption,
   type Address,
   type GetAccountInfoApi,
   type GetMultipleAccountsApi,
@@ -27,20 +42,11 @@ import {
   type TransactionSigner,
 } from "@solana/kit";
 import { chunk } from "../utils";
-import {
-  fromUmiOption,
-  getUmi,
-  toKitInstructions,
-  toUmiBasisPoints,
-  toUmiPublicKey,
-  toUmiSigner,
-} from "./metaplex-umi";
 
 export { TokenStandard };
 
-export const TOKEN_METADATA_PROGRAM_ADDRESS = address(
-  MPL_TOKEN_METADATA_PROGRAM_ID,
-);
+export const TOKEN_METADATA_PROGRAM_ADDRESS: Address =
+  MPL_TOKEN_METADATA_PROGRAM_ADDRESS;
 
 /** The fields this app writes to a token's metadata account. */
 export type TokenMetadataFields = Pick<DataV2Args, "name" | "symbol" | "uri">;
@@ -56,47 +62,47 @@ const dataV2 = (fields: Partial<TokenMetadataFields>): DataV2Args => ({
   ...fields,
 });
 
+/** The metadata PDA of `mint`. */
+export const findMetadataAddress = async (mint: Address): Promise<Address> =>
+  (await findMetadataPda({ mint }))[0];
+
 /**
- * Creates the Metaplex metadata account for `mint`. `wallet` must be the mint
- * authority; it pays for the account and becomes the update authority.
+ * Creates the Metaplex metadata account for `mint`. `authority` must be the
+ * mint authority; it pays for the account and becomes the update authority.
  */
-export function createMetadataInstructions(
-  wallet: Address,
+export async function createMetadataInstructions(
+  authority: TransactionSigner,
   mint: Address,
   fields: Partial<TokenMetadataFields>,
-): Instruction[] {
-  const umi = getUmi();
-  const mintKey = toUmiPublicKey(mint);
-  return toKitInstructions(
-    createMetadataAccountV3(umi, {
-      mint: mintKey,
-      metadata: findMetadataPda(umi, { mint: mintKey }),
-      mintAuthority: toUmiSigner(wallet),
-      updateAuthority: toUmiPublicKey(wallet),
-      payer: toUmiSigner(wallet),
+): Promise<Instruction[]> {
+  return [
+    await getCreateMetadataAccountV3InstructionAsync({
+      mint,
+      mintAuthority: authority,
+      payer: authority,
+      updateAuthority: authority.address,
       data: dataV2(fields),
       isMutable: true,
       collectionDetails: null,
     }),
-  );
+  ];
 }
 
-/** Rewrites the metadata of `mint`. `wallet` must be the update authority. */
-export function updateMetadataInstructions(
-  wallet: Address,
+/** Rewrites the metadata of `mint`. `authority` must be the update authority. */
+export async function updateMetadataInstructions(
+  authority: TransactionSigner,
   mint: Address,
   fields: Partial<TokenMetadataFields>,
-): Instruction[] {
-  const umi = getUmi();
-  return toKitInstructions(
-    updateMetadataAccountV2(umi, {
-      metadata: findMetadataPda(umi, { mint: toUmiPublicKey(mint) }),
-      updateAuthority: toUmiSigner(wallet),
+): Promise<Instruction[]> {
+  return [
+    getUpdateMetadataAccountV2Instruction({
+      metadata: await findMetadataAddress(mint),
+      updateAuthority: authority,
       data: dataV2(fields),
       isMutable: true,
       primarySaleHappened: true,
     }),
-  );
+  ];
 }
 
 /** A royalty recipient as stored in the metadata account. */
@@ -107,12 +113,6 @@ export type NftCreator = {
   verified: boolean;
 };
 
-const toUmiCreator = (creator: NftCreator): CreatorArgs => ({
-  address: toUmiPublicKey(creator.address),
-  share: creator.share,
-  verified: creator.verified,
-});
-
 export type CreateNftFields = {
   name: string;
   symbol: string;
@@ -120,9 +120,9 @@ export type CreateNftFields = {
   /** Royalties in basis points, 0–10000. */
   sellerFeeBasisPoints: number;
   /**
-   * Omit to let the program default apply: the wallet as the single, verified
-   * creator. A creator marked `verified` must sign, so only the wallet's own
-   * entry may be.
+   * Omit to let the program default apply: the authority as the single,
+   * verified creator. A creator marked `verified` must sign, so only the
+   * authority's own entry may be.
    */
   creators?: NftCreator[];
   isMutable: boolean;
@@ -133,50 +133,44 @@ export type CreateNftFields = {
 };
 
 /**
- * Mints a Token Metadata NFT to `wallet`: `createV1` (mint, metadata and
- * master edition) followed by `mintV1` of the single token. `wallet` pays and
- * becomes the update authority. `mint` is a fresh keypair signer; it is
- * attached to the instructions so the kit client signs with it.
+ * Mints a Token Metadata NFT to `authority`: `createV1` (mint, metadata and
+ * master edition) followed by `mintV1` of the single token. `authority` pays
+ * and becomes the update authority. `mint` is a fresh keypair signer; it is
+ * attached to `createV1` so the kit client signs with it.
  */
-export function createNftInstructions(
-  wallet: Address,
+export async function createNftInstructions(
+  authority: TransactionSigner,
   mint: TransactionSigner,
   fields: CreateNftFields,
-): Instruction[] {
-  const umi = getUmi();
-  const walletSigner = toUmiSigner(wallet);
-  const walletKey = toUmiPublicKey(wallet);
-  const mintKey = toUmiPublicKey(mint.address);
-
-  const builder = createV1(umi, {
-    mint: toUmiSigner(mint.address),
-    authority: walletSigner,
-    payer: walletSigner,
-    updateAuthority: walletKey,
-    name: fields.name,
-    symbol: fields.symbol,
-    uri: fields.uri,
-    sellerFeeBasisPoints: toUmiBasisPoints(fields.sellerFeeBasisPoints),
-    creators: fields.creators?.map(toUmiCreator),
-    isMutable: fields.isMutable,
-    isCollection: fields.isCollection,
-    tokenStandard: TokenStandard.NonFungible,
-    printSupply:
-      fields.maxSupply === 0
-        ? printSupply("Zero")
-        : printSupply("Limited", [fields.maxSupply]),
-  }).add(
-    mintV1(umi, {
-      mint: mintKey,
-      tokenOwner: walletKey,
-      authority: walletSigner,
-      payer: walletSigner,
+): Promise<Instruction[]> {
+  return Promise.all([
+    getCreateV1InstructionAsync({
+      mint,
+      authority,
+      payer: authority,
+      updateAuthority: authority.address,
+      name: fields.name,
+      symbol: fields.symbol,
+      uri: fields.uri,
+      sellerFeeBasisPoints: fields.sellerFeeBasisPoints,
+      creators: fields.creators,
+      isMutable: fields.isMutable,
+      isCollection: fields.isCollection,
+      tokenStandard: TokenStandard.NonFungible,
+      printSupply:
+        fields.maxSupply === 0
+          ? printSupply("Zero")
+          : printSupply("Limited", [fields.maxSupply]),
+    }),
+    getMintV1InstructionAsync({
+      mint: mint.address,
+      tokenOwner: authority.address,
+      authority,
+      payer: authority,
       tokenStandard: TokenStandard.NonFungible,
       amount: 1,
     }),
-  );
-
-  return toKitInstructions(builder, [mint]);
+  ]);
 }
 
 /**
@@ -211,34 +205,30 @@ export type TokenMetadata = TokenMetadataData & {
   collection: NftCollection | null;
 };
 
-/** The metadata PDA of `mint`. */
-export const findMetadataAddress = (mint: Address): Address =>
-  address(findMetadataPda(getUmi(), { mint: toUmiPublicKey(mint) })[0]);
-
 /**
- * Decoded with the program client's serializer rather than Umi's RPC, since
- * the app's Umi never talks to a node. The program null-pads the strings on
- * chain; Umi's utf8 decoder strips that, so they come back clean.
+ * Decoded with the program client's `Metadata` decoder. The program null-pads
+ * the strings on chain; kit's UTF-8 decoder strips the nulls, so they come
+ * back clean.
  */
 function decodeTokenMetadata(bytes: Uint8Array): TokenMetadata {
-  const [data] = getMetadataAccountDataSerializer().deserialize(bytes);
-  const collection = fromUmiOption(data.collection);
+  const data = getMetadataDecoder().decode(bytes);
+  const collection = unwrapOption(data.collection);
   return {
-    updateAuthority: address(data.updateAuthority),
+    updateAuthority: data.updateAuthority,
     name: data.name,
     symbol: data.symbol,
     uri: data.uri,
     sellerFeeBasisPoints: data.sellerFeeBasisPoints,
     creators:
-      fromUmiOption(data.creators)?.map((creator) => ({
-        address: address(creator.address),
+      unwrapOption(data.creators)?.map((creator) => ({
+        address: creator.address,
         share: creator.share,
         verified: creator.verified,
       })) ?? null,
     isMutable: data.isMutable,
-    tokenStandard: fromUmiOption(data.tokenStandard),
+    tokenStandard: unwrapOption(data.tokenStandard),
     collection: collection && {
-      key: address(collection.key),
+      key: collection.key,
       verified: collection.verified,
     },
   };
@@ -266,7 +256,10 @@ export async function fetchTokenMetadata(
   rpc: Rpc<GetAccountInfoApi>,
   mint: Address,
 ): Promise<TokenMetadata | null> {
-  const account = await fetchEncodedAccount(rpc, findMetadataAddress(mint));
+  const account = await fetchEncodedAccount(
+    rpc,
+    await findMetadataAddress(mint),
+  );
   return account.exists ? decodeTokenMetadata(account.data) : null;
 }
 
@@ -282,10 +275,10 @@ export async function fetchTokenMetadatas(
   rpc: Rpc<GetMultipleAccountsApi>,
   mints: Address[],
 ): Promise<(TokenMetadata | null)[]> {
+  const addresses = await Promise.all(mints.map(findMetadataAddress));
   const accounts = await Promise.all(
-    chunk(mints.map(findMetadataAddress), ACCOUNTS_PER_REQUEST).map(
-      (addresses) =>
-        fetchEncodedAccounts(rpc, addresses, { commitment: "confirmed" }),
+    chunk(addresses, ACCOUNTS_PER_REQUEST).map((group) =>
+      fetchEncodedAccounts(rpc, group, { commitment: "confirmed" }),
     ),
   );
   return accounts
@@ -305,104 +298,99 @@ export type UpdateNftFields = {
 };
 
 /**
- * Updates the metadata of `mint` with `updateV1`. `wallet` must be the update
- * authority. Each omitted field is left as it is.
+ * Updates the metadata of `mint` with `updateV1`. `authority` must be the
+ * update authority; it also pays. Each omitted field is left as it is.
  */
-export function updateNftInstructions(
-  wallet: Address,
+export async function updateNftInstructions(
+  authority: TransactionSigner,
   mint: Address,
   fields: UpdateNftFields,
-): Instruction[] {
-  const authority = toUmiSigner(wallet);
-  return toKitInstructions(
-    updateV1(getUmi(), {
-      mint: toUmiPublicKey(mint),
+): Promise<Instruction[]> {
+  const { data } = fields;
+  return [
+    await getUpdateV1InstructionAsync({
+      mint,
       authority,
       payer: authority,
-      newUpdateAuthority: fields.newUpdateAuthority
-        ? toUmiPublicKey(fields.newUpdateAuthority)
-        : undefined,
-      data: fields.data
-        ? {
-            ...fields.data,
-            creators: fields.data.creators?.map(toUmiCreator) ?? null,
-          }
-        : undefined,
+      newUpdateAuthority: fields.newUpdateAuthority,
+      data: data && {
+        name: data.name,
+        symbol: data.symbol,
+        uri: data.uri,
+        sellerFeeBasisPoints: data.sellerFeeBasisPoints,
+        creators: data.creators,
+      },
       isMutable: fields.isMutable,
       primarySaleHappened: fields.primarySaleHappened,
     }),
-  );
+  ];
 }
 
 /**
  * Puts `mint` into `collection`, verified, in the two steps the program
  * wants: `updateV1` writes the collection key, which can only be written
- * unverified, then `verifyCollectionV1` verifies it. `wallet` must be the
+ * unverified, then `verifyCollectionV1` verifies it. `authority` must be the
  * update authority of the NFT for the first and of the collection for the
  * second.
  */
-export function addToCollectionInstructions(
-  wallet: Address,
+export async function addToCollectionInstructions(
+  authority: TransactionSigner,
   mint: Address,
   collection: Address,
-): Instruction[] {
-  const umi = getUmi();
-  const authority = toUmiSigner(wallet);
-  const collectionMint = toUmiPublicKey(collection);
-  return toKitInstructions(
-    updateV1(umi, {
-      mint: toUmiPublicKey(mint),
+): Promise<Instruction[]> {
+  const metadata = await findMetadataAddress(mint);
+  return Promise.all([
+    getUpdateV1InstructionAsync({
+      mint,
+      metadata,
       authority,
       payer: authority,
       collection: {
         __kind: "Set",
-        fields: [{ key: collectionMint, verified: false }],
+        fields: [{ key: collection, verified: false }],
       },
-    }).add(
-      verifyCollectionV1(umi, {
-        authority,
-        metadata: findMetadataPda(umi, { mint: toUmiPublicKey(mint) }),
-        collectionMint,
-      }),
-    ),
-  );
+    }),
+    getVerifyCollectionV1InstructionAsync({
+      authority,
+      metadata,
+      collectionMint: collection,
+    }),
+  ]);
 }
 
 /**
  * Takes `mint` out of `collection` by unverifying the link. The metadata
  * keeps the collection key, marked unverified, which is what wallets and
- * marketplaces go by. `wallet` must be the update authority of the
+ * marketplaces go by. `authority` must be the update authority of the
  * collection, or of the NFT itself once the collection has been burned.
  */
-export function removeFromCollectionInstructions(
-  wallet: Address,
+export async function removeFromCollectionInstructions(
+  authority: TransactionSigner,
   mint: Address,
   collection: Address,
-): Instruction[] {
-  const umi = getUmi();
-  return toKitInstructions(
-    unverifyCollectionV1(umi, {
-      authority: toUmiSigner(wallet),
-      metadata: findMetadataPda(umi, { mint: toUmiPublicKey(mint) }),
-      collectionMint: toUmiPublicKey(collection),
+): Promise<Instruction[]> {
+  return [
+    await getUnverifyCollectionV1InstructionAsync({
+      authority,
+      metadata: await findMetadataAddress(mint),
+      collectionMint: collection,
     }),
-  );
+  ];
 }
 
 /**
- * Marks `wallet` as a verified creator of `mint`. The wallet must already be
- * in the creator list; verifying is the one change to a creator entry that
+ * Marks `creator` as a verified creator of `mint`. The creator must already
+ * be in the creator list; verifying is the one change to a creator entry that
  * the creator makes, so no update authority is needed.
  */
-export function verifyCreatorInstructions(
-  wallet: Address,
+export async function verifyCreatorInstructions(
+  creator: TransactionSigner,
   mint: Address,
-): Instruction[] {
-  const umi = getUmi();
-  return toKitInstructions(
-    verifyCreatorV1(umi, {
-      authority: toUmiSigner(wallet),
-      metadata: findMetadataPda(umi, { mint: toUmiPublicKey(mint) }),
+): Promise<Instruction[]> {
+  return [
+    getVerifyCreatorV1Instruction({
+      authority: creator,
+      metadata: await findMetadataAddress(mint),
     }),
-  );
+  ];
 }
