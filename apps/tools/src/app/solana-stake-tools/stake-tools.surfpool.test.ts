@@ -61,6 +61,12 @@ import {
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { CSVRow } from "./stake-create/csv-rows";
 import {
+  splitAmountError,
+  splitBounds,
+  splitInstructions,
+  splittableLamports,
+} from "./split-stake/split-plan";
+import {
   buildStakeAccountInstructions,
   sendStakeRow,
   sendStakeRowsInBatches,
@@ -581,159 +587,147 @@ describe.skipIf(!SURFPOOL_URL)("stake tools on surfpool", () => {
   // ---- split -------------------------------------------------------------
 
   describe("split", () => {
-    it("manual form shape on a delegated account: unfunded destination is refused by the current program", async () => {
+    /** Both forms send exactly this: destination funded with rent, then the amount. */
+    const split = (source: Address, amount: bigint, destination: KeyPairSigner) =>
+      ownerClient.sendTransaction(
+        splitInstructions({
+          source,
+          destination,
+          authority: ownerClient.payer,
+          amount,
+          rent,
+        }),
+      );
+
+    it("delegated source, 1.5 of 3 SOL: destination gets 1.5 SOL of stake on top of its rent", async () => {
       const stake = await createStake(ownerClient, {
         stake_amount: (3n * SOL).toString(),
         validator: VOTE,
       });
-      const split = await generateKeyPairSigner();
       const amount = (3n * SOL) / 2n;
-      // The BPF stake program requires the destination of an active or
-      // activating split to be pre-funded with its rent; the manual form
-      // allocates it with 0 lamports.
+      expect(splitAmountError(await readStake(stake), amount, rent)).toBeNull();
+      const destination = await generateKeyPairSigner();
+      await split(stake, amount, destination);
+      const [source, dest] = await Promise.all([
+        readStake(stake),
+        readStake(destination.address),
+      ]);
+      expect(dest.lamports).toBe(amount + rent);
+      expect(dest.stake?.delegation.stake).toBe(amount);
+      expect(dest.stake?.delegation.voterPubkey).toBe(VOTE);
+      expect(source.stake?.delegation.stake).toBe(3n * SOL - amount);
+      expect(source.lamports).toBe(3n * SOL + rent - amount);
+    });
+
+    it("the graphic form's default (half the delegated stake) on a 2 SOL account works", async () => {
+      const stake = await createStake(ownerClient, {
+        stake_amount: (2n * SOL).toString(),
+        validator: VOTE,
+      });
+      const acc = await readStake(stake);
+      const half = splittableLamports(acc, rent) / 2n;
+      expect(half).toBe(SOL);
+      expect(splitAmountError(acc, half, rent)).toBeNull();
+      const destination = await generateKeyPairSigner();
+      await split(stake, half, destination);
+      expect((await readStake(destination.address)).stake?.delegation.stake).toBe(SOL);
+      expect((await readStake(stake)).stake?.delegation.stake).toBe(SOL);
+    });
+
+    it("free lamports (MEV excess) never move; the source keeps them", async () => {
+      const stake = await createStake(ownerClient, {
+        stake_amount: (3n * SOL).toString(),
+        validator: VOTE,
+      });
+      await ownerClient.sendTransaction([
+        getTransferSolInstruction({
+          source: ownerClient.payer,
+          destination: stake,
+          amount: 100_000_000n,
+        }),
+      ]);
+      const acc = await readStake(stake);
+      expect(splittableLamports(acc, rent)).toBe(3n * SOL);
+      const destination = await generateKeyPairSigner();
+      await split(stake, SOL, destination);
+      const [source, dest] = await Promise.all([
+        readStake(stake),
+        readStake(destination.address),
+      ]);
+      expect(unclaimed(source)).toBe(100_000_000n);
+      expect(unclaimed(dest)).toBe(0n);
+      expect(dest.lamports).toBe(SOL + rent);
+    });
+
+    it("undelegated source: anything above rent, destination still gets its own rent", async () => {
+      const stake = await createStake(ownerClient, {
+        stake_amount: (2n * SOL).toString(),
+      });
+      const acc = await readStake(stake);
+      expect(splittableLamports(acc, rent)).toBe(2n * SOL);
+      const destination = await generateKeyPairSigner();
+      await split(stake, SOL, destination);
+      const dest = await readStake(destination.address);
+      expect(dest.stake).toBeNull();
+      expect(dest.lamports).toBe(SOL + rent);
+      expect((await readStake(stake)).lamports).toBe(SOL + rent);
+    });
+
+    it("amounts the forms refuse are the ones the program refuses", async () => {
+      const stake = await createStake(ownerClient, {
+        stake_amount: (2n * SOL).toString(),
+        validator: VOTE,
+      });
+      const acc = await readStake(stake);
+      for (const [label, amount] of [
+        ["0.5 SOL to the destination:", SOL / 2n],
+        ["1.5 SOL (source would keep 0.5 SOL):", (3n * SOL) / 2n],
+        ["everything (source would keep 0):", 2n * SOL],
+      ] as const) {
+        expect(splitAmountError(acc, amount, rent), label).not.toBeNull();
+        const destination = await generateKeyPairSigner();
+        const message = await failureMessage(
+          () => split(stake, amount, destination),
+          label,
+        );
+        expect(message, label).toMatch(/Custom program error: #12/);
+      }
+      // Below two minimum delegations nothing can be split at all.
+      const small = await readStake(
+        await createStake(ownerClient, {
+          stake_amount: (SOL + SOL / 2n).toString(),
+          validator: VOTE,
+        }),
+      );
+      expect(splitBounds(small, rent)).toBeNull();
+    });
+
+    it("program rule the forms work around: an unfunded destination is refused for a delegated source", async () => {
+      const stake = await createStake(ownerClient, {
+        stake_amount: (3n * SOL).toString(),
+        validator: VOTE,
+      });
+      const destination = await generateKeyPairSigner();
       const message = await failureMessage(
         () =>
           ownerClient.sendTransaction([
             getCreateAccountInstruction({
               payer: ownerClient.payer,
-              newAccount: split,
+              newAccount: destination,
               lamports: 0n,
               space: BigInt(STAKE_ACCOUNT_SIZE),
               programAddress: STAKE_PROGRAM_ADDRESS,
             }),
             getSplitInstruction({
               stake,
-              splitStake: split.address,
+              splitStake: destination.address,
               stakeAuthority: ownerClient.payer,
-              args: amount,
+              args: (3n * SOL) / 2n,
             }),
           ]),
-        "manual shape, delegated source, 1.5 of 3 SOL:",
+        "unfunded destination, delegated source:",
       );
-      expect(message).not.toBeNull();
-    });
-
-    it("graphic form's default 50% of the balance on a 2 SOL account is refused (rent is not stake)", async () => {
-      const stake = await createStake(ownerClient, {
-        stake_amount: (2n * SOL).toString(),
-        validator: VOTE,
-      });
-      const acc = await readStake(stake);
-      // SplitFormInner: newAccountLamports = round((1 - 50/100) * total lamports)
-      const half = BigInt(Math.round(0.5 * Number(acc.lamports)));
-      const split = await generateKeyPairSigner();
-      const message = await failureMessage(
-        () =>
-          ownerClient.sendTransaction([
-            getCreateAccountInstruction({
-              payer: ownerClient.payer,
-              newAccount: split,
-              lamports: rent,
-              space: BigInt(STAKE_ACCOUNT_SIZE),
-              programAddress: STAKE_PROGRAM_ADDRESS,
-            }),
-            getSplitInstruction({
-              stake,
-              splitStake: split.address,
-              stakeAuthority: ownerClient.payer,
-              args: half,
-            }),
-          ]),
-        "graphic shape, 50% of total lamports on 2 SOL stake:",
-      );
-      // Source would keep 2 SOL - half < 1 SOL of delegated stake.
-      expect(message).not.toBeNull();
-    });
-
-    it("graphic form shape: rent-funded destination, amount is the destination's stake", async () => {
-      const stake = await createStake(ownerClient, {
-        stake_amount: (3n * SOL).toString(),
-        validator: VOTE,
-      });
-      const split = await generateKeyPairSigner();
-      const amount = (3n * SOL) / 2n;
-      await ownerClient.sendTransaction([
-        getCreateAccountInstruction({
-          payer: ownerClient.payer,
-          newAccount: split,
-          lamports: rent,
-          space: BigInt(STAKE_ACCOUNT_SIZE),
-          programAddress: STAKE_PROGRAM_ADDRESS,
-        }),
-        getSplitInstruction({
-          stake,
-          splitStake: split.address,
-          stakeAuthority: ownerClient.payer,
-          args: amount,
-        }),
-      ]);
-      const [source, dest] = await Promise.all([
-        readStake(stake),
-        readStake(split.address),
-      ]);
-      expect(dest.lamports).toBe(amount + rent);
-      expect(dest.stake?.delegation.stake).toBe(amount);
-      expect(source.stake?.delegation.stake).toBe(3n * SOL - amount);
-    });
-
-    it("either side below 1 SOL of delegated stake is refused (the forms don't guard this)", async () => {
-      const stake = await createStake(ownerClient, {
-        stake_amount: (2n * SOL).toString(),
-        validator: VOTE,
-      });
-      for (const [label, amount, funded] of [
-        ["manual shape, 0.5 SOL total to destination:", SOL / 2n, 0n],
-        ["manual shape, 1 SOL total (stake < 1 SOL after rent):", SOL, 0n],
-        ["graphic shape, 0.5 SOL stake to destination:", SOL / 2n, rent],
-        ["graphic shape, 1.5 SOL (source keeps 0.5 SOL):", (3n * SOL) / 2n, rent],
-      ] as const) {
-        const split = await generateKeyPairSigner();
-        const message = await failureMessage(
-          () =>
-            ownerClient.sendTransaction([
-              getCreateAccountInstruction({
-                payer: ownerClient.payer,
-                newAccount: split,
-                lamports: funded,
-                space: BigInt(STAKE_ACCOUNT_SIZE),
-                programAddress: STAKE_PROGRAM_ADDRESS,
-              }),
-              getSplitInstruction({
-                stake,
-                splitStake: split.address,
-                stakeAuthority: ownerClient.payer,
-                args: amount,
-              }),
-            ]),
-          label,
-        );
-        expect(message, label).not.toBeNull();
-      }
-    });
-
-    it("undelegated account splits too (manual form, user-supplied keypair)", async () => {
-      const stake = await createStake(ownerClient, {
-        stake_amount: (2n * SOL).toString(),
-      });
-      const split = await generateKeyPairSigner();
-      await ownerClient.sendTransaction([
-        getCreateAccountInstruction({
-          payer: ownerClient.payer,
-          newAccount: split,
-          lamports: 0n,
-          space: BigInt(STAKE_ACCOUNT_SIZE),
-          programAddress: STAKE_PROGRAM_ADDRESS,
-        }),
-        getSplitInstruction({
-          stake,
-          splitStake: split.address,
-          stakeAuthority: ownerClient.payer,
-          args: SOL,
-        }),
-      ]);
-      const dest = await readStake(split.address);
-      expect(dest.stake).toBeNull();
-      expect(dest.lamports).toBe(SOL);
+      expect(message).toMatch(/Insufficient funds/);
     });
   });
 

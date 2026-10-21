@@ -1,3 +1,4 @@
+import { MIN_DELEGATION_LAMPORTS } from "@/lib/solana/stake-account";
 import { isAddress, lamports, lamportsToSol } from "@solana/kit";
 import Papa from "papaparse";
 import {
@@ -28,7 +29,7 @@ export interface ParsedData {
 
 export const MAX_ROWS = 50;
 /** Minimum delegation under SIMD-0490 (Stake v5), in lamports. */
-export const MIN_STAKE_LAMPORTS = 1_000_000_000;
+export const MIN_STAKE_LAMPORTS = Number(MIN_DELEGATION_LAMPORTS);
 /** The same, as SOL for messages. */
 export const MIN_STAKE_SOL = decimalFixedPointToString(
   lamportsToSol(lamports(BigInt(MIN_STAKE_LAMPORTS))),

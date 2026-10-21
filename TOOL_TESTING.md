@@ -139,29 +139,36 @@ on 2026-10-21. Findings cross-checked on mainnet where marked.
   locked-up surfnet account through the app's RPC and showed balance, voter,
   authorities, timestamp, "Enforced" badge and the current epoch correctly.
 
-- [x] **Split, manual form** (`split-stake`, `split-manual-form.tsx`) — **broken for delegated accounts**
+- [x] **Split, manual form** (`split-stake`, `split-manual-form.tsx`)
 
-  The form allocates the destination with 0 lamports and splits the entered
-  total into it. The BPF stake program refuses that for any active or
-  activating source ("insufficient funds"): the destination must be
-  pre-funded with its rent, split lamports map 1:1 to delegated stake, and
-  both sides must keep >= 1 SOL. Confirmed on mainnet by unsigned simulation
-  on a real active GREED stake account (program source:
-  `process_split` in solana-program/stake). Only undelegated (Initialized)
-  accounts still split this way. Fix: fund the destination with rent from
-  the wallet (graphic-form shape), treat the entered amount as the
-  destination's stake, validate amount >= 1 SOL and
-  `delegation.stake - amount >= 1 SOL` for delegated sources.
+  **Was broken for delegated accounts, fixed 2026-10-21.** The form
+  allocated the destination with 0 lamports and split the entered total
+  into it. The BPF stake program refuses that for any active or activating
+  source ("insufficient funds"): the destination must be pre-funded with its
+  rent, split lamports map 1:1 to delegated stake, and both sides must keep
+  >= 1 SOL (confirmed on mainnet by unsigned simulation on a real active
+  GREED stake account; `process_split` in solana-program/stake). Both forms
+  now go through `split-stake/split-plan.ts`: `splitInstructions` funds the
+  destination's rent from the wallet and moves the entered amount,
+  `splitAmountError` applies the program's rules before the wallet is asked
+  (>= 1 SOL on each side for a delegated source, rent-exempt on both sides
+  for an undelegated one), `parseSolInput` parses the decimal exactly. The
+  entered amount is now the stake that moves, rent on top, like the create
+  tool. Unit-tested in `split-plan.test.ts`; on the surfnet: 1.5 of 3 SOL,
+  an undelegated 1 SOL, MEV excess staying behind, and each refused amount
+  matching the program's refusal (stake error 12).
 
-- [x] **Split, graphic form** (`split-stake`, `split-graphic-form.tsx`) — **math off, no minimum guard**
+- [x] **Split, graphic form** (`split-stake`, `split-graphic-form.tsx`)
 
-  Shape is right (destination funded with rent; a 1.5 SOL split from a 3 SOL
-  stake gives the destination exactly 1.5 SOL of stake, verified). But the
-  slider works on total lamports (stake + rent + any MEV excess) while the
-  program splits delegated stake, and nothing enforces 1 SOL per side: the
-  default 50% on a 2 SOL account is refused with stake error 12. Fix: base
-  the math on `stake.delegation.stake`, clamp the slider to [1 SOL, stake −
-  1 SOL].
+  **Math was off and nothing enforced the minimum, fixed 2026-10-21.** The
+  slider worked on total lamports (stake + rent + any MEV excess) while the
+  program splits delegated stake, so the default 50% on a 2 SOL account was
+  refused with stake error 12. It now works on `splittableLamports`
+  (delegated stake, or the balance above rent when undelegated), keeps the
+  amount in lamports, shows `splitAmountError` under the slider and disables
+  Submit on it, and remounts when another account is picked. Verified on
+  the surfnet: half of a 2 SOL stake gives 1 SOL each. UI not exercised in
+  the browser (needs a connected wallet).
 
 - [x] **Merge** (`merge-stake`)
 

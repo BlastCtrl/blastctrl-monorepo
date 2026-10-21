@@ -3,6 +3,7 @@ import { useConnectorDialog } from "@/connector/connector-dialog";
 import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient } from "@/connector/use-kit-client";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { lamportsToSolString } from "@/lib/solana/common";
 import { parseJsonKeypair } from "@/lib/solana/parse-keypair";
 import { STAKE_ACCOUNT_SIZE } from "@/lib/solana/stake-account";
 import { useRentQuery } from "@/state/queries/use-rent";
@@ -17,25 +18,20 @@ import {
   Label,
 } from "@headlessui/react";
 import {
-  getSplitInstruction,
-  STAKE_PROGRAM_ADDRESS,
-} from "@solana-program/stake";
-import { getCreateAccountInstruction } from "@solana-program/system";
-import {
   address,
   generateKeyPairSigner,
   isAddress,
-  sol,
-  solToLamports,
   type KeyPairSigner,
-  lamportsToSol,
+  type Lamports,
 } from "@solana/kit";
 import { type FormEvent, useState } from "react";
 import { Box } from "./box";
 import {
-  decimalFixedPointToNumber,
-  decimalFixedPointToString,
-} from "@solana/fixed-points";
+  parseSolInput,
+  splitAmountError,
+  splitInstructions,
+  splittableLamports,
+} from "./split-plan";
 
 type Field = string;
 type Message = string;
@@ -71,22 +67,15 @@ export function SplitManualForm() {
       setFormErrors({ balance: "New stake amount is required." });
       return;
     }
-    if (
-      decimalFixedPointToNumber(lamportsToSol(rentExemption)) >=
-      Number(newAccountBalance)
-    ) {
-      setFormErrors({
-        balance: `New stake amount must be higher than the minimum rent (${rentExemption} lamports).`,
-      });
+    const amount = parseSolInput(newAccountBalance);
+    if (amount === null) {
+      setFormErrors({ balance: "Enter a SOL amount with at most 9 decimals." });
       return;
     }
-    if (
-      Number(newAccountBalance) >=
-      decimalFixedPointToNumber(lamportsToSol(data.lamports))
-    ) {
-      setFormErrors({
-        balance: `New amount is higher than the original stake balance (${decimalFixedPointToString(lamportsToSol(data.lamports))});`,
-      });
+    // The program's own rules, checked before anything reaches the wallet.
+    const amountError = splitAmountError(data, amount, rentExemption);
+    if (amountError) {
+      setFormErrors({ balance: amountError });
       return;
     }
 
@@ -104,24 +93,17 @@ export function SplitManualForm() {
 
     setIsConfirming(true);
     try {
-      const owner = client.payer;
-      // Same shape as the legacy StakeProgram.split: allocate the destination
-      // (unfunded here; the split moves the lamports), then split into it.
-      const result = await client.sendTransaction([
-        getCreateAccountInstruction({
-          payer: owner,
-          newAccount: splitStake,
-          lamports: 0n,
-          space: BigInt(STAKE_ACCOUNT_SIZE),
-          programAddress: STAKE_PROGRAM_ADDRESS,
+      // The destination is funded with its rent by the wallet, then the
+      // amount moves out of the source (see split-plan.ts for the rules).
+      const result = await client.sendTransaction(
+        splitInstructions({
+          source: address(accountToSplit),
+          destination: splitStake,
+          authority: client.payer,
+          amount,
+          rent: rentExemption,
         }),
-        getSplitInstruction({
-          stake: address(accountToSplit),
-          splitStake: splitStake.address,
-          stakeAuthority: owner,
-          args: solToLamports(sol(newAccountBalance)),
-        }),
-      ]);
+      );
 
       notify({
         type: "success",
@@ -164,6 +146,7 @@ export function SplitManualForm() {
           keypairFile={keypairFile}
           setKeypairFile={setKeypairFile}
           formError={formErrors}
+          rentExemption={rentExemption}
         />
         {data &&
           (!client ? (
@@ -224,6 +207,7 @@ function FormInner({
   setKeypairFile,
   accountToSplit,
   formError,
+  rentExemption,
 }: {
   newAccountBalance: string;
   setNewAccountBalance: (value: string) => void;
@@ -231,6 +215,7 @@ function FormInner({
   setKeypairFile: (file: File) => void;
   accountToSplit: string;
   formError: FormError;
+  rentExemption: Lamports | undefined;
 }) {
   const { data, isLoading, error } = useStakeAccount(
     isAddress(accountToSplit) ? accountToSplit : undefined,
@@ -242,16 +227,28 @@ function FormInner({
     return <div>{error.message}</div>;
   }
 
+  const splittable =
+    data && rentExemption !== undefined
+      ? splittableLamports(data, rentExemption)
+      : undefined;
+
   return (
     <Fieldset disabled={isLoading || data === undefined}>
       <Field className="w-full">
         <Label className="font-medium sm:text-sm/6">
-          Balance of the new account
+          Stake to move into the new account
         </Label>
         {!!data && (
           <Description className="text-zinc-500">
-            Original account balance:{" "}
-            {decimalFixedPointToString(lamportsToSol(data.lamports))}
+            {data.stake
+              ? `Delegated stake: ${lamportsToSolString(data.stake.delegation.stake)} SOL`
+              : `Balance: ${lamportsToSolString(data.lamports)} SOL`}
+            {splittable !== undefined &&
+              ` · available to split: ${lamportsToSolString(splittable)} SOL`}
+            {rentExemption !== undefined &&
+              `. The new account's rent-exempt reserve (${lamportsToSolString(rentExemption)} SOL) is paid by your wallet on top.`}
+            {data.stake &&
+              " A delegated account must keep at least 1 SOL of stake on each side."}
           </Description>
         )}
         <StyledInput

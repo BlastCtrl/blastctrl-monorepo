@@ -16,25 +16,22 @@ import {
   ClipboardDocumentIcon,
 } from "@heroicons/react/24/solid";
 import * as Slider from "@radix-ui/react-slider";
-import {
-  getSplitInstruction,
-  STAKE_PROGRAM_ADDRESS,
-} from "@solana-program/stake";
-import { getCreateAccountInstruction } from "@solana-program/system";
-import {
-  generateKeyPairSigner,
-  lamports,
-  type Address,
-  lamportsToSol,
-} from "@solana/kit";
+import { generateKeyPairSigner, type Address, type Lamports } from "@solana/kit";
 import type { SyntheticEvent } from "react";
 import { useState } from "react";
 import { Box } from "./box";
 import { PickerDialog } from "./picker-dialog";
-import { decimalFixedPointToNumber } from "@solana/fixed-points";
+import {
+  parseSolInput,
+  splitAmountError,
+  splitBounds,
+  splitInstructions,
+  splittableLamports,
+} from "./split-plan";
 
 export function SplitGraphicForm({ owner }: { owner: Address }) {
   const { data, isLoading, error } = useUserStakeAccounts(owner);
+  const { data: rent } = useRentQuery(STAKE_ACCOUNT_SIZE);
   const [selectedAccount, setSelectedAccount] =
     useState<StakeAccountType | null>(null);
   const [isCopied, setIsCopied] = useState(false);
@@ -87,65 +84,80 @@ export function SplitGraphicForm({ owner }: { owner: Address }) {
           </div>
         </Field>
       </Box>
-      {selectedAccount && (
-        <SplitFormInner owner={owner} selectedAccount={selectedAccount} />
+      {selectedAccount && rent !== undefined && (
+        <SplitFormInner
+          // Remount when the account changes so the split state resets.
+          key={selectedAccount.address}
+          owner={owner}
+          selectedAccount={selectedAccount}
+          rent={rent}
+        />
       )}
     </>
   );
 }
 
+/** Slider and input state: what moves to the new account, in lamports, with the strings being edited. */
+type SplitInputs = {
+  newLamports: bigint;
+  originalStake: string;
+  newStake: string;
+};
+
 function SplitFormInner({
   owner,
   selectedAccount,
+  rent,
 }: {
   owner: Address;
   selectedAccount: StakeAccountType;
+  rent: Lamports;
 }) {
   const { client } = useKitClient();
   const { setOpen } = useConnectorDialog();
   const [isConfirming, setIsConfirming] = useState(false);
   const [formSuccess, setFormSuccess] = useState("");
-  const { refetch: refetchRent } = useRentQuery(STAKE_ACCOUNT_SIZE);
 
-  // Slider math works in plain numbers; a stake account's balance is well
-  // below 2^53 lamports.
-  const totalLamports = Number(selectedAccount.lamports);
-  const totalSol = decimalFixedPointToNumber(
-    lamportsToSol(selectedAccount.lamports),
-  );
+  // What a split can move: the delegated stake, or everything above rent
+  // for an undelegated account. Free lamports (MEV rewards) never move.
+  const total = splittableLamports(selectedAccount, rent);
+  const bounds = splitBounds(selectedAccount, rent);
 
-  const [inputs, setInputs] = useState(() => {
-    const original = totalLamports * 0.5;
-    return {
-      percent: 50,
-      originalStake: lamportsToSolString(original),
-      newStake: lamportsToSolString(totalLamports - original),
-    };
+  const fromLamports = (newLamports: bigint): SplitInputs => ({
+    newLamports,
+    originalStake: lamportsToSolString(total - newLamports),
+    newStake: lamportsToSolString(newLamports),
   });
 
-  const inputError = inputs.percent >= 100 || inputs.percent <= 0;
+  const [inputs, setInputs] = useState<SplitInputs>(() =>
+    fromLamports(total / 2n),
+  );
+
+  const inputError = splitAmountError(selectedAccount, inputs.newLamports, rent);
+  // Share kept by the original account, for the slider.
+  const percent =
+    total > 0n
+      ? Number(((total - inputs.newLamports) * 10_000n) / total) / 100
+      : 100;
 
   const handleSlider = (value: number) => {
-    const original = (totalLamports * value) / 100;
-    setInputs({
-      percent: value,
-      originalStake: lamportsToSolString(original),
-      newStake: lamportsToSolString(totalLamports - original),
-    });
+    const kept = (total * BigInt(Math.round(value * 100))) / 10_000n;
+    setInputs(fromLamports(total - kept));
   };
   const handleLeftInput = (stakeStr: string) => {
-    const stake = Number(stakeStr);
+    const kept = parseSolInput(stakeStr);
+    const newLamports = kept === null ? total : total - kept;
     setInputs({
-      percent: (stake / totalSol) * 100,
+      newLamports,
       originalStake: stakeStr,
-      newStake: (totalSol - stake).toLocaleString("fullwide", fullwide),
+      newStake: lamportsToSolString(newLamports),
     });
   };
   const handleRightInput = (stakeStr: string) => {
-    const stake = Number(stakeStr);
+    const newLamports = parseSolInput(stakeStr) ?? 0n;
     setInputs({
-      percent: 100 - (stake / totalSol) * 100,
-      originalStake: (totalSol - stake).toLocaleString("fullwide", fullwide),
+      newLamports,
+      originalStake: lamportsToSolString(total - newLamports),
       newStake: stakeStr,
     });
   };
@@ -165,29 +177,18 @@ function SplitFormInner({
 
     setIsConfirming(true);
     try {
-      const { data: rentExemption } = await refetchRent({ throwOnError: true });
       const splitStake = await generateKeyPairSigner();
-      const newAccountLamports = lamports(
-        BigInt(Math.round((1 - inputs.percent / 100) * totalLamports)),
+      // The destination is funded with its rent by the wallet, then the
+      // chosen stake moves into it (see split-plan.ts for the rules).
+      const result = await client.sendTransaction(
+        splitInstructions({
+          source: selectedAccount.address,
+          destination: splitStake,
+          authority: client.payer,
+          amount: inputs.newLamports,
+          rent,
+        }),
       );
-
-      // Same shape as the legacy StakeProgram.split with a rent reserve: fund
-      // the destination's rent from the wallet, then split into it.
-      const result = await client.sendTransaction([
-        getCreateAccountInstruction({
-          payer: client.payer,
-          newAccount: splitStake,
-          lamports: rentExemption ?? 0n,
-          space: BigInt(STAKE_ACCOUNT_SIZE),
-          programAddress: STAKE_PROGRAM_ADDRESS,
-        }),
-        getSplitInstruction({
-          stake: selectedAccount.address,
-          splitStake: splitStake.address,
-          stakeAuthority: client.payer,
-          args: newAccountLamports,
-        }),
-      ]);
 
       notify({
         type: "success",
@@ -210,21 +211,32 @@ function SplitFormInner({
     <form className="mt-4" onSubmit={handleSubmit}>
       <Box>
         <div className="text-left">
-          <p className="text-sm font-medium">Current Stake Amount</p>
-          <p className="text-lg font-bold">{totalSol} SOL</p>
+          <p className="text-sm font-medium">
+            {selectedAccount.stake
+              ? "Delegated stake"
+              : "Balance above the rent-exempt reserve"}
+          </p>
+          <p className="text-lg font-bold">{lamportsToSolString(total)} SOL</p>
+          <p className="text-sm text-zinc-500">
+            The new account&apos;s rent-exempt reserve (
+            {lamportsToSolString(rent)} SOL) is paid by your wallet on top.
+            {selectedAccount.stake &&
+              " A delegated account must keep at least 1 SOL of stake on each side; any extra lamports (MEV rewards) stay in the original account."}
+          </p>
         </div>
 
         <div className="">
           <div
-            data-inputerror={inputError}
+            data-inputerror={!!inputError}
             className="text-right text-sm/6 font-medium text-zinc-500 data-[inputerror=true]:text-rose-500"
           >
-            Split ratio: {inputs.percent.toFixed(2)}%
+            Split ratio: {percent.toFixed(2)}%
           </div>
           <div className="h-8">
             <Slider.Root
-              value={[inputs.percent]}
+              value={[percent]}
               onValueChange={(value) => void handleSlider(value[0] ?? 50)}
+              disabled={bounds === null}
               className="group relative mt-1.5 flex w-full touch-none items-center transition-[margin] duration-300 select-none hover:-mx-1 hover:cursor-grab active:cursor-grabbing"
               min={0}
               max={100}
@@ -248,6 +260,7 @@ function SplitFormInner({
                 type="text"
                 id="originalStake"
                 name="originalStake"
+                inputMode="decimal"
                 value={inputs.originalStake}
                 onChange={({ target }) => {
                   if (/^\d*\.?\d{0,9}$/.test(target.value)) {
@@ -265,6 +278,7 @@ function SplitFormInner({
                 type="text"
                 id="newStake"
                 name="newStake"
+                inputMode="decimal"
                 value={inputs.newStake}
                 onChange={({ target }) => {
                   if (/^\d*\.?\d{0,9}$/.test(target.value)) {
@@ -277,6 +291,10 @@ function SplitFormInner({
             </div>
           </div>
         </div>
+
+        {inputError && (
+          <p className="mt-3 text-sm text-rose-600">{inputError}</p>
+        )}
 
         {!client ? (
           <div className="mt-6">
@@ -293,7 +311,7 @@ function SplitFormInner({
           <div className="mt-6">
             <Button
               type="submit"
-              disabled={inputError || isConfirming}
+              disabled={!!inputError || isConfirming}
               color="indigo"
               className="w-full"
             >
@@ -329,8 +347,3 @@ function SplitFormInner({
     </form>
   );
 }
-
-const fullwide: Intl.NumberFormatOptions = {
-  useGrouping: false,
-  maximumFractionDigits: 9,
-};
