@@ -180,38 +180,57 @@ export async function sendStakeRowsInBatches(
     const batch = rows.slice(start, start + BATCH_SIZE);
     batch.forEach(({ id }) => onUpdate(id, { status: "processing" }));
 
+    // Rows whose transaction compiled; the others were reported failed.
+    let ready: {
+      id: string;
+      stake: KeyPairSigner;
+      transaction: ReturnType<typeof compileTransaction>;
+    }[] = [];
     try {
-      // Plan: fee payer and provisory compute limits, no lifetime yet.
+      // Plan: fee payer and provisory compute limits, no lifetime yet. Each
+      // row is prepared on its own, so one that fails simulation (a bad
+      // validator, not enough SOL) is reported alone and the rest of the
+      // batch still goes to the wallet.
       const { value: latestBlockhash } = await client.rpc
         .getLatestBlockhash()
         .send();
       const prepared = await Promise.all(
-        batch.map(async ({ row }) => {
-          const stake = await generateKeyPairSigner();
-          const planned = await client.planTransaction(
-            buildStakeAccountInstructions(
-              walletSigner,
-              stake,
-              row,
-              rentReserve,
-            ),
-          );
-          const message = await estimateAndSetResourceLimits(
-            setTransactionMessageLifetimeUsingBlockhash(
-              latestBlockhash,
-              planned,
-            ),
-          );
-          return { stake, transaction: compileTransaction(message) };
+        batch.map(async ({ id, row }) => {
+          try {
+            const stake = await generateKeyPairSigner();
+            const planned = await client.planTransaction(
+              buildStakeAccountInstructions(
+                walletSigner,
+                stake,
+                row,
+                rentReserve,
+              ),
+            );
+            const message = await estimateAndSetResourceLimits(
+              setTransactionMessageLifetimeUsingBlockhash(
+                latestBlockhash,
+                planned,
+              ),
+            );
+            return { id, stake, transaction: compileTransaction(message) };
+          } catch (error) {
+            onUpdate(id, {
+              status: "failed",
+              error: transactionErrorMessage(error),
+            });
+            return null;
+          }
         }),
       );
+      ready = prepared.filter((p) => p !== null);
+      if (ready.length === 0) continue;
 
       // One wallet prompt for the whole batch. The wallet signs first because
       // it may rewrite the message; each stake keypair signs the result.
       let walletSigned;
       try {
         walletSigned = await walletSigner.modifyAndSignTransactions(
-          prepared.map((p) => p.transaction),
+          ready.map((p) => p.transaction),
         );
       } catch (error) {
         if (
@@ -233,10 +252,10 @@ export async function sendStakeRowsInBatches(
 
       await Promise.all(
         walletSigned.map(async (transaction, i) => {
-          const { id } = batch[i]!;
+          const { id, stake } = ready[i]!;
           try {
             const signed = await partiallySignTransaction(
-              [prepared[i]!.stake.keyPair],
+              [stake.keyPair],
               transaction,
             );
             assertIsSendableTransaction(signed);
@@ -255,8 +274,10 @@ export async function sendStakeRowsInBatches(
         }),
       );
     } catch (error) {
-      // Planning or signing failed for the whole batch (e.g. the user rejected).
-      batch.forEach(({ id }) =>
+      // The blockhash fetch or the wallet prompt failed (e.g. the user
+      // rejected): every row that was still in flight fails with that error.
+      const inFlight = ready.length > 0 ? ready : batch;
+      inFlight.forEach(({ id }) =>
         onUpdate(id, {
           status: "failed",
           error: transactionErrorMessage(error),

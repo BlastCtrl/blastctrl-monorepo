@@ -110,11 +110,14 @@ on 2026-10-21. Findings cross-checked on mainnet where marked.
   the withdrawer change under the fresh lockup works because the builder
   passes `lockupAuthority`. `sendStakeRowsInBatches` with a modifying signer:
   3 rows, one wallet prompt with 3 transactions, all confirmed.
-  **Open:** a row that fails simulation (bad validator address, "Incorrect
-  program id") fails every row of its batch of 10 before the wallet prompt;
-  the good rows are only recoverable through the per-row Retry. `sendBatches`
-  in `src/connector/send-batches.ts` handles this per transaction. CSV parsing
-  and validation are pure and not covered here.
+  **Fixed 2026-10-21:** a row that fails simulation (bad validator address,
+  "Incorrect program id") used to fail every row of its batch of 10 before
+  the wallet prompt. Rows are now prepared one by one: the bad row is
+  reported with its own error, the rest go to the wallet in one prompt (two
+  transactions for a 3-row batch with one bad row, verified), and a batch
+  with no compilable row prompts nothing. A wallet refusal still fails only
+  the rows that were in the prompt. CSV parsing and validation are pure and
+  not covered here.
 
 - [x] **Authorize** (`stake-authorize`)
 

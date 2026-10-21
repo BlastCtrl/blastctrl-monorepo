@@ -347,7 +347,7 @@ describe.skipIf(!SURFPOOL_URL)("stake tools on surfpool", () => {
       }
     });
 
-    it("CSV batch with one bad row: what happens to the good ones", async () => {
+    it("CSV batch with one bad row: the bad row fails alone, the rest go out in one prompt", async () => {
       const rows = [
         { id: "good-1", row: { stake_amount: (1n * SOL).toString() } },
         // Not a vote account: delegating to it fails.
@@ -358,20 +358,39 @@ describe.skipIf(!SURFPOOL_URL)("stake tools on surfpool", () => {
         { id: "good-2", row: { stake_amount: (1n * SOL).toString() } },
       ];
       const last = new Map<string, RowUpdate>();
+      const before = ownerPrompts.length;
       await sendStakeRowsInBatches(ownerClient, rows, rent, (id, update) =>
         last.set(id, update),
       );
       const bad = last.get("bad");
       expect(bad?.status).toBe("failed");
-      console.log("bad row error:", bad?.status === "failed" && bad.error);
-      console.log(
-        "good rows:",
-        last.get("good-1")?.status,
-        last.get("good-2")?.status,
+      expect(bad?.status === "failed" && bad.error).toMatch(
+        /Incorrect program id/,
       );
-      // Documented behaviour to decide on: are good rows sent when a sibling
-      // in the same batch fails simulation?
-      expect(["confirmed", "failed"]).toContain(last.get("good-1")?.status);
+      expect(last.get("good-1")?.status).toBe("confirmed");
+      expect(last.get("good-2")?.status).toBe("confirmed");
+      // The wallet was asked once, for the two rows that compiled.
+      expect(ownerPrompts.slice(before)).toEqual([2]);
+    });
+
+    it("CSV batch where every row is bad: no wallet prompt", async () => {
+      const rows = [
+        {
+          id: "bad-1",
+          row: { stake_amount: (1n * SOL).toString(), validator: other.address },
+        },
+        {
+          id: "bad-2",
+          row: { stake_amount: (1n * SOL).toString(), validator: other.address },
+        },
+      ];
+      const last = new Map<string, RowUpdate>();
+      const before = ownerPrompts.length;
+      await sendStakeRowsInBatches(ownerClient, rows, rent, (id, update) =>
+        last.set(id, update),
+      );
+      expect([...last.values()].every((u) => u.status === "failed")).toBe(true);
+      expect(ownerPrompts.slice(before)).toEqual([]);
     });
 
     it("delegation below 1 SOL is refused (SIMD-0490, same as mainnet)", async () => {
