@@ -18,17 +18,14 @@ import {
   setTransactionMessageLifetimeUsingBlockhash,
   SOLANA_ERROR__SIGNER__WALLET_MULTISIGN_UNIMPLEMENTED,
   type Instruction,
+  type MicroLamports,
   type Transaction,
   type TransactionSigner,
 } from "@solana/kit";
 
-/**
- * The backend sends what we sign and only accepts version 0 transactions.
- * Pinning the version here keeps that true even if the client's default
- * moves on. Pass it to `useKitClient` (stable identity matters for its memo).
- */
 export const TRANSACTION_CONFIG = {
   version: 0,
+  microLamportsPerComputeUnit: 10_000n as MicroLamports,
 } as const satisfies TransactionPlannerConfig;
 
 export type AirdropBatch = GetAirdrop200["transactions"][number];
@@ -127,14 +124,14 @@ export async function signBatches(
 
   const transactions = await Promise.all(
     batches.map(async (batch) => {
-      const planned = await client.planTransaction(
-        await batchInstructions(airdrop, batch, client.payer),
+      const instructions = await batchInstructions(
+        airdrop,
+        batch,
+        client.payer,
       );
-      if (planned.version !== 0) {
-        throw new Error(
-          `The airdrop backend accepts version 0 transactions, the client planned version ${String(planned.version)}`,
-        );
-      }
+      const planned = await client.planTransaction(instructions, {
+        maxInstructionsPerTransaction: instructions.length + 2,
+      });
       const message = await estimateAndSetResourceLimits(
         setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, planned),
       );
