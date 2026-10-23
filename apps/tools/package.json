@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@ardrive/turbo-sdk": "^2.1.2",
+    "@blastctrl/kit-extensions": "workspace:^",
     "@blastctrl/mpl-core": "workspace:^",
     "@blastctrl/mpl-token-metadata": "workspace:^",
     "@blastctrl/octane-core": "workspace:^",

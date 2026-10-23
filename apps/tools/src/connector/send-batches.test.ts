@@ -1,10 +1,12 @@
 import {
   SolanaError,
+  SOLANA_ERROR__JSON_RPC__SERVER_ERROR_MIN_CONTEXT_SLOT_NOT_REACHED,
   SOLANA_ERROR__SIGNER__WALLET_MULTISIGN_UNIMPLEMENTED,
   type Address,
   type Blockhash,
   type Instruction,
   type Signature,
+  type Slot,
 } from "@solana/kit";
 import { describe, expect, it } from "vitest";
 import {
@@ -26,6 +28,12 @@ const batches = Array.from({ length: 5 }, (_, index) => ({ index }));
 const noop: Instruction = {
   programAddress: "11111111111111111111111111111111" as Address,
 };
+/** What a fake sender resolves with: `signature-n`, confirmed at slot `n`. */
+const confirmed = (n: number) => ({
+  signature: `signature-${n}` as Signature,
+  slot: BigInt(n) as Slot,
+});
+
 /** A stand-in transaction; `n` tells them apart. */
 const transaction = (n: number) =>
   ({
@@ -40,7 +48,7 @@ const senderWith = (over: Partial<BatchSender> = {}): BatchSender => {
     latestBlockhash: async () => lifetime,
     prepare: async (instructions) => transaction(instructions.length),
     sign: async (transactions) => transactions,
-    sendAndConfirm: async () => `signature-${++sent}` as Signature,
+    sendAndConfirm: async () => confirmed(++sent),
     ...over,
   };
 };
@@ -107,7 +115,7 @@ describe("sendBatches with a wallet that signs everything at once", () => {
         sign: async () => {
           throw Error("User rejected the request.");
         },
-        sendAndConfirm: async () => `signature-${++sent}` as Signature,
+        sendAndConfirm: async () => confirmed(++sent),
       }),
     );
     expect(outcome).toBeInstanceOf(WalletRefusedError);
@@ -315,7 +323,7 @@ describe("sendInOrder", () => {
           if (inFlight++ > 0) overlapped = true;
           await Promise.resolve();
           inFlight--;
-          return `signature-${transaction.messageBytes[0]}` as Signature;
+          return confirmed(transaction.messageBytes[0]!);
         },
       }),
     );
@@ -331,7 +339,7 @@ describe("sendInOrder", () => {
       senderWith({
         sendAndConfirm: async () => {
           if (++sent === 3) throw Error("Transaction failed");
-          return `signature-${sent}` as Signature;
+          return confirmed(sent);
         },
       }),
     );
@@ -339,6 +347,39 @@ describe("sendInOrder", () => {
     expect(err).not.toBeInstanceOf(WalletRefusedError);
     expect(sent).toBe(3);
     expect(progress).toEqual([0, 1, 2]);
+  });
+
+  /** What the RPC throws when the node hasn't reached the minimum context slot. */
+  const behind = () =>
+    new SolanaError(
+      SOLANA_ERROR__JSON_RPC__SERVER_ERROR_MIN_CONTEXT_SLOT_NOT_REACHED,
+      { contextSlot: 0n } as never,
+    );
+
+  it("sends each step with the slot the one before confirmed at, again when a node hasn't reached it", async () => {
+    const sends: { step: number; minContextSlot: Slot | undefined }[] = [];
+    const { signatures } = await runInOrder(
+      senderWith({
+        sendAndConfirm: async (transaction, minContextSlot) => {
+          const step = transaction.messageBytes[0]!;
+          sends.push({ step, minContextSlot });
+          // Step 3 is refused once, by a node that hasn't seen step 2.
+          if (step === 3 && sends.filter((s) => s.step === 3).length === 1) {
+            throw behind();
+          }
+          return confirmed(step);
+        },
+      }),
+    );
+    expect(sends).toEqual([
+      { step: 1, minContextSlot: undefined },
+      { step: 2, minContextSlot: 1n },
+      { step: 3, minContextSlot: 2n },
+      { step: 3, minContextSlot: 2n },
+      { step: 4, minContextSlot: 3n },
+      { step: 5, minContextSlot: 4n },
+    ]);
+    expect(signatures).toEqual([1, 2, 3, 4, 5].map((n) => `signature-${n}`));
   });
 
   it("asks per step when the wallet can't batch, and says how far it got when refused", async () => {

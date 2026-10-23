@@ -1,20 +1,21 @@
 import { retryWithBackoff } from "@/lib/utils";
+import { sendAndConfirmWithSlotFactory } from "@blastctrl/kit-extensions";
 import {
   assertIsSendableTransaction,
   assertIsTransactionWithBlockhashLifetime,
   compileTransaction,
-  getSignatureFromTransaction,
   isSolanaError,
   isTransactionModifyingSigner,
-  sendAndConfirmTransactionFactory,
   setTransactionMessageComputeUnitLimit,
   setTransactionMessageLifetimeUsingBlockhash,
   SOLANA_ERROR__SIGNER__WALLET_MULTISIGN_UNIMPLEMENTED,
   type Instruction,
   type Signature,
+  type Slot,
   type Transaction,
   type TransactionWithLifetime,
 } from "@solana/kit";
+import { retryWhileBehind } from "./min-context-slot";
 import { estimateAndSetResourceLimitsWithBuffer } from "./resource-limits";
 import { transactionErrorMessage } from "./transaction-error";
 import type { KitClient } from "./use-kit-client";
@@ -89,6 +90,9 @@ export type BlockhashLifetime = Parameters<
 /** A compiled transaction, ready for the wallet. */
 export type PreparedTransaction = Transaction & TransactionWithLifetime;
 
+/** A confirmed transaction and the slot its confirmation was seen at. */
+export type Confirmed = { signature: Signature; slot: Slot };
+
 /**
  * What sending batches needs from the chain and the wallet. `kitBatchSender`
  * is the real one; tests fake it.
@@ -111,7 +115,15 @@ export type BatchSender = {
   sign: (
     transactions: PreparedTransaction[],
   ) => Promise<readonly PreparedTransaction[]>;
-  sendAndConfirm: (transaction: PreparedTransaction) => Promise<Signature>;
+  /**
+   * Sends, waits for confirmation and reports the slot it came at. With
+   * `minContextSlot`, an RPC node that hasn't reached that slot refuses the
+   * send instead of simulating it against an older state.
+   */
+  sendAndConfirm: (
+    transaction: PreparedTransaction,
+    minContextSlot?: Slot,
+  ) => Promise<Confirmed>;
 };
 
 export type BatchSenderOptions = {
@@ -140,7 +152,7 @@ export function kitBatchSender(
   const estimateAndSetResourceLimits = estimateAndSetResourceLimitsWithBuffer(
     client.rpc,
   );
-  const sendAndConfirm = sendAndConfirmTransactionFactory({
+  const sendAndConfirm = sendAndConfirmWithSlotFactory({
     rpc: client.rpc,
     rpcSubscriptions: client.rpcSubscriptions,
   });
@@ -169,11 +181,13 @@ export function kitBatchSender(
       return compileTransaction(message);
     },
     sign: (transactions) => signer.modifyAndSignTransactions(transactions),
-    sendAndConfirm: async (transaction) => {
+    sendAndConfirm: async (transaction, minContextSlot) => {
       assertIsSendableTransaction(transaction);
       assertIsTransactionWithBlockhashLifetime(transaction);
-      await sendAndConfirm(transaction, { commitment: "confirmed" });
-      return getSignatureFromTransaction(transaction);
+      return sendAndConfirm(transaction, {
+        commitment: "confirmed",
+        minContextSlot,
+      });
     },
   };
 }
@@ -208,9 +222,10 @@ export async function sendBatches<B extends { index: number }>(
       status: "failed",
       error: transactionErrorMessage(err),
     });
-  const report = (index: number, promise: Promise<Signature>) =>
+  const report = (index: number, promise: Promise<Confirmed>) =>
     promise.then(
-      (signature) => onBatchResult({ index, status: "confirmed", signature }),
+      ({ signature }) =>
+        onBatchResult({ index, status: "confirmed", signature }),
       (err: unknown) => fail(index, err),
     );
 
@@ -328,7 +343,7 @@ async function sendOneByOne<B extends { index: number }>(
 
     onStage?.(batch.index, "confirming");
     await sender.sendAndConfirm(signed).then(
-      (signature) =>
+      ({ signature }) =>
         onBatchResult({ index: batch.index, status: "confirmed", signature }),
       (err: unknown) => fail(batch.index, err),
     );
@@ -336,11 +351,21 @@ async function sendOneByOne<B extends { index: number }>(
 }
 
 /**
+ * Called before the first send and after each confirmation, with the count
+ * so far and the slot the latest confirmation came at.
+ */
+export type OrderProgress = (
+  confirmed: number,
+  total: number,
+  slot?: Slot,
+) => void;
+
+/**
  * Sends transactions that depend on each other, in order: each is confirmed
  * before the next goes out, and the first failure stops the rest. The wallet
  * is asked once for all of them, or per transaction when it can't do that,
- * like {@link sendBatches}. Reports how many have confirmed so far and
- * resolves with their signatures. A refusal throws `WalletRefusedError`.
+ * like {@link sendBatches}. Reports each confirmation and resolves with the
+ * signatures. A refusal throws `WalletRefusedError`.
  *
  * The sender must not simulate, since a step's accounts may not exist until
  * the step before it lands: use `kitBatchSender(client, { computeUnitLimit })`.
@@ -348,7 +373,7 @@ async function sendOneByOne<B extends { index: number }>(
 export async function sendInOrder(
   steps: Instruction[][],
   sender: BatchSender,
-  onProgress?: (confirmed: number, total: number) => void,
+  onProgress?: OrderProgress,
 ): Promise<Signature[]> {
   const signatures: Signature[] = [];
   onProgress?.(0, steps.length);
@@ -365,7 +390,7 @@ export async function sendInOrder(
     if (
       isSolanaError(err, SOLANA_ERROR__SIGNER__WALLET_MULTISIGN_UNIMPLEMENTED)
     ) {
-      return sendRestInOrder(steps, sender, signatures, onProgress);
+      return sendRestInOrder(steps, sender, signatures, undefined, onProgress);
     }
     if (isWalletRefusal(err)) {
       throw new WalletRefusedError(0, steps.length, err);
@@ -373,21 +398,32 @@ export async function sendInOrder(
     throw err;
   }
 
+  let last: Slot | undefined;
   for (const transaction of signed.slice(0, steps.length)) {
-    signatures.push(await sender.sendAndConfirm(transaction));
-    onProgress?.(signatures.length, steps.length);
+    const { signature, slot } = await sendAndConfirmStep(
+      sender,
+      transaction,
+      last,
+    );
+    last = slot;
+    signatures.push(signature);
+    onProgress?.(signatures.length, steps.length, slot);
   }
   // A wallet may hand back fewer than it was given; the rest are asked for
   // one at a time.
-  return sendRestInOrder(steps, sender, signatures, onProgress);
+  return sendRestInOrder(steps, sender, signatures, last, onProgress);
 }
 
-/** The steps after `signatures.length`, each with its own prompt and blockhash. */
+/**
+ * The steps after `signatures.length`, each with its own prompt and
+ * blockhash; `last` is the slot the previous step confirmed at, if any.
+ */
 async function sendRestInOrder(
   steps: Instruction[][],
   sender: BatchSender,
   signatures: Signature[],
-  onProgress?: (confirmed: number, total: number) => void,
+  last: Slot | undefined,
+  onProgress?: OrderProgress,
 ): Promise<Signature[]> {
   for (const step of steps.slice(signatures.length)) {
     const transaction = await sender.prepare(
@@ -403,8 +439,26 @@ async function sendRestInOrder(
       }
       throw err;
     }
-    signatures.push(await sender.sendAndConfirm(signed));
-    onProgress?.(signatures.length, steps.length);
+    const { signature, slot } = await sendAndConfirmStep(sender, signed, last);
+    last = slot;
+    signatures.push(signature);
+    onProgress?.(signatures.length, steps.length, slot);
   }
   return signatures;
 }
+
+/**
+ * `sender.sendAndConfirm` for one step, which needs the step before it,
+ * confirmed at `after`, to be visible: the RPC may confirm from one node
+ * and send through another a slot or two behind, where the accounts the
+ * earlier step made don't exist yet. The send names `after` as its minimum
+ * context slot, so such a node refuses it outright instead of simulating
+ * it against the older state, and it is tried again until a node that has
+ * caught up takes it.
+ */
+const sendAndConfirmStep = (
+  sender: BatchSender,
+  transaction: PreparedTransaction,
+  after: Slot | undefined,
+): Promise<Confirmed> =>
+  retryWhileBehind(() => sender.sendAndConfirm(transaction, after));

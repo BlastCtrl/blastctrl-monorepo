@@ -513,17 +513,45 @@ map custom stake codes to names with `getStakeErrorMessage`.
 
 - [ ] **Distributor (Solace airdrops)** (`distributor`, `distributor/new`, `distributor/[airdropId]`)
 
-  Not started. Plan: the on-chain part is sign-only (`distributor/transactions.ts`
-  builds version-0 transactions the backend sends); assert the compiled
-  transactions against the surfnet by simulating them unsigned; the Solace
-  backend and sign-in challenge are faked.
+  By hand on mainnet against the deployed Solace backend (2026-10-23, the
+  user), in progress. **Found and fixed:** "Start Airdrop" on a SOL airdrop
+  failed before the wallet prompt with "Unexpected transaction plan.
+  Expected single plan, got sequential plan." A SOL batch is 20 transfers
+  (`BATCH_SIZE`), and kit's planner caps a transaction at 16 instructions
+  by default (headroom for inner instructions under the format's limit of
+  64), so it split the batch in two and `planTransaction` refused the
+  result; size was fine (20 transfers measure about 1,190 bytes).
+  `signBatches` now plans each batch with `maxInstructionsPerTransaction`
+  set to the batch's instruction count plus the compute-budget ones. Token
+  batches (4 recipients) and the other `planTransaction` callers were under
+  the cap. **Found and fixed:** the backend then rejected the start with
+  `FST_AIRDROP_START_VALIDATION_ERROR`, "instructions length not equal to
+  expected (actual length: 21, expected: 22)": it expects a compute unit
+  price instruction too, which the pre-migration page sent (10,000
+  micro-lamports) and the planner config had dropped. `TRANSACTION_CONFIG`
+  now sets `microLamportsPerComputeUnit` to 10,000, and a planned SOL batch
+  checks out as 22 instructions, version 0, opening with the compute limit
+  and then the price (the old page sent price first; the backend's check
+  is on the count).
 
 ## Reclaim SOL landing (`reclaim-sol/`)
 
-- [ ] **Reclaim SOL** (no-options reclaim page)
+- [x] **Reclaim SOL** (no-options reclaim page)
 
-  Not started. Same seed and assertions as reclaim-rent; verify it shares
-  the scan and batch sender rather than duplicating them.
+  Covered by the reclaim-rent run (2026-10-22, by reading the code): the
+  page is another interface over the same modules, with no chain logic of
+  its own. `one-click-reclaim.tsx` scans with `useReclaimableAccounts`
+  (the same `fetchReclaimableAccounts`), keeps every unblocked account that
+  returns lamports with close-empty on (`reclaimLamports(a, true) > 0`,
+  the same rule as reclaim-rent's default selection minus the switch),
+  chunks by the same `ACCOUNTS_PER_TRANSACTION`, and sends through
+  `useReclaimExcess` with the same `SERVICE_FEE`, `FEE_PER_TRANSACTION`
+  and fee/rent helpers from `reclaim-rent/_components`. What reclaim-rent's
+  findings say applies here unchanged: frozen empty accounts are kept
+  open, the displayed fee can be a lamport per extra batch high, and the
+  fee recipient must be funded. Its own concerns are animation and copy
+  (see the memory notes on the landing page), not transactions. UI not
+  exercised against the surfnet.
 
 ## NFT tools (`solana-nft-tools/`)
 
@@ -769,13 +797,130 @@ map custom stake codes to names with `getStakeErrorMessage`.
   tell which mint was refused. Only reachable when an item's state changes
   between plan and send. UI not exercised.
 
-- [ ] **Transfer authority** (`transfer-authority`, `src/lib/solana/squads-multisig.ts`)
+- [x] **Transfer authority** (`transfer-authority`, `src/lib/solana/squads-multisig.ts`)
 
-  Not started. Plan: direct path (update authority transfer + creator
-  verification) on seeded NFTs; Squads path against a real mainnet multisig
-  fetched into the surfnet with the test key set as a member through
-  `surfnet_setAccount`, run `batchProposalSteps` with `sendInOrder`, then
-  `executeSteps`; assert the authority moved.
+  Scripted run, direct path: 5 tests, green on surfpool 1.6.1 on 2026-10-22
+  (file since removed). Squads path not exercised (feasible: the generated
+  client has `multisigCreateV2`, so a fresh single-member multisig could be
+  made on the surfnet; the real-multisig flow with other members approving
+  is not simulable). Seeded with the lib's `createNftInstructions` (createV1
+  + mintV1, one NFT per transaction), no cheat codes, four funded wallets:
+  W (the current authority), N (the new authority), C (the new creator) and
+  S (another creator), plus X, an unsigned address. NFTs fresh per test:
+  W's plain NFTs (W verified, 100) and B (W 60 verified / S 20 / X 20); D
+  (W 50 verified / S 50, then S verified itself with
+  `verifyCreatorInstructions`); E (`isMutable: false`) and F, handed to N
+  with `updateNftInstructions`; a 6-decimal mint with
+  `createMetadataInstructions` (Fungible), and a bare mint; S's J. Code
+  path: `fetchTokenMetadatas`, then `planTransfer` / `planVerify`
+  (`_components/plan.ts`), then `transferBatches` / `verifyBatches` /
+  `transferInstruction` / `transactionSize` (`_components/transactions.ts`),
+  then `sendBatches` with `kitBatchSender(client)`
+  (`connector/send-batches.ts`) and `build: batch => batch.instructions`,
+  which is what `SendPanel.send` does.
+  - **Modes, plan vs chain:** keep on A1: ready with `creators: null`, the
+    `updateV1` data decodes as `data: None`, `newUpdateAuthority: Some(N)`.
+    Swap on A2 and B with C as the new creator: A2 → [C 100 unverified];
+    B → [C 60 unverified, S 20, X 20]. Replace on A3 with N: [N 100
+    unverified]. After each run `updateAuthority = N` and exactly the
+    planned creators, other creators' flags unchanged; name, symbol, URI,
+    royalty, isMutable, primarySaleHappened, token standard and collection
+    unchanged. One prompt (`[1]`) per run, exactly the fee (5,000 lamports
+    per transaction). Planned again by W, all four read "done".
+  - **Step 2:** C's `planVerify` on three swapped NFTs: all ready; on a
+    plain W NFT "Your wallet isn't one of its creators", and N gets the
+    same on a swapped NFT. `verifyBatches` signed by C's client: one
+    transaction (3 NFTs, 407 B), prompts `[1]`, C paid 5,000 lamports, W
+    not prompted; only C's flag flipped. `planVerify` then says "done".
+  - **Plan skips** (identical in all three modes except D): D with replace,
+    "Other verified creator (S) must unverify first"; forced, 55
+    (CannotUnverifyAnotherCreator), so the plan agrees with the program. D
+    with swap and keep: ready and accepted (swap writes [C 50 unverified,
+    S 50 verified]; keep leaves both verified). E: "Immutable". F: "done".
+    Fungible: "Fungible token, not an NFT". Bare mint: "No Token Metadata
+    account". J: "Update authority is S"; forced, keep and swap both 158
+    (InvalidAuthorityType). E forced with keep (no data): **accepted**, the
+    authority moves and isMutable stays false; with swap data, 59
+    (DataIsImmutable). Transfer to yourself: the plan says "done" (the
+    step's input also refuses it with "That's the current update
+    authority"); forced, the program accepts it as a no-op for the fee.
+  - **Packing:** 12 plain NFTs with swap: `packBatches` gives 6
+    transactions of 2 NFTs, 710 B each (a third would pass 900 B);
+    `transactionSize` equals the compiled size. A swap/replace update is
+    about 219 B per NFT, so with data the 10-per-transaction cap never
+    applies; list order kept. One prompt for all 6 (`[6]`), each batch
+    signing → confirming → confirmed, 30,000 lamports, all 12 NFTs N's
+    with [C 100 unverified].
+  - **Failure inside a run:** 8 plain NFTs with replace plus D forced in
+    at position 2: batches [P1, D], 3 × 2, [P8]. Batch 0 fails in
+    `prepare` with `Custom program error: #55 (instruction #3)`; the other
+    4 go out in one prompt (`[4]`) and confirm (20,000 lamports). P1 stays
+    W's because its transaction was dropped. `sendBatches` doesn't throw,
+    so no toast; the panel row reads "Transaction 1 · 2 NFTs" plus the
+    bare error and the summary "4 of 5 transactions confirmed. The NFTs
+    were read again, so sending now only retries the ones that didn't go
+    through." Planned again, only P1 is ready.
+  - Every refusal toasts as kit's bare `Custom program error: #NN
+    (instruction #K)`, K from 1 with the compute-unit-limit instruction
+    first; all at simulation, before the wallet is asked.
+
+  **Open, plan:** `planTransfer` skips immutable NFTs with "Immutable" in
+  every mode, but the program accepts an authority-only `updateV1` (keep,
+  no data) on immutable metadata; the tool refuses a transfer it could make
+  in keep mode. **Open, partial failure:** one refused NFT also drops the
+  good NFT packed with it; the row doesn't name the mint and the error is a
+  bare number; only reachable when an NFT's state changes between check and
+  send. **Open, errors:** 55, 59 and 158 show as bare numbers. UI not
+  exercised against the surfnet.
+
+  **Squads path, by hand on mainnet (2026-10-22, the user, 2-of-2
+  multisig):** run 1, authority to the vault and then a creator
+  verification proposal, clean. Run 2, authority back from the vault for 6
+  NFTs in swap mode: the five proposal transactions (create, three adds,
+  activate + approve) all landed within one second from one wallet prompt
+  (verified from the wallet's history); the proposal was Active with 1 of 2
+  approvals. A sixth prompt then failed with the panel's "Whatever
+  confirmed before this stays" toast and left no trace on chain: the
+  panel's action buttons acted on the status from before the run (its
+  re-read was still in flight), so "Finish creating the proposal" sent an
+  activate on an already active proposal, which the program refuses.
+  **Fixed 2026-10-22:** the panel's actions are disabled while the
+  proposal is being re-read (a re-read before finishing was considered and
+  dropped: a status changed by someone else between refreshes is already
+  answered by the program's refusal and the toast). Run 3, authority back
+  from the vault for 5 NFTs (3 transactions): the create step and the
+  first add landed in consecutive slots at 12:57:12, then the second add
+  was refused by preflight with 3012 (Anchor's AccountNotInitialized) and
+  never broadcast; the wallet shows no failed transaction. The RPC
+  confirmed the first add from one node and simulated the next on another
+  a slot or two behind, where the batch and proposal didn't exist yet.
+  The wallet's own "simulation failed" warnings for all but the first
+  transaction are expected (each depends on the one before it) and the
+  panel says so. Run 4 (proposal #10, 6 NFTs, 4 transactions): all four
+  landed within two seconds, yet the panel then showed "Draft: 2 of 2
+  added" and offered "Finish creating the proposal", which sent an
+  activate on the already active proposal (6008, InvalidProposalStatus).
+  Same cause as run 2 and run 3, and systematic: 40 back-to-back reads of
+  the confirmed slot from the HTTP endpoint went backwards twice, so it is
+  answered by several nodes about a slot apart, and the read right after a
+  websocket confirmation is usually answered by one that hasn't reached
+  that slot. **Fixed 2026-10-23, one mechanism for both:** the sender
+  confirms through `@blastctrl/kit-extensions`'
+  `sendAndConfirmWithSlotFactory` (kit's own strategy, plus the slot the
+  confirmation came at); `sendInOrder` sends each step with the previous
+  step's slot as `minContextSlot` and reports the slot after each
+  confirmation; the panel reads the proposal with the last confirmed slot
+  as `minContextSlot`. A node that hasn't reached the slot refuses
+  (-32016, "minimum context slot has not been reached") instead of
+  answering from an older state, and `retryWhileBehind`
+  (`connector/min-context-slot.ts`) tries the send or the read again
+  until a node that has caught up answers. A run that fails partway keeps
+  the slot of its last confirmed step, so the read after it is right too.
+  Tried first and replaced: a retry on any preflight failure, and an
+  optimistic write of the expected state into the query cache. The
+  toast's "whatever confirmed before this stays" is only added when
+  something in the run confirmed. Not yet seen: the second
+  member's approve and the execute from this panel.
 
 - [x] **NFT faucet** (`nft-faucet`)
 
@@ -798,17 +943,17 @@ map custom stake codes to names with `getStakeErrorMessage`.
 
 ## Swaps
 
-- [ ] **Gasless swap** (`gasless-swap`, `api/octane/build-jup-swap`, `packages/octane-core`)
+- [x] **Gasless swap** (`gasless-swap`, `api/octane/build-jup-swap`, `packages/octane-core`)
 
-  Not started. Plan: `packages/octane-core` tests already fake Jupiter and
-  the RPC; add a surfnet case that takes a recorded Jupiter response, builds
-  the fee-payer-signed transaction with a surfnet-funded fee payer, signs
-  the user slot with the wallet-like signer and sends it. Lookup tables are
-  fetched from mainnet by the surfnet.
+  Tested by hand on the frontend against the live backend and Jupiter
+  (2026-10-22, the user). Not simulated: the fee payer and the swap route
+  come from the Octane backend, so a surfnet can't stand in for it; the
+  `packages/octane-core` tests fake Jupiter and the RPC.
 
-- [ ] **Gasless BONK swap** (`gasless-bonk-swap`)
+- [x] **Gasless BONK swap** (`gasless-bonk-swap`)
 
-  Not started. Same as gasless swap with the BONK burn fee; assert the burn.
+  Tested by hand on the frontend against the live backend (2026-10-22, the
+  user). Same dependencies as the gasless swap.
 
 ## Out of scope
 

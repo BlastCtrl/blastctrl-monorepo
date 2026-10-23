@@ -30,6 +30,7 @@ import {
   type Instruction,
   type ReadonlyUint8Array,
   type Rpc,
+  type Slot,
   type TransactionSigner,
 } from "@solana/kit";
 
@@ -160,11 +161,16 @@ export type BatchProposal = {
   executed: number;
 };
 
-/** A batch and its proposal, or null when either doesn't exist. */
+/**
+ * A batch and its proposal, or null when either doesn't exist. With
+ * `minContextSlot`, an RPC node that hasn't reached that slot refuses to
+ * answer (kit throws) rather than describing an older state.
+ */
 export async function fetchBatchProposal(
   rpc: Rpc<GetMultipleAccountsApi>,
   multisigAddress: Address,
   index: bigint,
+  minContextSlot?: Slot,
 ): Promise<BatchProposal | null> {
   const [batchAccount, proposalAccount] = await fetchEncodedAccounts(
     rpc,
@@ -172,7 +178,7 @@ export async function fetchBatchProposal(
       await transactionAddress(multisigAddress, index),
       await proposalAddress(multisigAddress, index),
     ],
-    { commitment: "confirmed" },
+    { commitment: "confirmed", minContextSlot },
   );
   if (!batchAccount?.exists || !proposalAccount?.exists) return null;
   try {

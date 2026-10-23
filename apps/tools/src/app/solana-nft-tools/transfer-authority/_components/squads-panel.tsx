@@ -8,6 +8,7 @@ import {
   sendInOrder,
 } from "@/connector/send-batches";
 import { transactionErrorMessage } from "@/connector/transaction-error";
+import { retryWhileBehind } from "@/connector/min-context-slot";
 import { useKitClient } from "@/connector/use-kit-client";
 import {
   approveInstruction,
@@ -21,9 +22,9 @@ import {
 } from "@/lib/solana/squads-multisig";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { useConnector } from "@solana/connector/react";
-import type { Address, Instruction } from "@solana/kit";
+import type { Address, Instruction, Slot } from "@solana/kit";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { EXECUTE_COMPUTE_UNITS } from "./squads";
 import type { Batch } from "./transactions";
 
@@ -62,11 +63,23 @@ export function SquadsPanel({
   const me = account ?? undefined;
   const member = info.members.find((m) => m.address === me);
 
+  /**
+   * The slot the last run's final transaction confirmed at. Reads name it
+   * as their minimum context slot, so an RPC node a slot behind the one
+   * that confirmed refuses to answer instead of describing the proposal
+   * as it was before that transaction, and the read is tried again until
+   * a node that has caught up answers.
+   */
+  const confirmedAt = useRef<Slot | undefined>(undefined);
   const proposal = useQuery({
     queryKey: ["squads-batch", network, info.address, index?.toString()],
     queryFn: () => {
       if (!rpc) throw Error("RPC not available");
-      return fetchBatchProposal(rpc, info.address, index!);
+      return retryWhileBehind(
+        () =>
+          fetchBatchProposal(rpc, info.address, index!, confirmedAt.current),
+        { delayMs: 500 },
+      );
     },
     enabled: index !== null && !!rpc,
     refetchInterval: busy ? false : 20_000,
@@ -76,11 +89,18 @@ export function SquadsPanel({
   const current = proposal.data;
   const closed =
     !current || current.status === "Rejected" || current.status === "Cancelled";
+  /**
+   * While a read is in flight the status on screen is the previous one,
+   * and acting on it could redo a step that already landed (activating an
+   * active proposal), so the actions wait for the read.
+   */
+  const stale = index !== null && (proposal.isPending || proposal.isFetching);
 
   /**
-   * The steps depend on each other, so they can't be simulated for a compute
-   * budget before they land; each gets the runtime's default unless told
-   * otherwise.
+   * Sends a run's steps, then reads the proposal as of its last confirmed
+   * one, whether or not the run got to the end. The steps depend on each
+   * other, so they can't be simulated for a compute budget before they
+   * land; each gets the runtime's default unless told otherwise.
    */
   const run = async (
     label: string,
@@ -92,12 +112,16 @@ export function SquadsPanel({
     if (!client) return;
     setBusy(true);
     onBusyChange(true);
+    let confirmed = 0;
     try {
       await sendInOrder(
         await steps(),
         kitBatchSender(client, { computeUnitLimit }),
-        (done, total) =>
-          setProgress(`${label}: ${done} of ${total} transactions confirmed`),
+        (done, total, slot) => {
+          confirmed = done;
+          if (slot !== undefined) confirmedAt.current = slot;
+          setProgress(`${label}: ${done} of ${total} transactions confirmed`);
+        },
       );
     } catch (err) {
       const refused = err instanceof WalletRefusedError;
@@ -106,7 +130,10 @@ export function SquadsPanel({
         title: refused ? "Cancelled in your wallet" : `${label} failed`,
         description: refused
           ? undefined
-          : `${transactionErrorMessage(err)} Whatever confirmed before this stays; check the status and carry on from there.`,
+          : transactionErrorMessage(err) +
+            (confirmed > 0
+              ? " Whatever confirmed before this stays; check the status and carry on from there."
+              : ""),
       });
     } finally {
       setBusy(false);
@@ -137,7 +164,7 @@ export function SquadsPanel({
     });
 
   const finish = (draft: BatchProposal) =>
-    run("Finishing the proposal", async () =>
+    run("Finishing the proposal", () =>
       batchProposalSteps({
         multisig: info,
         member: member!,
@@ -227,7 +254,9 @@ export function SquadsPanel({
         {member && closed && (
           <Button
             color="indigo"
-            disabled={busy || disabled || ready === 0 || !member.initiate}
+            disabled={
+              busy || stale || disabled || ready === 0 || !member.initiate
+            }
             onClick={create}
           >
             Create a proposal for {ready} {ready === 1 ? "NFT" : "NFTs"}
@@ -236,7 +265,7 @@ export function SquadsPanel({
         {member && current?.status === "Draft" && (
           <Button
             color="indigo"
-            disabled={busy || !member.initiate}
+            disabled={busy || stale || !member.initiate}
             onClick={() => finish(current)}
           >
             Finish creating the proposal
@@ -248,7 +277,7 @@ export function SquadsPanel({
           !current.approved.includes(me!) && (
             <Button
               color="indigo"
-              disabled={busy}
+              disabled={busy || stale}
               onClick={() => approve(current)}
             >
               Approve
@@ -259,7 +288,7 @@ export function SquadsPanel({
           member.execute && (
             <Button
               color="indigo"
-              disabled={busy}
+              disabled={busy || stale}
               onClick={() => execute(current)}
             >
               Execute {current.size - current.executed}{" "}
@@ -273,8 +302,10 @@ export function SquadsPanel({
       {member && closed && ready > 0 && (
         <p className="text-xs text-gray-500">
           Creating it takes {batches.length + 2} transactions from your wallet,
-          which also pays the rent for the proposal&apos;s accounts. Members
-          approve it once, here or in the Squads app.
+          which also pays the rent for the proposal&apos;s accounts. Your wallet
+          may warn that all but the first fail in simulation: each needs the one
+          before it to land first. Members approve it once, here or in the
+          Squads app.
         </p>
       )}
 
