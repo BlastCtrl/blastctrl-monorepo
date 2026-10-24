@@ -950,10 +950,14 @@ map custom stake codes to names with `getStakeErrorMessage`.
   come from the Octane backend, so a surfnet can't stand in for it; the
   `packages/octane-core` tests fake Jupiter and the RPC.
 
-- [x] **Gasless BONK swap** (`gasless-bonk-swap`)
+- [ ] **Gasless swap with BONK selected** (`gasless-swap?token=bonk`)
 
-  Tested by hand on the frontend against the live backend (2026-10-22, the
-  user). Same dependencies as the gasless swap.
+  The gasless BONK swap page was merged into the gasless swap on
+  2026-10-24, and the BONK burn was removed from `packages/octane-core`, so
+  BONK now swaps like any other token. `/gasless-bonk-swap` redirects here
+  with BONK selected. The old page passed a hand test against the live
+  backend (2026-10-22, the user); the merged page with BONK selected hasn't
+  been tested by hand yet. Same dependencies as the gasless swap.
 
 ## Out of scope
 

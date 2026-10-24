@@ -1,13 +1,11 @@
 import { getTransferSolInstruction } from "@solana-program/system";
 import {
   findAssociatedTokenPda,
-  getBurnInstruction,
   getCloseAccountInstruction,
   getCreateAssociatedTokenIdempotentInstruction,
   TOKEN_PROGRAM_ADDRESS,
 } from "@solana-program/token";
 import {
-  address,
   appendTransactionMessageInstructions,
   assertIsTransactionWithBlockhashLifetime,
   compileTransaction,
@@ -23,7 +21,6 @@ import {
   type GetFeeForMessageApi,
   type GetLatestBlockhashApi,
   type GetMultipleAccountsApi,
-  type Instruction,
   type KeyPairSigner,
   type Rpc,
   type Transaction,
@@ -32,10 +29,6 @@ import {
 } from "@solana/kit";
 import { getJupiterSwapToSol, WSOL_MINT, type JupiterQuote } from "./jupiter";
 import { fetchAddressesByLookupTable } from "./lookup-tables";
-
-export const BONK_MINT = address(
-  "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
-);
 
 /**
  * Rent for a token account. The fee payer lays it out for the user's
@@ -63,8 +56,6 @@ export type SwapCache = {
 export type SwapFees = {
   /** Octane's cut of the SOL the user receives, in basis points. */
   platformSolFeeBps: number;
-  /** Burned from the input when it is BONK, in basis points. */
-  bonkBurnFeeBps: number;
 };
 
 export type SwapToSol = {
@@ -78,7 +69,7 @@ export type SwapToSol = {
  * with Octane's `feePayer` paying for it, signed by the fee payer. The user
  * pays the fee payer back out of the SOL received: the rent of the
  * wrapped-SOL account the fee payer creates, the transaction fee, and the
- * platform fee. Swapping BONK also burns a share of the input.
+ * platform fee.
  */
 export async function buildJupiterSwapToSOL({
   rpc,
@@ -111,14 +102,6 @@ export async function buildJupiterSwapToSOL({
     throw new Error("Too many requests for same user and mint");
   }
 
-  // SPECIAL CASE: swapping BONK burns a share of the amount, and the rest
-  // is what gets swapped.
-  const burnFee =
-    sourceMint === BONK_MINT
-      ? (amount * BigInt(fees.bonkBurnFeeBps)) / 10_000n
-      : 0n;
-  amount -= burnFee;
-
   const swap = await getJupiterSwapToSol({
     user,
     inputMint: sourceMint,
@@ -132,16 +115,11 @@ export async function buildJupiterSwapToSOL({
     ...swap.computeBudgetInstructions,
   ].reverse();
 
-  const [addressesByLookupTable, [nativeAta], [sourceAta]] = await Promise.all([
+  const [addressesByLookupTable, [nativeAta]] = await Promise.all([
     fetchAddressesByLookupTable(rpc, swap.addressLookupTableAddresses),
     findAssociatedTokenPda({
       owner: user,
       mint: WSOL_MINT,
-      tokenProgram: TOKEN_PROGRAM_ADDRESS,
-    }),
-    findAssociatedTokenPda({
-      owner: user,
-      mint: sourceMint,
       tokenProgram: TOKEN_PROGRAM_ADDRESS,
     }),
   ]);
@@ -160,17 +138,6 @@ export async function buildJupiterSwapToSOL({
   });
   const platformFee =
     (BigInt(swap.quote.outAmount) * BigInt(fees.platformSolFeeBps)) / 10_000n;
-  const burnInstructions: Instruction[] =
-    burnFee > 0n
-      ? [
-          getBurnInstruction({
-            account: sourceAta,
-            mint: sourceMint,
-            authority: userSigner,
-            amount: burnFee,
-          }),
-        ]
-      : [];
 
   const { value: lifetime } = await rpc
     .getLatestBlockhash({ commitment: "confirmed" })
@@ -197,7 +164,6 @@ export async function buildJupiterSwapToSOL({
               destination: feePayer.address,
               amount: repayLamports,
             }),
-            ...burnInstructions,
           ],
           m,
         ),

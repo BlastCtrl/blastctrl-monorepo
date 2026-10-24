@@ -46,10 +46,7 @@ export async function POST(req: Request) {
       amount,
       slippageBps,
       cache,
-      fees: {
-        bonkBurnFeeBps: env.BONK_BURN_FEE_BPS,
-        platformSolFeeBps: env.OCTANE_PLATFORM_FEE_BPS,
-      },
+      fees: { platformSolFeeBps: env.OCTANE_PLATFORM_FEE_BPS },
     });
 
     const { blockhash, lastValidBlockHeight } = transaction.lifetimeConstraint;

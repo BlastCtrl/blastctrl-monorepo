@@ -1,8 +1,5 @@
 import { getTransferSolInstructionDataDecoder } from "@solana-program/system";
-import {
-  getBurnInstructionDataDecoder,
-  TOKEN_PROGRAM_ADDRESS,
-} from "@solana-program/token";
+import { TOKEN_PROGRAM_ADDRESS } from "@solana-program/token";
 import {
   address,
   decompileTransactionMessage,
@@ -15,7 +12,6 @@ import {
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it, mock } from "node:test";
 import {
-  BONK_MINT,
   buildJupiterSwapToSOL,
   LAMPORTS_PER_TOKEN_ACCOUNT,
   type SwapRpc,
@@ -40,7 +36,7 @@ const fresh = (): Address =>
 const pools = [fresh(), fresh(), fresh()];
 
 const TRANSACTION_FEE = 15_000n;
-const fees = { platformSolFeeBps: 100, bonkBurnFeeBps: 250 };
+const fees = { platformSolFeeBps: 100 };
 
 const apiInstruction = (
   programId: Address,
@@ -210,18 +206,6 @@ describe("buildJupiterSwapToSOL", () => {
       message.instructions[5]!.accounts![1]!.address,
       feePayer.address,
     );
-  });
-
-  it("burns a share of BONK and swaps the rest", async () => {
-    const { message } = await build(BONK_MINT, 1_000_000n);
-    assert.equal(jupiter.quoteAmount, "975000");
-    const burn = message.instructions.at(-1)!;
-    assert.equal(burn.programAddress, TOKEN_PROGRAM_ADDRESS);
-    assert.equal(
-      getBurnInstructionDataDecoder().decode(burn.data!).amount,
-      25_000n,
-    );
-    assert.equal(burn.accounts![1]!.address, BONK_MINT);
   });
 
   it("refuses an empty amount and a repeat within a few seconds", async () => {
