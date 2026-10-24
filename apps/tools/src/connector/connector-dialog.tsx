@@ -171,7 +171,7 @@ export const ConnectorDialog = () => {
           transition
           className={cn(
             // Mobile: a bottom sheet that slides up. Desktop: a centered card.
-            "flex max-h-[90dvh] w-full flex-col overflow-y-auto overscroll-contain bg-white",
+            "flex max-h-[90dvh] w-full flex-col overflow-x-clip overflow-y-auto overscroll-contain bg-white",
             // Generous bottom padding: in-wallet browsers often overlay their own
             // toolbars on top of the safe area.
             "rounded-t-[22px] pt-2 pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] shadow-[0_-12px_32px_-12px_rgba(9,9,11,.25)]",
