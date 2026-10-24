@@ -86,10 +86,7 @@ export const ConnectorMenu = ({
 
 const MenuContent = ({ close }: { close: () => void }) => {
   const { account, connector, disconnectWallet } = useConnector();
-  const { cluster, type: clusterType } = useCluster();
   const { setOpen: openDialog } = use(ConnectorDialogContext);
-
-  const network = NETWORKS[clusterType ?? "custom"];
 
   if (!account) return null;
 
@@ -101,13 +98,6 @@ const MenuContent = ({ close }: { close: () => void }) => {
           <WalletTile connector={connector} />
           <span className="flex-1 truncate text-[15px] font-medium sm:text-sm">
             {connector?.name ?? "Wallet"}
-          </span>
-          <span className="inline-flex h-[26px] items-center gap-1.5 rounded-full bg-white/10 px-2.5 text-xs font-medium sm:h-6 sm:px-[9px]">
-            <span
-              aria-hidden
-              className={cn("size-[7px] rounded-full", network.dot)}
-            />
-            {cluster?.label ?? network.label}
           </span>
         </div>
         <AddressRow address={account} />
