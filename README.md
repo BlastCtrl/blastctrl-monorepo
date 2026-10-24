@@ -67,6 +67,19 @@ and config exports.
 configuration. The app imports the stylesheet and explicitly scans the UI
 package's source, so UI components do not need a separate CSS build.
 
+### Production domains
+
+The `apps/tools` Vercel project serves both `tools.blastctrl.com` and
+`reclaim.blastctrl.com`. Host-specific rules in `apps/tools/next.config.js` serve
+the reclaim page and its sitemap at the reclaim domain's root. The old
+`tools.blastctrl.com/reclaim-sol` URL redirects permanently to the new domain;
+other page paths on the reclaim domain redirect to the toolbox. API routes,
+the `/blast-api` proxy, and static assets stay available on both domains.
+
+The hostname rules leave localhost and Vercel preview URLs unchanged, so the
+reclaim page remains available at `/reclaim-sol` there. Routing regression tests
+can be run with `pnpm --filter @blastctrl/tools exec vitest run next.config.test.ts`.
+
 ### Using custom Swap API urls
 
 You can set custom URLs via the configuration for any self-hosted Jupiter APIs, like the [V6 Swap API](https://station.jup.ag/docs/apis/self-hosted) or [QuickNode's Metis API](https://marketplace.quicknode.com/add-on/metis-jupiter-v6-swap-api). Here is an example
