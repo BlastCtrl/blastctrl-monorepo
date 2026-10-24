@@ -13,7 +13,7 @@ type TokensResponse = {
   };
 };
 
-const ignoreList = ["Bonk", "SOL"];
+const ignoreList = ["SOL"];
 
 export function jupTokensQuery(
   rpc: AppRpc | null,

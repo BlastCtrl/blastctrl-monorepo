@@ -4,7 +4,6 @@ const baseUrl = "https://tools.blastctrl.com";
 
 const paths = [
   "/",
-  "/gasless-bonk-swap",
   "/gasless-swap",
   "/gmeet-cc-capture",
   "/permanent-storage-tools",

@@ -76,7 +76,7 @@ export default function Page() {
             Gasless Swap
           </Link>
           <Link
-            href="/gasless-bonk-swap"
+            href="/gasless-swap?token=bonk"
             className="inline-flex items-center justify-center rounded-lg border-2 border-orange-600 bg-amber-300 px-3 py-1.5 text-orange-950 shadow-sm hover:bg-amber-200"
           >
             <Image

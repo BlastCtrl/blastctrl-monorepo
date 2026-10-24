@@ -12,14 +12,15 @@ import { formatNumber, numberFormatter } from "@/lib/utils";
 import { useJupQuery } from "@/state/queries/use-jup-quote";
 import { jupTokensQuery } from "@/state/queries/use-jup-tokens";
 import { useTokenBalance } from "@/state/queries/use-token-balance";
-import { Button } from "@blastctrl/ui";
+import { Button, cn } from "@blastctrl/ui";
 import { ChevronRightIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
 import { useCluster, useConnector } from "@solana/connector/react";
 import { useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
-import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
+import { CheemsImage } from "./_components/cheems-image";
 import { Popover, PopoverButton, PopoverPanel } from "./_components/popover";
 import { SlippageSelect, toSlippageBps } from "./_components/slippage-select";
 import { TokenQuote } from "./_components/token-quote";
@@ -39,7 +40,26 @@ type SelectToken = {
   address: string;
 };
 
+const BONK: SelectToken = {
+  name: "Bonk",
+  decimals: 5,
+  symbol: "Bonk",
+  address: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+};
+
+// The form reads the preselected token from the query string, which Next only
+// lets a client component do under a Suspense boundary when the page is
+// prerendered.
 export default function GaslessSwap() {
+  return (
+    <Suspense fallback={null}>
+      <GaslessSwapForm />
+    </Suspense>
+  );
+}
+
+function GaslessSwapForm() {
+  const params = useSearchParams();
   const { type: network } = useCluster();
   const { account } = useConnector();
   const { rpc: appRpc } = useAppRpc();
@@ -59,7 +79,10 @@ export default function GaslessSwap() {
   const swapAmount = watch("swapAmount");
   const slippageBps = toSlippageBps(watch("slippage"));
   const debouncedSwapAmount = useDebounce(swapAmount, 400);
-  const [selectToken, setSelectToken] = useState<SelectToken | null>(null);
+  const [selectToken, setSelectToken] = useState<SelectToken | null>(() =>
+    params.get("token")?.toLowerCase() === "bonk" ? BONK : null,
+  );
+  const isBonk = selectToken?.address === BONK.address;
   const [isSwapping, setIsSwapping] = useState(false);
 
   const balanceQuery = useTokenBalance(selectToken?.address ?? "");
@@ -150,7 +173,12 @@ export default function GaslessSwap() {
   }
 
   return (
-    <div className="mx-auto max-w-lg overflow-visible bg-white px-4 py-4 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow-sm">
+    <div
+      className={cn(
+        "mx-auto overflow-visible bg-white px-4 py-4 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow-sm",
+        isBonk ? "max-w-3xl" : "max-w-lg",
+      )}
+    >
       <div className="border-b border-gray-200 pb-6">
         <h1 className="mb-4 text-center font-display text-3xl font-semibold">
           Gasless Swap
@@ -162,164 +190,169 @@ export default function GaslessSwap() {
           <br />
           Just connect your wallet, enter the swap amount and we&apos;ll fund
           your trade for you.
-          <br />
-          <br />
-          You can swap $BONK with our{" "}
-          <Link
-            href="/gasless-bonk-swap"
-            className="font-medium whitespace-nowrap text-blue-600 hover:underline"
-          >
-            gasless BONK Swap utility &rarr;
-          </Link>
         </p>
       </div>
 
-      <form
-        onSubmit={handleSubmit(submitSwap)}
-        className="mx-auto flex w-[95%] flex-1 flex-col justify-start sm:w-4/5"
-      >
-        <button
-          aria-disabled={balanceQuery.status !== "success"}
-          onClick={() => {
-            if (balanceQuery.data?.uiAmount) {
-              setValue("swapAmount", Number(balanceQuery.data.uiAmount));
-            }
-          }}
-          className="w-full py-2 text-right text-base whitespace-pre"
-        >
-          <span className="text-xs text-gray-600">Balance </span>
-          {balanceQuery.data?.uiAmount ? (
-            <span className="font-medium text-indigo-600">
-              {numberFormatter.format(balanceQuery.data.uiAmount)}
-            </span>
-          ) : (
-            <span className="font-medium">0</span>
+      <div className="flex gap-x-8">
+        {isBonk && (
+          // Cheems drops its BONK bubbles into this wrapper.
+          <div className="relative mt-4 hidden flex-1 shrink-0 px-2 sm:block">
+            <CheemsImage />
+          </div>
+        )}
+
+        <form
+          onSubmit={handleSubmit(submitSwap)}
+          className={cn(
+            "mx-auto flex w-[95%] flex-1 flex-col justify-start",
+            isBonk ? "sm:mt-4 sm:w-auto" : "sm:w-4/5",
           )}
-        </button>
-
-        <div>
-          <span className="block font-medium text-gray-600">
-            You will sell:
-          </span>
-          <div className="mt-2 flex gap-x-2 sm:mt-1">
-            <Popover as="div" className="relative xs:w-32">
-              <PopoverButton
-                onMouseEnter={prefetchJupTokens}
-                data-testid="token-selector-popover-trigger"
-                className="inline-flex size-full items-center justify-between rounded-md border border-transparent bg-gray-200 px-3 font-medium text-gray-800"
-              >
-                <span className="mr-2 block xs:mr-0">
-                  {selectToken?.symbol ?? "Name"}
-                </span>
-                <ChevronUpDownIcon className="h-4 w-4 text-gray-700" />
-              </PopoverButton>
-              <PopoverPanel>
-                <TokenSelectPanel onSelect={(token) => setSelectToken(token)} />
-              </PopoverPanel>
-            </Popover>
-            <input
-              type="number"
-              step="any"
-              inputMode="numeric"
-              autoComplete="off"
-              {...register("swapAmount", {
-                required: true,
-                validate: {
-                  notEnoughTokens: (value) =>
-                    balanceQuery.data?.uiAmount
-                      ? value <= balanceQuery.data.uiAmount ||
-                        `Not enough ${selectToken?.name}`
-                      : true,
-                },
-              })}
-              placeholder="0.00"
-              className="min-w-0 grow rounded-md border-transparent bg-gray-200 px-3 py-2 text-right font-medium text-gray-600 placeholder:text-gray-400 focus:ring-0 focus:outline-hidden"
-            />
-          </div>
-          <span className="text-sm text-red-600">
-            {errors?.swapAmount?.message}
-          </span>
-        </div>
-
-        {/* Price quote */}
-
-        <div className="mt-6">
-          <div className="flex w-full flex-wrap items-center justify-between">
-            <span className="text-base font-medium text-gray-600">
-              You will receive:
-            </span>
-          </div>
-          <div className="pointer-events-none relative mt-2 flex h-10 w-full items-center justify-between rounded-md bg-gray-200 px-3 shadow-xs sm:mt-1">
-            <div className="inline-flex items-center">
-              <Image
-                unoptimized={true}
-                src="/sol_coin.png"
-                alt=""
-                className="rounded-full"
-                height={20}
-                width={20}
-              />
-              <span className="pl-2 font-medium tracking-wider text-gray-500">
-                SOL
+        >
+          <button
+            aria-disabled={balanceQuery.status !== "success"}
+            onClick={() => {
+              if (balanceQuery.data?.uiAmount) {
+                setValue("swapAmount", Number(balanceQuery.data.uiAmount));
+              }
+            }}
+            className="w-full py-2 text-right text-base whitespace-pre"
+          >
+            <span className="text-xs text-gray-600">Balance </span>
+            {balanceQuery.data?.uiAmount ? (
+              <span className="font-medium text-indigo-600">
+                {numberFormatter.format(balanceQuery.data.uiAmount)}
               </span>
-            </div>
-            <div className="inline-flex items-center gap-x-2">
-              <span className="font-medium text-gray-600">
-                {quoteQuery.data
-                  ? formatNumber.format(
-                      decimalFixedPointToNumber(
-                        lamportsToSol(
-                          lamports(BigInt(quoteQuery.data.outAmount)),
-                        ),
-                      ),
-                      5,
-                    )
-                  : "0.00"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <TokenQuote quoteToken={selectToken} />
-
-        <div className="mt-6 flex w-full gap-x-2">
-          <Controller
-            name="slippage"
-            control={control}
-            render={({ field }) => (
-              <SlippageSelect value={field.value} onChange={field.onChange} />
+            ) : (
+              <span className="font-medium">0</span>
             )}
-          />
-          {account ? (
-            <Button
-              color="indigo"
-              type="submit"
-              className="w-full"
-              disabled={isSwapping}
-            >
-              <ChevronRightIcon className="size-5 text-white" />
-              Submit
-            </Button>
-          ) : (
-            <Button
-              color="indigo"
-              type="button"
-              className="w-full"
-              onClick={() => setOpen(true)}
-            >
-              Connect your wallet
-            </Button>
-          )}
-        </div>
-        <a
-          target="_blank"
-          rel="noreferrer"
-          href="https://station.jup.ag/docs"
-          className="mt-1 text-right text-sm text-gray-600 hover:underline"
-        >
-          Swap is powered by Jupiter
-        </a>
-      </form>
+          </button>
+
+          <div>
+            <span className="block font-medium text-gray-600">
+              You will sell:
+            </span>
+            <div className="mt-2 flex gap-x-2 sm:mt-1">
+              <Popover as="div" className="relative xs:w-32">
+                <PopoverButton
+                  onMouseEnter={prefetchJupTokens}
+                  data-testid="token-selector-popover-trigger"
+                  className="inline-flex size-full items-center justify-between rounded-md border border-transparent bg-gray-200 px-3 font-medium text-gray-800"
+                >
+                  <span className="mr-2 block xs:mr-0">
+                    {selectToken?.symbol ?? "Name"}
+                  </span>
+                  <ChevronUpDownIcon className="h-4 w-4 text-gray-700" />
+                </PopoverButton>
+                <PopoverPanel>
+                  <TokenSelectPanel
+                    onSelect={(token) => setSelectToken(token)}
+                  />
+                </PopoverPanel>
+              </Popover>
+              <input
+                type="number"
+                step="any"
+                inputMode="numeric"
+                autoComplete="off"
+                {...register("swapAmount", {
+                  required: true,
+                  validate: {
+                    notEnoughTokens: (value) =>
+                      balanceQuery.data?.uiAmount
+                        ? value <= balanceQuery.data.uiAmount ||
+                          `Not enough ${selectToken?.name}`
+                        : true,
+                  },
+                })}
+                placeholder="0.00"
+                className="min-w-0 grow rounded-md border-transparent bg-gray-200 px-3 py-2 text-right font-medium text-gray-600 placeholder:text-gray-400 focus:ring-0 focus:outline-hidden"
+              />
+            </div>
+            <span className="text-sm text-red-600">
+              {errors?.swapAmount?.message}
+            </span>
+          </div>
+
+          {/* Price quote */}
+
+          <div className="mt-6">
+            <div className="flex w-full flex-wrap items-center justify-between">
+              <span className="text-base font-medium text-gray-600">
+                You will receive:
+              </span>
+            </div>
+            <div className="pointer-events-none relative mt-2 flex h-10 w-full items-center justify-between rounded-md bg-gray-200 px-3 shadow-xs sm:mt-1">
+              <div className="inline-flex items-center">
+                <Image
+                  unoptimized={true}
+                  src="/sol_coin.png"
+                  alt=""
+                  className="rounded-full"
+                  height={20}
+                  width={20}
+                />
+                <span className="pl-2 font-medium tracking-wider text-gray-500">
+                  SOL
+                </span>
+              </div>
+              <div className="inline-flex items-center gap-x-2">
+                <span className="font-medium text-gray-600">
+                  {quoteQuery.data
+                    ? formatNumber.format(
+                        decimalFixedPointToNumber(
+                          lamportsToSol(
+                            lamports(BigInt(quoteQuery.data.outAmount)),
+                          ),
+                        ),
+                        5,
+                      )
+                    : "0.00"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <TokenQuote quoteToken={selectToken} />
+
+          <div className="mt-6 flex w-full gap-x-2">
+            <Controller
+              name="slippage"
+              control={control}
+              render={({ field }) => (
+                <SlippageSelect value={field.value} onChange={field.onChange} />
+              )}
+            />
+            {account ? (
+              <Button
+                color="indigo"
+                type="submit"
+                className="w-full"
+                disabled={isSwapping}
+              >
+                <ChevronRightIcon className="size-5 text-white" />
+                Submit
+              </Button>
+            ) : (
+              <Button
+                color="indigo"
+                type="button"
+                className="w-full"
+                onClick={() => setOpen(true)}
+              >
+                Connect your wallet
+              </Button>
+            )}
+          </div>
+          <a
+            target="_blank"
+            rel="noreferrer"
+            href="https://station.jup.ag/docs"
+            className="mt-1 text-right text-sm text-gray-600 hover:underline"
+          >
+            Swap is powered by Jupiter
+          </a>
+        </form>
+      </div>
     </div>
   );
 }

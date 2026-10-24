@@ -22,7 +22,7 @@ export const navigation = [
   {
     name: "Gasless Swap",
     href: "/gasless-swap",
-    description: "Swap any token for SOL",
+    description: "Swap any token, BONK included, for SOL",
   },
   {
     name: "Add or remove from collection",
@@ -54,11 +54,6 @@ export const navigation = [
     name: "Upload to Arweave",
     href: "/permanent-storage-tools/file-upload",
     in: "Storage",
-  },
-  {
-    name: "Gasless Bonk Swap",
-    href: "/gasless-bonk-swap",
-    description: "Swap Bonk tokens for SOL without gas fees",
   },
   {
     name: "Close empty accounts",

@@ -15,14 +15,13 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
 import Image from "next/image";
 import Link from "next/link";
 import { useContext, useEffect, useState } from "react";
-import { BAR_LINK } from "./bar-link";
 import { CommandPaletteContext } from "./command-palette";
-import { GASLESS, GaslessMenu } from "./gasless-menu";
 import { ReclaimLink } from "./reclaim-link";
 
-const SECTIONS = navigation.filter(
-  (nav) => !nav.in && !GASLESS.some((swap) => swap.href === nav.href),
-);
+const BAR_LINK =
+  "rounded-md px-3 py-2 text-base font-medium whitespace-nowrap text-white hover:bg-primary-focus focus:outline-hidden focus-visible:ring-2 focus-visible:ring-white";
+
+const SECTIONS = navigation.filter((nav) => !nav.in);
 
 export function Topbar() {
   const { setIsOpen } = useContext(CommandPaletteContext);
@@ -61,7 +60,6 @@ export function Topbar() {
                     {item.name}
                   </Link>
                 ))}
-                <GaslessMenu />
                 <ReclaimLink className="ml-2" />
               </div>
             </div>
@@ -155,17 +153,6 @@ export function Topbar() {
                 className={BAR_LINK}
               >
                 {item.name}
-              </CloseButton>
-            ))}
-            {GASLESS.map(({ name, href, Icon }) => (
-              <CloseButton
-                key={href}
-                as={Link}
-                href={href}
-                className={cn(BAR_LINK, "inline-flex items-center gap-x-2")}
-              >
-                <Icon className="size-6" />
-                {name}
               </CloseButton>
             ))}
             <ReclaimLink className="mt-2 ml-3" />
