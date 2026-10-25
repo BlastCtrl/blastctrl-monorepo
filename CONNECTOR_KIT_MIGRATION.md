@@ -339,8 +339,8 @@ same scan the reclaim tools run: `packages/rent-reclaimer` holds the scan
 (`discoverReclaimableAccounts`, `lookupReclaimableMint`), the account rules
 and `quoteReclaim`, and takes any kit `Rpc` with the methods it reads, so
 the app passes `useAppRpc().rpc` and the server `createSolanaRpc(url)`. The
-app wraps the scan with DAS names; the server checks the genesis hash first
-and quotes both scenarios. Every request of a scan takes the caller's
+app wraps the scan with DAS names; the server quotes both
+scenarios. Every request of a scan takes the caller's
 `abortSignal` through `.send({ abortSignal })` (and `fetchEncodedAccounts`'
 config); kit's request coalescer puts a signal of its own in front of
 `fetch`, so a test checks that aborting reaches the request rather than

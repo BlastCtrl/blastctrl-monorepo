@@ -9,8 +9,6 @@ import {
 import { address, createSolanaRpc } from "@solana/kit";
 
 export const RECLAIM_URL = "https://reclaim.blastctrl.com";
-// getGenesisHash returns the full hash, not the shortened CAIP-2 network ID.
-const MAINNET_GENESIS_HASH = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d";
 export const ACCOUNT_LIMIT = 5000;
 export const DETAIL_LIMIT = 20;
 export const SCAN_TIMEOUT_MS = 25_000;
@@ -20,26 +18,17 @@ export type Scan = (
   signal: AbortSignal,
 ) => Promise<DiscoveredAccount[]>;
 
-export class WrongNetworkError extends Error {
-  constructor() {
-    super(
-      "The server RPC endpoint is not mainnet-beta. Set RPC_ENDPOINT to a Solana mainnet RPC endpoint. No estimate was returned.",
-    );
-    this.name = "WrongNetworkError";
-  }
-}
-
-/** RPC credentials remain on this server. The caller cannot choose an RPC URL. */
+/**
+ * RPC credentials remain on this server. The caller cannot choose an RPC URL.
+ * `RPC_ENDPOINT` is trusted to be a mainnet endpoint; nothing checks it.
+ */
 export function createRpcScan(rpcUrl: string): Scan {
   const rpc = createSolanaRpc(rpcUrl);
-  return async (owner, abortSignal) => {
-    const genesisHash = await rpc.getGenesisHash().send({ abortSignal });
-    if (genesisHash !== MAINNET_GENESIS_HASH) throw new WrongNetworkError();
-    return discoverReclaimableAccounts(rpc, address(owner), {
+  return async (owner, abortSignal) =>
+    discoverReclaimableAccounts(rpc, address(owner), {
       maxAccounts: ACCOUNT_LIMIT,
       abortSignal,
     });
-  };
 }
 
 export function summarize(

@@ -27,7 +27,8 @@ cp apps/mcp/.env.example apps/mcp/.env
 
 Edit `apps/mcp/.env`:
 
-- Set `RPC_ENDPOINT` to an HTTPS mainnet RPC endpoint. The server checks its genesis hash.
+- Set `RPC_ENDPOINT` to an HTTPS mainnet RPC endpoint. Nothing checks the
+  network, so a devnet URL would quote devnet balances as mainnet.
 - Set `RECLAIM_RENT_FEE_BPS` to the website's effective service fee rate.
   For example, use `500` for 5%. Use `0` only when the website has no fee.
   The website enables the fee only when its recipient and rate are both set.

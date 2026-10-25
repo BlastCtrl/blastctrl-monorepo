@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { isAddress } from "@solana/kit";
 import { z } from "zod";
 import { ScanLimitError } from "@blastctrl/rent-reclaimer";
-import { SCAN_TIMEOUT_MS, summarize, WrongNetworkError } from "./analysis";
+import { SCAN_TIMEOUT_MS, summarize } from "./analysis";
 import type { Scan } from "./analysis";
 
 const lamports = z.string().regex(/^-?\d+$/);
@@ -101,7 +101,7 @@ export function createMcpServer({
       } catch (error) {
         // RPC errors can contain provider URLs and API keys. Never return them.
         const message =
-          error instanceof ScanLimitError || error instanceof WrongNetworkError
+          error instanceof ScanLimitError
             ? error.message
             : signal.aborted
               ? "The scan timed out or was cancelled. No estimate was returned. Try again."

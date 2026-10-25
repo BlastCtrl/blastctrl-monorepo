@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DiscoveredAccount } from "@blastctrl/rent-reclaimer";
 import { ScanLimitError } from "@blastctrl/rent-reclaimer";
 import { createHttpServer, limitScans } from "./http";
-import { summarize, WrongNetworkError } from "./analysis";
+import { summarize } from "./analysis";
 import type { Scan } from "./analysis";
 import { readConfig } from "./config";
 import { createMcpServer } from "./server";
@@ -82,7 +82,7 @@ describe("MCP over real local HTTP", () => {
         grossLamports: "2039280",
         estimatedNetLamports: "2006738",
       },
-      reclaimUrl: "https://tools.blastctrl.com/spl-token-tools/reclaim-rent",
+      reclaimUrl: "https://reclaim.blastctrl.com",
     });
     expect(scan.mock.calls[0]![0]).toBe(address);
   });
@@ -132,20 +132,6 @@ describe("MCP over real local HTTP", () => {
     });
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result)).toContain("too many token accounts");
-  });
-
-  it("reports a wrong RPC network with a safe configuration error", async () => {
-    const { client } = await connect(async () => {
-      throw new WrongNetworkError();
-    });
-    const result = await client.callTool({
-      name: "analyze_rent_reclaim",
-      arguments: { address },
-    });
-    expect(result.isError).toBe(true);
-    expect(result.structuredContent).toBeUndefined();
-    expect(JSON.stringify(result)).toContain("not mainnet-beta");
-    expect(JSON.stringify(result)).toContain("Set RPC_ENDPOINT");
   });
 
   it("checks host and origin, provides health, and limits request body size", async () => {
