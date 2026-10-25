@@ -1,0 +1,6 @@
+# Program IDLs the Codama clients are generated from. Collapsed in GitHub
+# pull-request diffs and left out of language stats; they stay in the tree
+# because `pnpm generate` reads them and their diff is what to review on a
+# program bump. source.json (the pinned commit) stays visible.
+packages/*/idl/*.json linguist-generated=true
+packages/*/idl/source.json -linguist-generated
