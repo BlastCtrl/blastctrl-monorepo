@@ -1,14 +1,14 @@
 "use client";
 
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { Button } from "@blastctrl/ui";
+import { useConnector } from "@solana/connector/react";
 import { Box } from "./box";
 import { StakeMergeForm } from "./stake-merge-form";
-import { Button } from "@blastctrl/ui";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 
 export default function StakeLockupManagement() {
-  const { publicKey } = useWallet();
-  const { setVisible } = useWalletModal();
+  const { account } = useConnector();
+  const { setOpen } = useConnectorDialog();
 
   return (
     <>
@@ -46,15 +46,15 @@ export default function StakeLockupManagement() {
           </div>
         </header>
       </Box>
-      {publicKey ? (
-        <StakeMergeForm />
+      {account ? (
+        <StakeMergeForm owner={account} />
       ) : (
         <Box className="mt-4">
           <Button
             color="indigo"
             type="button"
             className="w-full"
-            onClick={() => setVisible(true)}
+            onClick={() => setOpen(true)}
           >
             Connect your wallet
           </Button>

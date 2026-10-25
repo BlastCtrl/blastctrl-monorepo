@@ -1,39 +1,44 @@
 "use client";
 
+import { notify } from "@/components/notification";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
+import { lamportsToSolString } from "@/lib/solana/common";
+import { STAKE_ACCOUNT_SIZE } from "@/lib/solana/stake-account";
+import { useRentQuery } from "@/state/queries/use-rent";
 import { useUserStakeAccounts } from "@/state/queries/use-user-stake-accounts";
 import type { StakeAccountType } from "@/state/queries/use-user-stake-accounts";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { Button, SpinnerIcon } from "@blastctrl/ui";
+import { Field, Label } from "@headlessui/react";
+import {
+  ClipboardDocumentCheckIcon,
+  ClipboardDocumentIcon,
+} from "@heroicons/react/24/solid";
+import * as Slider from "@radix-ui/react-slider";
+import { generateKeyPairSigner, type Address, type Lamports } from "@solana/kit";
 import type { SyntheticEvent } from "react";
 import { useState } from "react";
-import { lamportsToSol, lamportsToSolString } from "@/lib/solana/common";
-import { signWithWalletFirst } from "@/lib/solana/send";
-import {
-  ClipboardDocumentIcon,
-  ClipboardDocumentCheckIcon,
-} from "@heroicons/react/24/solid";
-import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { Box } from "./box";
-import { Field, Label } from "@headlessui/react";
-import * as Slider from "@radix-ui/react-slider";
-import { retryWithBackoff } from "@/lib/utils";
-import { Keypair, StakeProgram, Transaction } from "@solana/web3.js";
-import { notify } from "@/components/notification";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { PickerDialog } from "./picker-dialog";
-import { useRentQuery } from "./rent-query";
+import {
+  parseSolInput,
+  splitAmountError,
+  splitBounds,
+  splitInstructions,
+  splittableLamports,
+} from "./split-plan";
 
-export function SplitGraphicForm() {
-  const { publicKey } = useWallet();
-  const { data, isLoading, error } = useUserStakeAccounts(
-    publicKey ?? undefined,
-  );
+export function SplitGraphicForm({ owner }: { owner: Address }) {
+  const { data, isLoading, error } = useUserStakeAccounts(owner);
+  const { data: rent } = useRentQuery(STAKE_ACCOUNT_SIZE);
   const [selectedAccount, setSelectedAccount] =
     useState<StakeAccountType | null>(null);
   const [isCopied, setIsCopied] = useState(false);
 
   const copyToClipboard = () => {
     if (selectedAccount) {
-      void navigator.clipboard.writeText(selectedAccount.accountId.toString());
+      void navigator.clipboard.writeText(selectedAccount.address);
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     }
@@ -57,6 +62,7 @@ export function SplitGraphicForm() {
           <div className="flex items-center gap-4">
             <div className="mt-1 w-72">
               <PickerDialog
+                owner={owner}
                 data={data}
                 selectedAccount={selectedAccount}
                 setSelectedAccount={setSelectedAccount}
@@ -78,149 +84,123 @@ export function SplitGraphicForm() {
           </div>
         </Field>
       </Box>
-      {selectedAccount && <SplitFormInner selectedAccount={selectedAccount} />}
+      {selectedAccount && rent !== undefined && (
+        <SplitFormInner
+          // Remount when the account changes so the split state resets.
+          key={selectedAccount.address}
+          owner={owner}
+          selectedAccount={selectedAccount}
+          rent={rent}
+        />
+      )}
     </>
   );
 }
 
+/** Slider and input state: what moves to the new account, in lamports, with the strings being edited. */
+type SplitInputs = {
+  newLamports: bigint;
+  originalStake: string;
+  newStake: string;
+};
+
 function SplitFormInner({
+  owner,
   selectedAccount,
+  rent,
 }: {
+  owner: Address;
   selectedAccount: StakeAccountType;
+  rent: Lamports;
 }) {
-  const { connection } = useConnection();
+  const { client } = useKitClient();
+  const { setOpen } = useConnectorDialog();
   const [isConfirming, setIsConfirming] = useState(false);
   const [formSuccess, setFormSuccess] = useState("");
-  const { publicKey, signTransaction } = useWallet();
-  const { setVisible } = useWalletModal();
-  const { data: rentExemption, refetch } = useRentQuery(StakeProgram.space);
 
-  // multiply the lamports by the percent
-  // check for error => percent is >= 100 or <= 0
-  // Do not allow submit if there's an error
-  // show red borders if there's an input error
-  const [inputs, setInputs] = useState(() => {
-    const original = selectedAccount.lamports * 0.5;
-    return {
-      percent: 50,
-      originalStake: lamportsToSolString(original),
-      newStake: lamportsToSolString(selectedAccount.lamports - original),
-    };
+  // What a split can move: the delegated stake, or everything above rent
+  // for an undelegated account. Free lamports (MEV rewards) never move.
+  const total = splittableLamports(selectedAccount, rent);
+  const bounds = splitBounds(selectedAccount, rent);
+
+  const fromLamports = (newLamports: bigint): SplitInputs => ({
+    newLamports,
+    originalStake: lamportsToSolString(total - newLamports),
+    newStake: lamportsToSolString(newLamports),
   });
 
-  const inputError = inputs.percent >= 100 || inputs.percent <= 0;
+  const [inputs, setInputs] = useState<SplitInputs>(() =>
+    fromLamports(total / 2n),
+  );
+
+  const inputError = splitAmountError(selectedAccount, inputs.newLamports, rent);
+  // Share kept by the original account, for the slider.
+  const percent =
+    total > 0n
+      ? Number(((total - inputs.newLamports) * 10_000n) / total) / 100
+      : 100;
 
   const handleSlider = (value: number) => {
-    const original = (selectedAccount.lamports * value) / 100;
-    setInputs({
-      percent: value,
-      originalStake: lamportsToSolString(original),
-      newStake: lamportsToSolString(selectedAccount.lamports - original),
-    });
+    const kept = (total * BigInt(Math.round(value * 100))) / 10_000n;
+    setInputs(fromLamports(total - kept));
   };
   const handleLeftInput = (stakeStr: string) => {
-    const stake = Number(stakeStr);
-    const source = lamportsToSol(selectedAccount.lamports);
-    const percent = (stake / source) * 100;
+    const kept = parseSolInput(stakeStr);
+    const newLamports = kept === null ? total : total - kept;
     setInputs({
-      percent,
+      newLamports,
       originalStake: stakeStr,
-      newStake: (source - stake).toLocaleString("fullwide", fullwide),
+      newStake: lamportsToSolString(newLamports),
     });
   };
-
   const handleRightInput = (stakeStr: string) => {
-    const stake = Number(stakeStr);
-    const source = lamportsToSol(selectedAccount.lamports);
-    const percent = 100 - (stake / source) * 100;
+    const newLamports = parseSolInput(stakeStr) ?? 0n;
     setInputs({
-      percent,
-      originalStake: (source - stake).toLocaleString("fullwide", fullwide),
+      newLamports,
+      originalStake: lamportsToSolString(total - newLamports),
       newStake: stakeStr,
     });
   };
 
   const handleSubmit = async (e: SyntheticEvent) => {
     e.preventDefault();
-    if (!publicKey || !signTransaction || !selectedAccount) {
-      throw Error("publicKey || signTransaction unsupported");
-    }
-    if (inputError) return;
+    if (!client || inputError) return;
 
     if (
-      selectedAccount.data.info.meta.authorized.staker !== publicKey.toString()
+      selectedAccount.meta.authorized.staker !== owner &&
+      !window.confirm(
+        'Your wallet doesn\'t have the "staker" authority over this staking account. This action will likely fail. Continue anyway?',
+      )
     ) {
-      window.alert(
-        'Your wallet doesn\'t have the "staker" authority over this staking account. This action will likely fail.',
-      );
+      return;
     }
 
+    setIsConfirming(true);
     try {
-      await refetch({ throwOnError: true });
-      const { context, value } = await retryWithBackoff(() =>
-        connection.getLatestBlockhashAndContext("confirmed"),
+      const splitStake = await generateKeyPairSigner();
+      // The destination is funded with its rent by the wallet, then the
+      // chosen stake moves into it (see split-plan.ts for the rules).
+      const result = await client.sendTransaction(
+        splitInstructions({
+          source: selectedAccount.address,
+          destination: splitStake,
+          authority: client.payer,
+          amount: inputs.newLamports,
+          rent,
+        }),
       );
-
-      const stakeAccount = Keypair.generate();
-      const tx = new Transaction();
-      const newAccountBalanceLamports = +(
-        (1 - inputs.percent / 100) *
-        selectedAccount.lamports
-      ).toFixed(0);
-
-      tx.add(
-        // ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1e6 }),
-        StakeProgram.split(
-          {
-            authorizedPubkey: publicKey,
-            stakePubkey: selectedAccount.accountId,
-            splitStakePubkey: stakeAccount.publicKey,
-            lamports: newAccountBalanceLamports,
-          },
-          rentExemption ?? 0,
-        ),
-      );
-
-      tx.feePayer = publicKey;
-      tx.recentBlockhash = value.blockhash;
-      const signed = await signWithWalletFirst(tx, signTransaction, [
-        stakeAccount,
-      ]);
-      const signature = await connection.sendRawTransaction(
-        signed.serialize(),
-        {
-          minContextSlot: context.slot,
-          maxRetries: 0,
-          preflightCommitment: "confirmed",
-          skipPreflight: true,
-        },
-      );
-      if (!isConfirming) {
-        setIsConfirming(true);
-      }
-
-      const result = await connection.confirmTransaction(
-        {
-          signature,
-          blockhash: value.blockhash,
-          lastValidBlockHeight: value.lastValidBlockHeight,
-        },
-        "confirmed",
-      );
-
-      if (result.value.err) throw Error(JSON.stringify(result.value.err));
 
       notify({
         type: "success",
         title: "Transaction confirmed",
-        txid: signature,
+        txid: result.context.signature,
       });
-      setFormSuccess(stakeAccount.publicKey.toString());
+      setFormSuccess(splitStake.address);
     } catch (error) {
       notify({
         type: "error",
         title: "Transaction error",
-        description: error instanceof Error ? error.message : String(error),
+        description: transactionErrorMessage(error),
       });
     } finally {
       setIsConfirming(false);
@@ -231,23 +211,32 @@ function SplitFormInner({
     <form className="mt-4" onSubmit={handleSubmit}>
       <Box>
         <div className="text-left">
-          <p className="text-sm font-medium">Current Stake Amount</p>
-          <p className="text-lg font-bold">
-            {lamportsToSol(selectedAccount.lamports)} SOL
+          <p className="text-sm font-medium">
+            {selectedAccount.stake
+              ? "Delegated stake"
+              : "Balance above the rent-exempt reserve"}
+          </p>
+          <p className="text-lg font-bold">{lamportsToSolString(total)} SOL</p>
+          <p className="text-sm text-zinc-500">
+            The new account&apos;s rent-exempt reserve (
+            {lamportsToSolString(rent)} SOL) is paid by your wallet on top.
+            {selectedAccount.stake &&
+              " A delegated account must keep at least 1 SOL of stake on each side; any extra lamports (MEV rewards) stay in the original account."}
           </p>
         </div>
 
         <div className="">
           <div
-            data-inputerror={inputError}
+            data-inputerror={!!inputError}
             className="text-right text-sm/6 font-medium text-zinc-500 data-[inputerror=true]:text-rose-500"
           >
-            Split ratio: {inputs.percent.toFixed(2)}%
+            Split ratio: {percent.toFixed(2)}%
           </div>
           <div className="h-8">
             <Slider.Root
-              value={[inputs.percent]}
+              value={[percent]}
               onValueChange={(value) => void handleSlider(value[0] ?? 50)}
+              disabled={bounds === null}
               className="group relative mt-1.5 flex w-full touch-none items-center transition-[margin] duration-300 select-none hover:-mx-1 hover:cursor-grab active:cursor-grabbing"
               min={0}
               max={100}
@@ -271,6 +260,7 @@ function SplitFormInner({
                 type="text"
                 id="originalStake"
                 name="originalStake"
+                inputMode="decimal"
                 value={inputs.originalStake}
                 onChange={({ target }) => {
                   if (/^\d*\.?\d{0,9}$/.test(target.value)) {
@@ -288,6 +278,7 @@ function SplitFormInner({
                 type="text"
                 id="newStake"
                 name="newStake"
+                inputMode="decimal"
                 value={inputs.newStake}
                 onChange={({ target }) => {
                   if (/^\d*\.?\d{0,9}$/.test(target.value)) {
@@ -301,10 +292,14 @@ function SplitFormInner({
           </div>
         </div>
 
-        {!publicKey ? (
+        {inputError && (
+          <p className="mt-3 text-sm text-rose-600">{inputError}</p>
+        )}
+
+        {!client ? (
           <div className="mt-6">
             <Button
-              onClick={() => void setVisible(true)}
+              onClick={() => setOpen(true)}
               type="button"
               color="indigo"
               className="w-full"
@@ -316,7 +311,7 @@ function SplitFormInner({
           <div className="mt-6">
             <Button
               type="submit"
-              disabled={inputError}
+              disabled={!!inputError || isConfirming}
               color="indigo"
               className="w-full"
             >
@@ -352,8 +347,3 @@ function SplitFormInner({
     </form>
   );
 }
-
-const fullwide: Intl.NumberFormatOptions = {
-  useGrouping: false,
-  maximumFractionDigits: 9,
-};

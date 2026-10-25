@@ -1,9 +1,9 @@
 "use client";
 
+import { NETWORKS } from "@/connector/network";
 import { compress } from "@/lib/solana/common";
 import { cn } from "@blastctrl/ui";
-import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useCluster, useConnector } from "@solana/connector/react";
 import { useMemo, useState } from "react";
 import { MintListInput } from "./_components/mint-list-input";
 import { parseMintList } from "./_components/mint-list";
@@ -24,8 +24,8 @@ const STEPS = [
 ];
 
 export default function TransferAuthority() {
-  const { publicKey } = useWallet();
-  const network = useNetworkConfigurationStore((state) => state.network);
+  const { account } = useConnector();
+  const { type: network } = useCluster();
   const [step, setStep] = useState(0);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -69,11 +69,11 @@ export default function TransferAuthority() {
       </div>
 
       <p className="mt-4 text-sm text-gray-500">
-        {publicKey ? (
+        {account ? (
           <>
             Connected as{" "}
             <span className="font-mono text-gray-900">
-              {compress(publicKey.toBase58(), 6)}
+              {compress(account, 6)}
             </span>
           </>
         ) : (
@@ -83,10 +83,10 @@ export default function TransferAuthority() {
         <span
           className={cn(
             "font-medium",
-            network === "mainnet-beta" ? "text-gray-900" : "text-amber-700",
+            network === "mainnet" ? "text-gray-900" : "text-amber-700",
           )}
         >
-          {networkName(network)}
+          {network ? NETWORKS[network].label : "an unknown network"}
         </span>
         . Change it in the wallet menu; your wallet should be on the same
         network.
@@ -110,14 +110,4 @@ export default function TransferAuthority() {
       </div>
     </div>
   );
-}
-
-function networkName(network: string) {
-  if (network === "mainnet-beta") return "mainnet";
-  if (network === "devnet" || network === "testnet") return network;
-  try {
-    return `a custom RPC (${new URL(network).host})`;
-  } catch {
-    return "a custom RPC";
-  }
 }

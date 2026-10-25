@@ -1,6 +1,6 @@
 {
   "name": "@blastctrl/octane-core",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -15,26 +15,18 @@
     "test": "glob -c \"tsx --test --test-reporter spec \" \"./src/__test__/**/*-test.ts\""
   },
   "dependencies": {
-    "@solana/spl-token": "^0.4.12",
-    "@solana/web3.js": "^1.99.0",
-    "@types/bs58": "^4.0.1",
-    "bn.js": "^5.2.1",
-    "bs58": "4.0.1",
-    "tweetnacl": "^1.0.3"
+    "@solana-program/system": "^0.16.0",
+    "@solana-program/token": "^0.18.0",
+    "@solana/kit": "^8.5.0"
   },
   "devDependencies": {
-    "@types/bn.js": "^5.1.5",
-    "@types/node": "^20.12.7",
-    "cache-manager": "^5.5.2",
-    "glob": "^10.3.14",
-    "tsx": "^4.9.4",
     "@blastctrl/eslint-config": "workspace:*",
     "@blastctrl/typescript-config": "workspace:^",
+    "@types/node": "^20.12.7",
     "eslint": "10.11.0",
+    "glob": "^10.3.14",
+    "tsx": "^4.9.4",
     "typescript": "6.0.3"
-  },
-  "peerDependencies": {
-    "cache-manager": "^5.5.2"
   },
   "prettier": "@blastctrl/prettier-config"
 }

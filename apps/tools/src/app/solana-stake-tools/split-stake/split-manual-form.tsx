@@ -1,7 +1,12 @@
 import { notify } from "@/components/notification";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
 import { useDebounce } from "@/lib/hooks/use-debounce";
-import { isPublicKey, lamportsToSol } from "@/lib/solana/common";
-import { retryWithBackoff } from "@/lib/utils";
+import { lamportsToSolString } from "@/lib/solana/common";
+import { parseJsonKeypair } from "@/lib/solana/parse-keypair";
+import { STAKE_ACCOUNT_SIZE } from "@/lib/solana/stake-account";
+import { useRentQuery } from "@/state/queries/use-rent";
 import { useStakeAccount } from "@/state/queries/use-stake-account";
 import { Button, cn, SpinnerIcon } from "@blastctrl/ui";
 import {
@@ -12,29 +17,29 @@ import {
   type InputProps,
   Label,
 } from "@headlessui/react";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import {
-  ComputeBudgetProgram,
-  Keypair,
-  PublicKey,
-  StakeProgram,
-  Transaction,
-} from "@solana/web3.js";
+  address,
+  generateKeyPairSigner,
+  isAddress,
+  type KeyPairSigner,
+  type Lamports,
+} from "@solana/kit";
 import { type FormEvent, useState } from "react";
-import { useRentQuery } from "./rent-query";
-import { parseJsonKeypair } from "@/lib/solana/parse-keypair";
-import { signWithWalletFirst } from "@/lib/solana/send";
 import { Box } from "./box";
+import {
+  parseSolInput,
+  splitAmountError,
+  splitInstructions,
+  splittableLamports,
+} from "./split-plan";
 
 type Field = string;
 type Message = string;
 type FormError = Record<Field, Message>;
 
 export function SplitManualForm() {
-  const { connection } = useConnection();
-  const { publicKey, signTransaction } = useWallet();
-  const { setVisible } = useWalletModal();
+  const { client } = useKitClient();
+  const { setOpen } = useConnectorDialog();
 
   const [accountToSplit, setAccountToSplit] = useState("");
   const [newAccountBalance, setNewAccountBalance] = useState("");
@@ -46,18 +51,15 @@ export function SplitManualForm() {
 
   const debouncedAccountToSplit = useDebounce(accountToSplit, 300);
   const { data, refetch } = useStakeAccount(
-    isPublicKey(debouncedAccountToSplit) ? debouncedAccountToSplit : undefined,
+    isAddress(debouncedAccountToSplit) ? debouncedAccountToSplit : undefined,
     false,
   );
-  const { data: rentExemption } = useRentQuery(StakeProgram.space);
+  const { data: rentExemption } = useRentQuery(STAKE_ACCOUNT_SIZE);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!publicKey || !signTransaction) return;
-    if (data === undefined) return;
-    if (rentExemption === undefined) return;
-
-    if (!isPublicKey(accountToSplit)) return;
+    if (!client || data === undefined || rentExemption === undefined) return;
+    if (!isAddress(accountToSplit)) return;
 
     setFormErrors({});
 
@@ -65,92 +67,56 @@ export function SplitManualForm() {
       setFormErrors({ balance: "New stake amount is required." });
       return;
     }
-    if (lamportsToSol(rentExemption) >= Number(newAccountBalance)) {
-      setFormErrors({
-        balance: `New stake amount must be higher than the minimum rent (${rentExemption} lamports).`,
-      });
+    const amount = parseSolInput(newAccountBalance);
+    if (amount === null) {
+      setFormErrors({ balance: "Enter a SOL amount with at most 9 decimals." });
       return;
     }
-    if (Number(newAccountBalance) >= lamportsToSol(data.lamports)) {
-      setFormErrors({
-        balance: `New amount is higher than the original stake balance (${lamportsToSol(data.lamports)});`,
-      });
+    // The program's own rules, checked before anything reaches the wallet.
+    const amountError = splitAmountError(data, amount, rentExemption);
+    if (amountError) {
+      setFormErrors({ balance: amountError });
       return;
     }
 
+    let splitStake: KeyPairSigner;
+    if (keypairFile) {
+      const parsed = await parseJsonKeypair(keypairFile);
+      if (!parsed.success) {
+        setFormErrors({ keypair: `Invalid keypair format: ${parsed.error}` });
+        return;
+      }
+      splitStake = parsed.signer;
+    } else {
+      splitStake = await generateKeyPairSigner();
+    }
+
+    setIsConfirming(true);
     try {
-      const { context, value } = await retryWithBackoff(() =>
-        connection.getLatestBlockhashAndContext("confirmed"),
+      // The destination is funded with its rent by the wallet, then the
+      // amount moves out of the source (see split-plan.ts for the rules).
+      const result = await client.sendTransaction(
+        splitInstructions({
+          source: address(accountToSplit),
+          destination: splitStake,
+          authority: client.payer,
+          amount,
+          rent: rentExemption,
+        }),
       );
-
-      const tx = new Transaction();
-      let stakeAccount;
-      if (keypairFile) {
-        const parsed = await parseJsonKeypair(keypairFile);
-        if (parsed.success) {
-          stakeAccount = parsed.keypair;
-        } else {
-          setFormErrors({ keypair: `Invalid keypair format: ${parsed.error}` });
-          return;
-        }
-      } else {
-        stakeAccount = Keypair.generate();
-      }
-
-      tx.add(
-        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1e6 }),
-        StakeProgram.split(
-          {
-            authorizedPubkey: publicKey,
-            stakePubkey: new PublicKey(accountToSplit),
-            splitStakePubkey: stakeAccount.publicKey,
-            lamports: Number(newAccountBalance) * 1e9,
-          },
-          0,
-        ),
-      );
-
-      tx.feePayer = publicKey;
-      tx.recentBlockhash = value.blockhash;
-      const signed = await signWithWalletFirst(tx, signTransaction, [
-        stakeAccount,
-      ]);
-      const signature = await connection.sendRawTransaction(
-        signed.serialize(),
-        {
-          minContextSlot: context.slot,
-          maxRetries: 0,
-          preflightCommitment: "confirmed",
-          skipPreflight: true,
-        },
-      );
-      if (!isConfirming) {
-        setIsConfirming(true);
-      }
-
-      const result = await connection.confirmTransaction(
-        {
-          signature,
-          blockhash: value.blockhash,
-          lastValidBlockHeight: value.lastValidBlockHeight,
-        },
-        "confirmed",
-      );
-
-      if (result.value.err) throw Error(JSON.stringify(result.value.err));
 
       notify({
         type: "success",
         title: "Transaction confirmed",
-        txid: signature,
+        txid: result.context.signature,
       });
-      setFormSuccess(stakeAccount.publicKey.toString());
-      refetch();
+      setFormSuccess(splitStake.address);
+      void refetch();
     } catch (error) {
       notify({
         type: "error",
         title: "Transaction error",
-        description: error instanceof Error ? error.message : String(error),
+        description: transactionErrorMessage(error),
       });
     } finally {
       setIsConfirming(false);
@@ -168,7 +134,7 @@ export function SplitManualForm() {
             autoCorrect="false"
             value={accountToSplit}
             onChange={({ target }) => setAccountToSplit(target.value)}
-            invalid={accountToSplit !== "" && !isPublicKey(accountToSplit)}
+            invalid={accountToSplit !== "" && !isAddress(accountToSplit)}
             placeholder="Account address"
           />
         </Field>
@@ -180,12 +146,13 @@ export function SplitManualForm() {
           keypairFile={keypairFile}
           setKeypairFile={setKeypairFile}
           formError={formErrors}
+          rentExemption={rentExemption}
         />
         {data &&
-          (!publicKey ? (
+          (!client ? (
             <div>
               <Button
-                onClick={() => void setVisible(true)}
+                onClick={() => setOpen(true)}
                 type="button"
                 color="indigo"
                 className="w-full"
@@ -195,7 +162,12 @@ export function SplitManualForm() {
             </div>
           ) : (
             <div>
-              <Button type="submit" color="indigo" className="w-full">
+              <Button
+                type="submit"
+                color="indigo"
+                className="w-full"
+                disabled={isConfirming}
+              >
                 {isConfirming && (
                   <SpinnerIcon className="mr-1 -ml-1 inline size-[1em] animate-spin" />
                 )}
@@ -235,6 +207,7 @@ function FormInner({
   setKeypairFile,
   accountToSplit,
   formError,
+  rentExemption,
 }: {
   newAccountBalance: string;
   setNewAccountBalance: (value: string) => void;
@@ -242,9 +215,10 @@ function FormInner({
   setKeypairFile: (file: File) => void;
   accountToSplit: string;
   formError: FormError;
+  rentExemption: Lamports | undefined;
 }) {
   const { data, isLoading, error } = useStakeAccount(
-    isPublicKey(accountToSplit) ? accountToSplit : undefined,
+    isAddress(accountToSplit) ? accountToSplit : undefined,
   );
 
   if (!isLoading && data === undefined) return null;
@@ -253,15 +227,28 @@ function FormInner({
     return <div>{error.message}</div>;
   }
 
+  const splittable =
+    data && rentExemption !== undefined
+      ? splittableLamports(data, rentExemption)
+      : undefined;
+
   return (
     <Fieldset disabled={isLoading || data === undefined}>
       <Field className="w-full">
         <Label className="font-medium sm:text-sm/6">
-          Balance of the new account
+          Stake to move into the new account
         </Label>
         {!!data && (
           <Description className="text-zinc-500">
-            Original account balance: {lamportsToSol(data?.lamports)}
+            {data.stake
+              ? `Delegated stake: ${lamportsToSolString(data.stake.delegation.stake)} SOL`
+              : `Balance: ${lamportsToSolString(data.lamports)} SOL`}
+            {splittable !== undefined &&
+              ` · available to split: ${lamportsToSolString(splittable)} SOL`}
+            {rentExemption !== undefined &&
+              `. The new account's rent-exempt reserve (${lamportsToSolString(rentExemption)} SOL) is paid by your wallet on top.`}
+            {data.stake &&
+              " A delegated account must keep at least 1 SOL of stake on each side."}
           </Description>
         )}
         <StyledInput

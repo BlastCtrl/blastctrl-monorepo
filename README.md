@@ -12,8 +12,11 @@ This monorepo currently hosts the Blast Tools Nextjs application, but it could b
 │   ├── prettier-config : shared Prettier configuration
 │   ├── tailwind-config : Tailwind v4 theme and PostCSS configuration
 │   ├── typescript-config : TypeScript 6 base, Next.js, React and bundler presets
+│   ├── mpl-core : Codama-generated @solana/kit client for Metaplex Core (see its README)
+│   ├── mpl-token-metadata : Codama-generated @solana/kit client for Metaplex Token Metadata (see its README)
 │   ├── octane-core : fork of Octane used by the gasless-swap tool
 │   ├── solace-sdk : Orval-generated Blast API client (see its README)
+│   ├── squads : Codama-generated @solana/kit client for Squads v4 multisigs (see its README)
 │   ├── ui : React components consumed directly from source
 ├── e2e-tests : Playwright tests and Node.js scripts
 ```
@@ -32,12 +35,10 @@ You will need to setup the following environment variables in the `apps/tools/.e
 
 ```
 NEXT_PUBLIC_RPC_ENDPOINT=
-NEXT_PUBLIC_DAS_API=
 JUP_SWAP_API=
 REDIS_URL=
 REDIS_TOKEN=
 OCTANE_SECRET_KEYPAIR=
-BONK_BURN_FEE_BPS=
 OCTANE_PLATFORM_FEE_BPS=
 ```
 

@@ -1,51 +1,79 @@
+import { useAppRpc } from "@/connector/app-rpc";
+import { chunk } from "@/lib/utils";
+import {
+  findAssociatedTokenPda,
+  TOKEN_PROGRAM_ADDRESS,
+} from "@solana-program/token";
+import { address, type Address } from "@solana/kit";
 import { useQuery } from "@tanstack/react-query";
-import { useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey } from "@solana/web3.js";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 
 export const tokenAccountExistenceQueryKey = (
   mintAddress: string,
-  recipients: string[]
-) => ["token-account-existence", mintAddress, recipients] as const;
+  recipients: string[],
+  tokenProgram: Address,
+  network: string,
+) =>
+  [
+    "token-account-existence",
+    mintAddress,
+    recipients,
+    tokenProgram,
+    network,
+  ] as const;
 
+/** Which recipients already have an associated token account for `mintAddress`. */
 export function useTokenAccountExistence(
   mintAddress: string,
-  recipients: string[]
+  recipients: string[],
+  tokenProgram: Address = TOKEN_PROGRAM_ADDRESS,
 ) {
-  const { connection } = useConnection();
+  const { rpc, network } = useAppRpc();
 
   return useQuery({
-    enabled: !!mintAddress && recipients.length > 0,
-    queryKey: tokenAccountExistenceQueryKey(mintAddress, recipients),
-    queryFn: async () => {
-      const mint = new PublicKey(mintAddress);
-      const ataAddresses = recipients.map((recipient) =>
-        getAssociatedTokenAddressSync(mint, new PublicKey(recipient))
+    enabled: !!mintAddress && recipients.length > 0 && !!rpc,
+    queryKey: tokenAccountExistenceQueryKey(
+      mintAddress,
+      recipients,
+      tokenProgram,
+      network,
+    ),
+    queryFn: async ({ signal }) => {
+      if (!rpc) throw new Error("RPC not available");
+      const mint = address(mintAddress);
+      const atas = await Promise.all(
+        recipients.map(
+          async (recipient) =>
+            (
+              await findAssociatedTokenPda({
+                owner: address(recipient),
+                mint,
+                tokenProgram,
+              })
+            )[0],
+        ),
       );
 
-      // Fetch accounts in batches of 100
-      const batchSize = 100;
-      const results: (boolean)[] = [];
-
-      for (let i = 0; i < ataAddresses.length; i += batchSize) {
-        const batch = ataAddresses.slice(i, i + batchSize);
-        const accountInfos = await connection.getMultipleAccountsInfo(batch);
-        
-        // null means account doesn't exist, needs to be created
-        // non-null means account exists, no creation needed
-        const batchResults = accountInfos.map(accountInfo => accountInfo !== null);
-        results.push(...batchResults);
+      // getMultipleAccounts takes at most 100 addresses; we only need existence.
+      const exists: boolean[] = [];
+      for (const batch of chunk(atas, 100)) {
+        const { value } = await rpc
+          .getMultipleAccounts(batch, {
+            encoding: "base64",
+            dataSlice: { offset: 0, length: 0 },
+          })
+          .send({ abortSignal: signal });
+        exists.push(...value.map((account) => account !== null));
       }
 
       return {
         recipients: recipients.map((recipient, index) => ({
           address: recipient,
-          exists: results[index] ?? false,
+          exists: exists[index] ?? false,
         })),
-        accountsToCreate: results.filter(exists => !exists).length,
+        accountsToCreate: exists.filter((e) => !e).length,
         totalRecipients: recipients.length,
       };
     },
-    staleTime: 30000, // Cache for 30 seconds
+    staleTime: 30_000,
   });
 }

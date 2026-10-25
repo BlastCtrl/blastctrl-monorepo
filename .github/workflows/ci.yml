@@ -40,11 +40,9 @@ jobs:
           REDIS_URL: https://redis.example.invalid
           REDIS_TOKEN: ci-placeholder
           OCTANE_SECRET_KEYPAIR: ci-placeholder
-          BONK_BURN_FEE_BPS: "0"
           OCTANE_PLATFORM_FEE_BPS: "0"
           BLAST_BACKEND_URL: https://backend.example.invalid
           NEXT_PUBLIC_RPC_ENDPOINT: https://rpc.example.invalid
-          NEXT_PUBLIC_DAS_API: https://das.example.invalid
 
       - name: Typecheck
         run: pnpm typecheck

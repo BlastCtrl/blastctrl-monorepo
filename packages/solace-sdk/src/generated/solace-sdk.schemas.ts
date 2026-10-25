@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Blast API
  * Create and manage Solana SOL and SPL token airdrops.
- * OpenAPI spec version: 1.0.3
+ * OpenAPI spec version: 1.1.0
  */
 export interface Def0 {
   error: string;
@@ -123,9 +123,21 @@ export type ListAirdrops200Item = {
   createdAt: number;
   updatedAt: number;
   mintAddress: string;
+  tokenProgram: string;
   decimals: number;
   recipients: ListAirdrops200ItemRecipientsItem[];
 };
+
+/**
+ * Program that owns mintAddress. Defaults to the classic Token program when omitted.
+ */
+export type CreateTokenAirdropBodyTokenProgram = typeof CreateTokenAirdropBodyTokenProgram[keyof typeof CreateTokenAirdropBodyTokenProgram];
+
+
+export const CreateTokenAirdropBodyTokenProgram = {
+  TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+  TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+} as const;
 
 export type CreateTokenAirdropBodyBatchesItemItem = {
   address: string;
@@ -135,6 +147,8 @@ export type CreateTokenAirdropBodyBatchesItemItem = {
 
 export type CreateTokenAirdropBody = {
   mintAddress: string;
+  /** Program that owns mintAddress. Defaults to the classic Token program when omitted. */
+  tokenProgram?: CreateTokenAirdropBodyTokenProgram;
   /**
      * @minimum 0
      * @maximum 9
@@ -211,6 +225,7 @@ export type GetAirdrop200 = {
   createdAt: number;
   updatedAt: number;
   mintAddress: string;
+  tokenProgram: string;
   decimals: number;
   transactions: GetAirdrop200TransactionsItem[];
 };
@@ -272,4 +287,14 @@ export type GetHealth200 = typeof GetHealth200[keyof typeof GetHealth200];
 export const GetHealth200 = {
   ok: 'ok',
 } as const;
+
+export type GetSolanaRpcConfigHealth200 = {
+  configured: boolean;
+  valid: boolean;
+};
+
+export type GetSolanaRpcConfigHealth503 = {
+  configured: boolean;
+  valid: boolean;
+};
 

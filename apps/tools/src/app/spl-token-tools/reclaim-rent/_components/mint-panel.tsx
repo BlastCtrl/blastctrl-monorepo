@@ -1,8 +1,8 @@
-import { compress, isPublicKey } from "@/lib/solana/common";
-import { useDasApi } from "@/state/queries/das";
+import { useAppRpc } from "@/connector/app-rpc";
+import { compress } from "@/lib/solana/common";
 import { lookupMint } from "@/state/queries/use-reclaimable-accounts";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
-import { useConnection } from "@solana/wallet-adapter-react";
+import { isAddress } from "@solana/kit";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { CollapsibleTable } from "./collapsible-table";
@@ -27,13 +27,15 @@ export function MintPanel({
   onToggle,
   onToggleAll,
 }: Props) {
-  const { connection } = useConnection();
-  const { url } = useDasApi();
+  const { rpc, dasAvailable } = useAppRpc();
   const [address, setAddress] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const check = useMutation({
-    mutationFn: (mint: string) => lookupMint(connection, url, mint, owner),
+    mutationFn: (mint: string) => {
+      if (!rpc) throw Error("RPC not available");
+      return lookupMint(rpc, dasAvailable, mint, owner);
+    },
     onSuccess: (result) => {
       if (result.status === "ok") {
         onAdd(result.account);
@@ -49,7 +51,7 @@ export function MintPanel({
   const submit = () => {
     const trimmed = address.trim();
     setError(null);
-    if (!isPublicKey(trimmed)) {
+    if (!isAddress(trimmed)) {
       setError("That isn't a Solana address. Paste the mint address in full.");
       return;
     }

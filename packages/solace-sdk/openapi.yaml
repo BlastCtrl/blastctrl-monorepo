@@ -2,7 +2,7 @@ openapi: 3.0.0
 info:
   title: Blast API
   description: Create and manage Solana SOL and SPL token airdrops.
-  version: 1.0.3
+  version: 1.1.0
 components:
   securitySchemes:
     bearerAuth:
@@ -300,6 +300,7 @@ paths:
                     - updatedAt
                     - recipients
                     - mintAddress
+                    - tokenProgram
                     - decimals
                   properties:
                     id:
@@ -322,6 +323,8 @@ paths:
                     updatedAt:
                       type: number
                     mintAddress:
+                      type: string
+                    tokenProgram:
                       type: string
                     decimals:
                       type: integer
@@ -362,6 +365,13 @@ paths:
               properties:
                 mintAddress:
                   type: string
+                tokenProgram:
+                  type: string
+                  enum:
+                    - TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+                    - TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb
+                  description: Program that owns mintAddress. Defaults to the classic Token
+                    program when omitted.
                 decimals:
                   type: integer
                   minimum: 0
@@ -487,6 +497,7 @@ paths:
                   - createdAt
                   - updatedAt
                   - mintAddress
+                  - tokenProgram
                   - decimals
                 properties:
                   id:
@@ -509,6 +520,8 @@ paths:
                   updatedAt:
                     type: integer
                   mintAddress:
+                    type: string
+                  tokenProgram:
                     type: string
                   decimals:
                     type: integer
@@ -808,6 +821,45 @@ paths:
               schema:
                 enum:
                   - ok
+  /health/solana-rpc:
+    get:
+      operationId: getSolanaRpcConfigHealth
+      summary: Check Solana RPC URL configuration
+      tags:
+        - Health
+      description: Checks whether SOLANA_RPC_URL is explicitly set to an HTTP(S) URL.
+        Does not contact the provider or return the URL.
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - configured
+                  - valid
+                additionalProperties: false
+                properties:
+                  configured:
+                    type: boolean
+                  valid:
+                    type: boolean
+        "503":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - configured
+                  - valid
+                additionalProperties: false
+                properties:
+                  configured:
+                    type: boolean
+                  valid:
+                    type: boolean
 servers:
   - url: http://localhost:3000
     description: Development server

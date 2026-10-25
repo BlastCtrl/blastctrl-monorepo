@@ -1,12 +1,12 @@
 "use client";
 
 import BlastCtrlIcon from "@/../public/blastctrl_icon.svg";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { NETWORKS } from "@/connector/network";
 import { compress } from "@/lib/solana";
-import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { ChevronDownIcon } from "@heroicons/react/20/solid";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useCluster, useConnector } from "@solana/connector/react";
 import Image from "next/image";
 import Link from "next/link";
 import { Suspense, use } from "react";
@@ -31,12 +31,12 @@ export function SiteHeader() {
 }
 
 function NetworkBadge() {
-  use(browser("The network is persisted in localStorage"));
-  const network = useNetworkConfigurationStore((state) => state.network);
-  if (network === "mainnet-beta") return null;
+  use(browser("The active cluster is client-side state"));
+  const { type } = useCluster();
+  if (!type || type === "mainnet") return null;
   return (
-    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 capitalize">
-      {network.startsWith("http") ? "Custom RPC" : network}
+    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900">
+      {NETWORKS[type].label}
     </span>
   );
 }
@@ -51,24 +51,25 @@ const ITEM =
  * results are never mistaken for real ones.
  */
 function Wallet() {
-  const { publicKey, wallet, disconnect } = useWallet();
-  const { setVisible } = useWalletModal();
-  const address = publicKey?.toBase58();
+  const { account: address, connector, disconnectWallet } = useConnector();
+  const { setOpen } = useConnectorDialog();
 
   return (
     <div className="flex items-center gap-2">
       <Suspense fallback={null}>
         <NetworkBadge />
       </Suspense>
-      {address && wallet && (
+      {address && connector && (
         <Menu>
           <MenuButton className="flex items-center gap-2 rounded-full border border-zinc-300 bg-white py-1 pr-2.5 pl-1 text-sm font-medium text-slate-800 transition-colors hover:border-zinc-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-800 data-open:border-zinc-400">
-            {/* eslint-disable-next-line @next/next/no-img-element -- a data URL from the wallet */}
-            <img
-              src={wallet.adapter.icon}
-              alt=""
-              className="size-6 rounded-full"
-            />
+            {connector.icon && (
+              // eslint-disable-next-line @next/next/no-img-element -- a data URL from the wallet
+              <img
+                src={connector.icon}
+                alt=""
+                className="size-6 rounded-full"
+              />
+            )}
             {compress(address, 4)}
             <ChevronDownIcon
               aria-hidden="true"
@@ -93,7 +94,7 @@ function Wallet() {
               <button
                 type="button"
                 className={ITEM}
-                onClick={() => setVisible(true)}
+                onClick={() => setOpen(true)}
               >
                 Change wallet
               </button>
@@ -102,7 +103,7 @@ function Wallet() {
               <button
                 type="button"
                 className={ITEM}
-                onClick={() => void disconnect()}
+                onClick={() => void disconnectWallet()}
               >
                 Disconnect
               </button>

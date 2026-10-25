@@ -1,21 +1,28 @@
 import { chunk } from "@/lib/utils";
 import {
-  createAssociatedTokenAccountIdempotentInstruction,
-  getAssociatedTokenAddressSync,
-} from "@solana/spl-token";
-import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+  findAssociatedTokenPda,
+  getCreateAssociatedTokenIdempotentInstruction,
+} from "@solana-program/token";
+import { getTransferSolInstruction } from "@solana-program/system";
+import type { ClusterType } from "@solana/connector/react";
+import {
+  address,
+  type Address,
+  type Instruction,
+  type TransactionSigner,
+} from "@solana/kit";
 import devnetMints from "./demo-mints.devnet.json";
 import mainnetMints from "./demo-mints.json";
 
-export type DemoMint = { name: string; mint: PublicKey; program: PublicKey };
+export type DemoMint = { name: string; mint: Address; program: Address };
 
 const toDemoMints = (
   list: { id: string; name: string; tokenProgram: string }[],
 ): DemoMint[] =>
   list.map((m) => ({
     name: m.name,
-    mint: new PublicKey(m.id),
-    program: new PublicKey(m.tokenProgram),
+    mint: address(m.id),
+    program: address(m.tokenProgram),
   }));
 
 /**
@@ -26,18 +33,19 @@ const toDemoMints = (
 export const DEMO_MINTS = toDemoMints(mainnetMints);
 
 /**
- * The devnet counterpart: mints made for the panel, with the same split and
- * a similar spread of extensions. Devnet gets reset now and then; if they
- * disappear, make a new set and replace the file.
+ * The devnet counterpart: mints made for the panel by
+ * `scripts/make-devnet-demo-mints.mjs`, plain Token program mints. Devnet
+ * gets reset now and then; if they disappear, make a new set and replace
+ * the file.
  */
 export const DEVNET_DEMO_MINTS = toDemoMints(devnetMints);
 
 /**
- * The demo mints a network has, or null where there are none. Like the rest
- * of the app, a custom RPC url counts as mainnet.
+ * The demo mints a cluster has, or null where there are none. Like the rest
+ * of the app, a custom endpoint counts as mainnet.
  */
-export function demoMintsFor(network: string): DemoMint[] | null {
-  switch (network) {
+export function demoMintsFor(cluster: ClusterType | null): DemoMint[] | null {
+  switch (cluster) {
     case "devnet":
       return DEVNET_DEMO_MINTS;
     case "testnet":
@@ -52,10 +60,10 @@ export function demoMintsFor(network: string): DemoMint[] | null {
  * everyone on devnet, where the SOL it spends is free.
  */
 export function showsTestAccountsPanel(
-  network: string,
+  cluster: ClusterType | null,
   nodeEnv: string | undefined = process.env.NODE_ENV,
 ): boolean {
-  return nodeEnv === "development" || network === "devnet";
+  return nodeEnv === "development" || cluster === "devnet";
 }
 
 /**
@@ -65,43 +73,42 @@ export function showsTestAccountsPanel(
  */
 export const MINTS_PER_TRANSACTION = 8;
 
-type Lifetime = { blockhash: string; lastValidBlockHeight: number };
-
 /**
  * Gives the wallet a token account for every mint, then sends each one
- * `excess` lamports on top of its rent. Creating is idempotent, so running
- * it again only adds the excess to accounts that are still there.
+ * `excess` lamports on top of its rent, as one batch of instructions per
+ * transaction. Creating is idempotent, so running it again only adds the
+ * excess to accounts that are still there.
  */
-export function buildTestAccountTransactions(
+export function buildTestAccountInstructions(
   mints: DemoMint[],
-  wallet: PublicKey,
-  lifetime: Lifetime,
+  wallet: TransactionSigner,
   excess: number,
-) {
-  return chunk(mints, MINTS_PER_TRANSACTION).map((batch) => {
-    const tx = new Transaction({ feePayer: wallet, ...lifetime });
-    for (const { mint, program } of batch) {
-      const account = getAssociatedTokenAddressSync(
-        mint,
-        wallet,
-        false,
-        program,
-      );
-      tx.add(
-        createAssociatedTokenAccountIdempotentInstruction(
-          wallet,
-          account,
-          wallet,
+): Promise<Instruction[][]> {
+  return Promise.all(
+    chunk(mints, MINTS_PER_TRANSACTION).map(async (batch) => {
+      const instructions: Instruction[] = [];
+      for (const { mint, program } of batch) {
+        const [account] = await findAssociatedTokenPda({
+          owner: wallet.address,
+          tokenProgram: program,
           mint,
-          program,
-        ),
-        SystemProgram.transfer({
-          fromPubkey: wallet,
-          toPubkey: account,
-          lamports: excess,
-        }),
-      );
-    }
-    return tx;
-  });
+        });
+        instructions.push(
+          getCreateAssociatedTokenIdempotentInstruction({
+            payer: wallet,
+            ata: account,
+            owner: wallet.address,
+            mint,
+            tokenProgram: program,
+          }),
+          getTransferSolInstruction({
+            source: wallet,
+            destination: account,
+            amount: excess,
+          }),
+        );
+      }
+      return instructions;
+    }),
+  );
 }

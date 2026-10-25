@@ -1,26 +1,25 @@
 import { notify } from "@/components";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
 import { compress } from "@/lib/solana";
-import { isATA, normalizeTokenAmount } from "@/lib/solana/common";
-import { findTokenByMint } from "@/lib/solana/common-tokens";
-import { createRecoverNestedTokenAccountInstruction } from "@/lib/solana/token";
+import { normalizeTokenAmount } from "@/lib/solana/common";
 import { SpinnerIcon } from "@blastctrl/ui";
 import { Tooltip } from "@blastctrl/ui/tooltip";
 import { ChevronRightIcon, WalletIcon } from "@heroicons/react/20/solid";
 import { QuestionMarkCircleIcon } from "@heroicons/react/24/solid";
-import type { Account } from "@solana/spl-token";
-import { getAssociatedTokenAddressSync, getMint } from "@solana/spl-token";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { Transaction } from "@solana/web3.js";
-import Image from "next/image";
+import { fetchMint } from "@solana-program/token";
 import type { Dispatch, SetStateAction } from "react";
 import { useState } from "react";
-import type { findNestedAta } from "../_utils";
-
-type NestedPairs = Awaited<ReturnType<typeof findNestedAta>>;
+import {
+  recoverNestedInstructions,
+  type NestedPair,
+  type TokenAccount,
+} from "../_utils";
 
 type NestedListProps = {
-  nestedTokenAccounts?: NestedPairs;
-  setNestedTokenAccounts: Dispatch<SetStateAction<NestedPairs>>;
+  nestedTokenAccounts?: NestedPair[];
+  setNestedTokenAccounts: Dispatch<SetStateAction<NestedPair[]>>;
 };
 
 export const NestedList = ({
@@ -43,12 +42,10 @@ export const NestedList = ({
       </h3>
 
       <ul className="mt-4 w-full space-y-4">
-        {nestedTokenAccounts.map(({ parent, nested }, idx) => (
-          <li key={idx}>
+        {nestedTokenAccounts.map((pair, idx) => (
+          <li key={pair.nested.address}>
             <NestedInfo
-              key={idx}
-              parent={parent}
-              nested={nested}
+              {...pair}
               idx={idx}
               setNestedTokenAccounts={setNestedTokenAccounts}
             />
@@ -62,68 +59,30 @@ export const NestedList = ({
 export const NestedInfo = ({
   parent,
   nested,
+  recoverable,
   idx,
   setNestedTokenAccounts,
-}: {
-  parent: Account;
-  nested: Account;
+}: NestedPair & {
   idx: number;
-  setNestedTokenAccounts: Dispatch<SetStateAction<NestedPairs>>;
+  setNestedTokenAccounts: Dispatch<SetStateAction<NestedPair[]>>;
 }) => {
-  const { connection } = useConnection();
-  const { publicKey: wallet, sendTransaction } = useWallet();
+  const { client } = useKitClient();
+  const { setOpen } = useConnectorDialog();
   const [confirming, setConfirming] = useState(false);
 
-  const parentTokenInfo = findTokenByMint(parent.mint.toBase58());
-  const nestedTokenInfo = findTokenByMint(nested.mint.toBase58());
-  const recoverable = isATA({
-    address: nested.address,
-    owner: parent.address,
-    mint: nested.mint,
-  });
-
   const handleRecover = async () => {
-    if (!wallet) {
-      notify({ type: "error", description: "Connect your wallet" });
+    if (!client) {
+      setOpen(true);
       return;
     }
-    let nestedDecimals = nestedTokenInfo?.decimals;
-    if (!nestedDecimals) {
-      const info = await getMint(connection, nested.mint);
-      nestedDecimals = info.decimals;
-    }
 
+    setConfirming(true);
     try {
-      const destination = getAssociatedTokenAddressSync(
-        nested.mint,
-        wallet,
-        true,
+      const { decimals } = (await fetchMint(client.rpc, nested.data.mint)).data;
+
+      const result = await client.sendTransaction(
+        await recoverNestedInstructions(client.payer, parent, nested),
       );
-      const {
-        context: { slot: minContextSlot },
-        value: { blockhash, lastValidBlockHeight },
-      } = await connection.getLatestBlockhashAndContext();
-      const tx = new Transaction().add(
-        createRecoverNestedTokenAccountInstruction(
-          wallet,
-          nested.address,
-          nested.mint,
-          destination,
-          parent.address,
-          parent.mint,
-        ),
-      );
-      setConfirming(true);
-      const signature = await sendTransaction(tx, connection, {
-        minContextSlot,
-      });
-      console.log(signature);
-      const { value } = await connection.confirmTransaction({
-        blockhash,
-        lastValidBlockHeight,
-        signature,
-      });
-      if (value.err) throw Error("Error confirming transaction.");
       notify({
         type: "success",
         title: "Recover nested success",
@@ -131,29 +90,21 @@ export const NestedInfo = ({
           <>
             Successfully recovered{" "}
             <span className="font-medium text-blue-300">
-              {normalizeTokenAmount(nested.amount.toString(), nestedDecimals)}
+              {normalizeTokenAmount(nested.data.amount.toString(), decimals)}
             </span>{" "}
             tokens.
           </>
         ),
-        txid: signature,
+        txid: result.context.signature,
       });
-      setNestedTokenAccounts((prev) => {
-        const copy = [...prev];
-        copy.splice(idx, 1);
-        return copy;
-      });
-    } catch (err) {
-      console.log({ err });
+      setNestedTokenAccounts((prev) => prev.filter((_, i) => i !== idx));
+    } catch (error) {
       notify({
         type: "error",
-        title: "Error confirming recover nested",
-        description:
-          err instanceof Error ? (
-            <span className="break-all">{err.message}</span>
-          ) : (
-            "Unknown error, check the console for more details"
-          ),
+        title: "Error recovering nested account",
+        description: (
+          <span className="break-all">{transactionErrorMessage(error)}</span>
+        ),
       });
     } finally {
       setConfirming(false);
@@ -164,45 +115,27 @@ export const NestedInfo = ({
     <div className="divide-y divide-gray-200 overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-black/5">
       <div className="px-4 py-5 sm:p-6">
         <div className="grid gap-y-4 xs:grid-cols-2">
-          {[parent, nested].map((account, idx) => {
-            const tokenInfo = idx === 0 ? parentTokenInfo : nestedTokenInfo;
-
+          {([parent, nested] as TokenAccount[]).map((account, idx) => {
             return (
               <div key={idx} className="flex">
                 <div className="mt-2 mr-4 shrink-0 self-start">
-                  {tokenInfo ? (
-                    <Image
-                      src={tokenInfo.image}
-                      className="size-10 rounded-full"
-                      alt="Token logo"
-                      height={40}
-                      width={40}
-                    />
-                  ) : (
-                    <QuestionMarkCircleIcon className="h-10 w-10 rounded-full text-blue-400" />
-                  )}
+                  <QuestionMarkCircleIcon className="h-10 w-10 rounded-full text-blue-400" />
                 </div>
                 <div>
                   <h4 className="text-sm font-bold tracking-wider text-gray-700 uppercase">
                     {idx === 0 ? "Parent" : "Nested"}
                   </h4>
-                  {tokenInfo ? (
-                    <p className="text-sm text-gray-700">{tokenInfo.ticker}</p>
-                  ) : (
-                    <p className="font-mono leading-5 font-medium tracking-tighter text-gray-700">
-                      {compress(account.mint.toBase58(), 6)}
-                    </p>
-                  )}
+                  <p className="font-mono leading-5 font-medium tracking-tighter text-gray-700">
+                    {compress(account.data.mint, 6)}
+                  </p>
                   <p className="font-mono leading-5 font-medium tracking-tighter text-gray-500">
-                    {compress(account.address.toBase58(), 6)}
+                    {compress(account.address, 6)}
                   </p>
                   <div className="mt-2 inline-flex w-full items-center justify-end">
                     <WalletIcon className="mr-1 h-3 w-3 text-gray-500" />
                     <span className="font-mono text-gray-900 underline">
-                      {normalizeTokenAmount(
-                        account.amount.toString(),
-                        tokenInfo?.decimals ?? 0,
-                      ).toLocaleString()}
+                      {/* Raw units: the mint's decimals aren't looked up yet. */}
+                      {account.data.amount.toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -216,7 +149,7 @@ export const NestedInfo = ({
           <button
             type="button"
             onClick={handleRecover}
-            disabled={confirming || !recoverable}
+            disabled={confirming}
             className="inline-flex items-center rounded-full border border-transparent bg-green-600 px-3 py-0.5 text-sm text-white hover:bg-green-700 disabled:bg-green-700"
           >
             {confirming ? (
@@ -243,7 +176,7 @@ export const NestedInfo = ({
             😥 Unrecoverable
             <Tooltip
               content={
-                "Currently, only nested associated token accounts can be recovered. It isn't possible to recover regular token accounts."
+                "Only a nested associated token account of the same token program as its parent can be recovered. Regular token accounts, and a Token-2022 account nested in a Token account (or the other way round), can't be."
               }
             >
               <QuestionMarkCircleIcon className="ml-2 size-5 text-gray-400 hover:cursor-pointer" />

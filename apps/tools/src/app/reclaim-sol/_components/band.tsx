@@ -11,8 +11,8 @@ import {
   ReclaimPill,
 } from "@/app/spl-token-tools/reclaim-rent/_components/results/bits";
 import { Stage } from "@/app/spl-token-tools/reclaim-rent/_components/results/stage";
-import { useRentRate } from "@/app/spl-token-tools/reclaim-rent/_components/use-rent-rate";
-import { isPublicKey } from "@/lib/solana/common";
+import { useRentRate } from "@/state/queries/use-rent";
+import { isAddress } from "@solana/kit";
 import { cn } from "@blastctrl/ui";
 import { AnimatePresence, motion } from "motion/react";
 import type { FormEvent, ReactNode } from "react";
@@ -206,7 +206,7 @@ function AddressForm({
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const address = value.trim();
-    if (isPublicKey(address)) onCheck(address);
+    if (isAddress(address)) onCheck(address);
     else setInvalid(true);
   };
 

@@ -3,7 +3,7 @@ import { compress } from "@/lib/solana";
 import { useJupTokens } from "@/state/queries/use-jup-tokens";
 import { SpinnerIcon } from "@blastctrl/ui";
 import { LinkIcon, MagnifyingGlassIcon } from "@heroicons/react/20/solid";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnector } from "@solana/connector/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useRef, useState } from "react";
 import { PopoverButton } from "./popover";
@@ -23,10 +23,10 @@ export function TokenSelectPanel({
 }) {
   "use no memo";
 
-  const { publicKey } = useWallet();
+  const { account } = useConnector();
   const [enableUnknownTokens, setEnableUnknownTokens] = useState(false);
   const { data, status, error } = useJupTokens(
-    publicKey?.toString(),
+    account ?? undefined,
     enableUnknownTokens,
   );
   const [filter, setFilter] = useState("");

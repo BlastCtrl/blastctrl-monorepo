@@ -1,5 +1,4 @@
 import { SiteChrome } from "@/components/layout/site-chrome";
-import "@solana/wallet-adapter-react-ui/styles.css";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "../styles/globals.css";

@@ -1,8 +1,14 @@
-import { useAssetData } from "@/state/queries/use-asset-data";
-import type { ParsedTokenAccount } from "@/state/queries/use-owner-assets";
-import { ownerAssetsKey } from "@/state/queries/use-owner-assets";
+import { notify } from "@/components";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient, type KitClient } from "@/connector/use-kit-client";
 import { compress, normalizeTokenAmount } from "@/lib/solana";
-import { signWithWalletFirst } from "@/lib/solana/send";
+import { getTransferHookProgram } from "@/lib/solana/token-2022";
+import { useAssetData } from "@/state/queries/use-asset-data";
+import {
+  ownerAssetsKey,
+  useOwnerAssets,
+  type ParsedTokenAccount,
+} from "@/state/queries/use-owner-assets";
 import { Button, CopyButton } from "@blastctrl/ui";
 import {
   Table,
@@ -12,38 +18,201 @@ import {
   TableHeader,
   TableRow,
 } from "@blastctrl/ui/table";
-import type { Keypair } from "@solana/web3.js";
-import { PublicKey, SendTransactionError, Transaction } from "@solana/web3.js";
-import { useState } from "react";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { useQueryClient } from "@tanstack/react-query";
 import {
-  createBurnInstruction,
-  createCloseAccountInstruction,
-  createTransferInstruction,
-  getAssociatedTokenAddressSync,
-} from "@solana/spl-token";
-import { retryWithBackoff } from "@/lib/utils";
-import { notify } from "@/components";
+  decodeMint,
+  findAssociatedTokenPda,
+  getBurnInstruction,
+  getCloseAccountInstruction,
+  getCreateAssociatedTokenIdempotentInstruction,
+  getTransferCheckedInstruction,
+} from "@solana-program/token";
+import {
+  address,
+  fetchEncodedAccounts,
+  flattenTransactionPlanResult,
+  nonDivisibleSequentialInstructionPlan,
+  parallelInstructionPlan,
+  type Address,
+  type GetMultipleAccountsApi,
+  type Instruction,
+  type KeyPairSigner,
+  type Rpc,
+  type TransactionSigner,
+} from "@solana/kit";
+import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
-type TokenAction = "transfer" | "burn" | null;
+type TokenAction = "transfer" | "burn";
+
+type MintInfo = { decimals: number; transferHook: Address | null };
+
+/**
+ * What a transfer needs to know about each mint: its decimals, which
+ * `TransferChecked` carries, and whether its transfers must call a hook
+ * program.
+ */
+async function fetchMintInfo(
+  rpc: Rpc<GetMultipleAccountsApi>,
+  mints: Address[],
+): Promise<Map<Address, MintInfo>> {
+  const accounts = await fetchEncodedAccounts(rpc, mints);
+  return new Map(
+    accounts.map((account) => {
+      if (!account.exists) {
+        throw Error(`Mint ${compress(account.address, 4)} does not exist`);
+      }
+      return [
+        account.address,
+        {
+          decimals: decodeMint(account).data.decimals,
+          transferHook: getTransferHookProgram(account.data),
+        },
+      ];
+    }),
+  );
+}
+
+/**
+ * Burns the whole balance, or moves it to `recipient`'s ATA (created if
+ * missing), then closes the account so its rent goes to `recipient`.
+ *
+ * The transfer is a `TransferChecked`, which names the mint: Token-2022
+ * refuses a plain `Transfer` from an account carrying transfer-fee or
+ * transfer-hook state (every PYUSD account, for one), as it needs the mint
+ * to compute the fee or find the hook.
+ */
+async function tokenInstructions(
+  account: ParsedTokenAccount,
+  action: TokenAction,
+  source: KeyPairSigner,
+  recipient: TransactionSigner,
+  decimals: number,
+): Promise<Instruction[]> {
+  const tokenAccount = address(account.token_account);
+  const mint = address(account.mint);
+  const tokenProgram = address(account.token_program);
+  const config = { programAddress: tokenProgram };
+  const instructions: Instruction[] = [];
+
+  if (action === "burn") {
+    instructions.push(
+      getBurnInstruction(
+        {
+          account: tokenAccount,
+          mint,
+          authority: source,
+          amount: account.balance,
+        },
+        config,
+      ),
+    );
+  } else {
+    const [destination] = await findAssociatedTokenPda({
+      owner: recipient.address,
+      mint,
+      tokenProgram,
+    });
+    instructions.push(
+      getCreateAssociatedTokenIdempotentInstruction({
+        payer: recipient,
+        ata: destination,
+        owner: recipient.address,
+        mint,
+        tokenProgram,
+      }),
+      getTransferCheckedInstruction(
+        {
+          source: tokenAccount,
+          mint,
+          destination,
+          authority: source,
+          amount: account.balance,
+          decimals,
+        },
+        config,
+      ),
+    );
+  }
+
+  instructions.push(
+    getCloseAccountInstruction(
+      { account: tokenAccount, destination: recipient.address, owner: source },
+      config,
+    ),
+  );
+  return instructions;
+}
+
+/**
+ * Sends the selected burns and transfers, the connected wallet paying and
+ * receiving, and returns the signatures of the transactions that landed.
+ *
+ * A transfer of a mint with an active transfer hook is refused up front:
+ * the hook's extra accounts are not resolved here, and the program would
+ * reject the transfer without them. Burning such a token still works.
+ */
+async function sendTokenActions(
+  client: KitClient,
+  selected: { account: ParsedTokenAccount; action: TokenAction }[],
+  sourceWallet: KeyPairSigner,
+) {
+  const mints = await fetchMintInfo(client.rpc, [
+    ...new Set(selected.map(({ account }) => address(account.mint))),
+  ]);
+  for (const { account, action } of selected) {
+    const hook = mints.get(address(account.mint))?.transferHook;
+    if (action === "transfer" && hook) {
+      throw Error(
+        `Transfers of ${compress(account.mint, 4)} must call its transfer hook program (${compress(hook, 4)}), which this tool does not support. The token can be burnt instead.`,
+      );
+    }
+  }
+
+  const groups = await Promise.all(
+    selected.map(({ account, action }) =>
+      tokenInstructions(
+        account,
+        action,
+        sourceWallet,
+        client.payer,
+        mints.get(address(account.mint))!.decimals,
+      ),
+    ),
+  );
+  // Each token's instructions must land together (close after burn or
+  // transfer); the groups are independent, so the planner packs as many
+  // as fit into one transaction and sends any overflow as further ones.
+  // The source wallet's keypair is attached to its instructions, so the
+  // client signs with it after the connected wallet.
+  const result = await client.sendTransactions(
+    parallelInstructionPlan(
+      groups.map((group) => nonDivisibleSequentialInstructionPlan(group)),
+    ),
+  );
+  return flattenTransactionPlanResult(result)
+    .filter((r) => r.status === "successful")
+    .map((r) => r.context.signature);
+}
 
 export const TokenList = ({
   tokenAccounts,
   sourceWallet,
 }: {
   tokenAccounts: ParsedTokenAccount[];
-  sourceWallet: Keypair;
+  sourceWallet: KeyPairSigner;
 }) => {
-  const { connection } = useConnection();
-  const { publicKey, signTransaction } = useWallet();
+  const { client } = useKitClient();
   const queryClient = useQueryClient();
+  const { refetch } = useOwnerAssets(sourceWallet.address);
   const [tokenActions, setTokenActions] = useState<Map<string, TokenAction>>(
     new Map(),
   );
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleActionChange = (tokenAccount: string, action: TokenAction) => {
+  const handleActionChange = (
+    tokenAccount: string,
+    action: TokenAction | null,
+  ) => {
     setTokenActions((prev) => {
       const newMap = new Map(prev);
       if (action === null) {
@@ -55,172 +224,50 @@ export const TokenList = ({
     });
   };
 
-  const selectedCount = Array.from(tokenActions.values()).filter(
-    (action) => action !== null,
-  ).length;
+  const selectedCount = tokenActions.size;
 
   const handleSubmit = async () => {
-    if (!publicKey || isProcessing || !signTransaction) return;
+    if (!client || isProcessing) return;
 
-    const selectedTokens = tokenAccounts
-      .map((account) => {
-        const action = tokenActions.get(account.token_account);
-        if (!action) return null;
-
-        return {
-          mint: account.mint,
-          balance: account.balance,
-          action,
-          tokenAccount: account.token_account,
-          tokenProgram: account.token_program,
-        };
-      })
-      .filter((item) => item !== null);
-
-    if (selectedTokens.length === 0) return;
-
-    console.log("Selected tokens to process:", selectedTokens);
+    const selected = tokenAccounts.flatMap((account) => {
+      const action = tokenActions.get(account.token_account);
+      return action ? [{ account, action }] : [];
+    });
+    if (selected.length === 0) return;
 
     setIsProcessing(true);
-
     try {
-      // Build transaction instructions
-      const instructions = [];
+      const signatures = await sendTokenActions(client, selected, sourceWallet);
 
-      for (const token of selectedTokens) {
-        const tokenAccountPubkey = new PublicKey(token.tokenAccount);
-        const mintPubkey = new PublicKey(token.mint);
-        const tokenProgramPubkey = new PublicKey(token.tokenProgram);
-
-        if (token.action === "burn") {
-          // Burn all tokens
-          instructions.push(
-            createBurnInstruction(
-              tokenAccountPubkey,
-              mintPubkey,
-              sourceWallet.publicKey,
-              token.balance,
-              [],
-              tokenProgramPubkey,
-            ),
-          );
-        } else if (token.action === "transfer") {
-          // Get or create the destination ATA for the connected wallet
-          const destinationAta = getAssociatedTokenAddressSync(
-            mintPubkey,
-            publicKey,
-            false,
-            tokenProgramPubkey,
-          );
-
-          // Transfer all tokens to the connected wallet
-          instructions.push(
-            createTransferInstruction(
-              tokenAccountPubkey,
-              destinationAta,
-              sourceWallet.publicKey,
-              token.balance,
-              [],
-              tokenProgramPubkey,
-            ),
-          );
-        }
-
-        // Close the token account and recover rent
-        instructions.push(
-          createCloseAccountInstruction(
-            tokenAccountPubkey,
-            publicKey,
-            sourceWallet.publicKey,
-            [],
-            tokenProgramPubkey,
-          ),
-        );
-      }
-
-      // Get latest blockhash
-      const { context, value } = await retryWithBackoff(() =>
-        connection.getLatestBlockhashAndContext("confirmed"),
-      );
-
-      // Create and sign transaction
-      const tx = new Transaction({
-        feePayer: publicKey,
-        blockhash: value.blockhash,
-        lastValidBlockHeight: value.lastValidBlockHeight,
-      }).add(...instructions);
-
-      // The wallet signs as fee payer, then the source wallet (the one we
-      // have the private key for)
-      const signed = await signWithWalletFirst(tx, signTransaction, [
-        sourceWallet,
-      ]);
-
-      const signature = await connection.sendRawTransaction(
-        signed.serialize(),
-        {
-          minContextSlot: context.slot,
-          maxRetries: 0,
-          preflightCommitment: "confirmed",
-          skipPreflight: true,
-        },
-      );
-
-      const loadingToastId = notify({
-        type: "loading",
-        title: "Transaction sent",
-        description: "Confirming transaction...",
-      });
-
-      // Confirm transaction
-      const result = await connection.confirmTransaction(
-        {
-          signature,
-          blockhash: value.blockhash,
-          lastValidBlockHeight: value.lastValidBlockHeight,
-        },
-        "confirmed",
-      );
-
-      if (result.value.err) {
-        throw new Error(JSON.stringify(result.value.err));
-      }
-
-      // Update the loading toast with success
-      notify(
-        {
+      signatures.forEach((signature, index) => {
+        notify({
           type: "success",
-          title: "Transaction confirmed",
-          description: `Successfully processed ${selectedTokens.length} token${selectedTokens.length > 1 ? "s" : ""}`,
+          title:
+            signatures.length > 1
+              ? `Transaction ${index + 1} of ${signatures.length} confirmed`
+              : "Transaction confirmed",
+          description:
+            signatures.length === 1
+              ? `Successfully processed ${selected.length} token${selected.length > 1 ? "s" : ""}`
+              : undefined,
           txid: signature,
-        },
-        loadingToastId,
-      );
+        });
+      });
 
-      // Wait half a second before invalidating queries
+      // Give the RPC a moment before re-reading both wallets' token accounts.
       await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Invalidate the query cache for both wallets
-      await queryClient.invalidateQueries({
-        queryKey: ownerAssetsKey(publicKey.toBase58()),
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: ownerAssetsKey(sourceWallet.publicKey.toBase58()),
-      });
-
-      // Clear selections
+      await Promise.all([
+        refetch(),
+        queryClient.invalidateQueries({
+          queryKey: ownerAssetsKey(client.payer.address),
+        }),
+      ]);
       setTokenActions(new Map());
-    } catch (err) {
-      console.error("Transaction error:", err);
-      if (err instanceof SendTransactionError) {
-        console.log(err.logs);
-      }
+    } catch (error) {
       notify({
         type: "error",
         title: "Transaction failed",
-        description:
-          err instanceof Error ? err.message : "An unknown error occurred",
+        description: transactionErrorMessage(error),
       });
     } finally {
       setIsProcessing(false);
@@ -234,7 +281,7 @@ export const TokenList = ({
           {selectedCount} token{selectedCount !== 1 ? "s" : ""} selected
         </div>
         <div className="text-sm text-gray-600">
-          Source wallet: {compress(sourceWallet.publicKey.toBase58(), 4)}
+          Source wallet: {compress(sourceWallet.address, 4)}
         </div>
       </div>
 
@@ -320,7 +367,7 @@ export const TokenList = ({
         <Button
           color="indigo"
           onClick={handleSubmit}
-          disabled={selectedCount === 0 || isProcessing}
+          disabled={!client || selectedCount === 0 || isProcessing}
         >
           {isProcessing
             ? "Processing..."

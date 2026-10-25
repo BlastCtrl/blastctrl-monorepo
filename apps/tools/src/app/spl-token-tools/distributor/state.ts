@@ -1,36 +1,41 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSolace } from "./solace-provider";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { SolaceError } from "./common";
-import type {
-  CreateAirdrop201,
-  RetryAirdropTransactionBody,
-  CreateAirdropBody,
-  StartAirdrop200,
-  StartAirdropBodyItem,
-  GetAirdrop200,
-  ListAirdrops200Item,
-  CreateTokenAirdrop201,
-  CreateTokenAirdropBody,
-} from "@blastctrl/solace-sdk";
 import { notify } from "@/components/notification";
 import { withMinimumTime } from "@/lib/utils";
+import {
+  createAirdrop,
+  createTokenAirdrop,
+  deleteAirdrop,
+  getAirdrop,
+  listAirdrops,
+  retryAirdropTransaction,
+  setAirdropLabel,
+  SolaceApiError,
+  startAirdrop,
+  type GetAirdrop200,
+  type ListAirdrops200Item,
+  type RetryAirdropTransactionBody,
+} from "@blastctrl/solace-sdk";
+import { useConnector } from "@solana/connector/react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSolaceAuth } from "./solace-provider";
+
+export const airdropsQueryKey = (account: string | null) =>
+  ["airdrops", "all", account] as const;
+
+/** Title and message for a toast, from an SDK error or anything else thrown. */
+const describeError = (error: Error): [string | undefined, string] =>
+  error instanceof SolaceApiError
+    ? [error.error, error.message]
+    : [undefined, error.message];
 
 export function useGetAirdrops() {
-  const sdk = useSolace();
-  const { publicKey } = useWallet();
+  const { requestInit } = useSolaceAuth();
+  const { account } = useConnector();
 
-  return useQuery<ListAirdrops200Item[], SolaceError>({
+  return useQuery({
     retry: 1,
-    enabled: !!publicKey,
-    queryKey: ["airdrops", "all", publicKey?.toString()],
-    queryFn: async () => {
-      const response = await sdk.api.listAirdrops();
-      if (response.status !== 200) {
-        throw new SolaceError(response.data);
-      }
-      return response.data;
-    },
+    enabled: !!account,
+    queryKey: airdropsQueryKey(account),
+    queryFn: ({ signal }) => listAirdrops({ ...requestInit, signal }),
   });
 }
 
@@ -65,7 +70,7 @@ function getAirdropByIdTransformer(data: GetAirdrop200) {
 }
 
 export function useGetAirdropById(airdropId: string, hasStarted?: boolean) {
-  const sdk = useSolace();
+  const { requestInit } = useSolaceAuth();
 
   return useQuery({
     refetchInterval: (query) => {
@@ -82,94 +87,54 @@ export function useGetAirdropById(airdropId: string, hasStarted?: boolean) {
       return false;
     },
     queryKey: ["airdrops", "single", airdropId],
-    queryFn: async () => {
-      const response = await sdk.api.getAirdrop(airdropId);
-
-      if (response.status !== 200) {
-        throw new SolaceError(response.data);
-      }
-      return response.data;
-    },
+    queryFn: ({ signal }) => getAirdrop(airdropId, { ...requestInit, signal }),
     retry: 1,
     select: getAirdropByIdTransformer,
   });
 }
 
 export function useCreateAirdrop() {
-  const sdk = useSolace();
+  const { requestInit } = useSolaceAuth();
 
-  return useMutation<CreateAirdrop201, SolaceError, CreateAirdropBody>({
+  return useMutation({
     mutationKey: ["createAirdrop"],
-    mutationFn: async (data) => {
-      const response = await withMinimumTime(sdk.api.createAirdrop(data), 500);
-      if (response.status !== 201) {
-        throw new SolaceError(response.data);
-      }
-      return response.data;
-    },
+    mutationFn: (data: Parameters<typeof createAirdrop>[0]) =>
+      withMinimumTime(createAirdrop(data, requestInit), 500),
   });
 }
 
 export function useCreateTokenAirdrop() {
-  const sdk = useSolace();
+  const { requestInit } = useSolaceAuth();
 
-  return useMutation<
-    CreateTokenAirdrop201,
-    SolaceError,
-    CreateTokenAirdropBody
-  >({
+  return useMutation({
     mutationKey: ["createTokenAirdrop"],
-    mutationFn: async (data) => {
-      const response = await withMinimumTime(
-        sdk.api.createTokenAirdrop(data),
-        500,
-      );
-      if (response.status !== 201) {
-        throw new SolaceError(response.data);
-      }
-      return response.data;
-    },
+    mutationFn: (data: Parameters<typeof createTokenAirdrop>[0]) =>
+      withMinimumTime(createTokenAirdrop(data, requestInit), 500),
   });
 }
 
 export function useStartAirdrop(airdropId: string) {
-  const sdk = useSolace();
+  const { requestInit } = useSolaceAuth();
 
-  return useMutation<StartAirdrop200, SolaceError, StartAirdropBodyItem[]>({
+  return useMutation({
     mutationKey: ["startAirdrop"],
-    mutationFn: async (data) => {
-      const response = await sdk.api.startAirdrop(airdropId, data);
-
-      if (response.status !== 200) {
-        throw new SolaceError(response.data);
-      }
-      return response.data;
-    },
+    mutationFn: (data: Parameters<typeof startAirdrop>[1]) =>
+      startAirdrop(airdropId, data, requestInit),
   });
 }
 
 export function useRetryTransaction(airdropId: string, batchId: string) {
-  const sdk = useSolace();
+  const { requestInit } = useSolaceAuth();
 
   return useMutation({
     mutationKey: ["retry", airdropId, batchId],
-    mutationFn: async (data: RetryAirdropTransactionBody) => {
-      const response = await sdk.api.retryAirdropTransaction(
-        airdropId,
-        batchId,
-        data,
-      );
-
-      if (response.status !== 200) {
-        throw new SolaceError(response.data);
-      }
-
-      return response.data;
-    },
+    mutationFn: (data: RetryAirdropTransactionBody) =>
+      retryAirdropTransaction(airdropId, batchId, data, requestInit),
   });
 }
+
 export function useRetryMany(airdropId: string) {
-  const sdk = useSolace();
+  const { requestInit } = useSolaceAuth();
 
   return useMutation({
     mutationKey: ["retry-many", airdropId],
@@ -181,22 +146,16 @@ export function useRetryMany(airdropId: string) {
     ) => {
       const responses = await Promise.allSettled(
         data.map((batchData) =>
-          sdk.api.retryAirdropTransaction(
+          retryAirdropTransaction(
             airdropId,
             batchData.batchId.toString(),
             batchData.data,
+            requestInit,
           ),
         ),
       );
 
-      if (
-        responses.some((response) => {
-          return (
-            response.status === "rejected" ||
-            (response.status === "fulfilled" && response.value.status !== 200)
-          );
-        })
-      ) {
+      if (responses.some((response) => response.status === "rejected")) {
         throw new Error("Some retry requests were rejected.");
       }
 
@@ -213,20 +172,12 @@ export function useRetryMany(airdropId: string) {
 }
 
 export function useDeleteAirdrop() {
-  const sdk = useSolace();
+  const { requestInit } = useSolaceAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationKey: ["delete"],
-    mutationFn: async ({ id }: { id: string }) => {
-      const response = await sdk.api.deleteAirdrop(id);
-
-      if (response.status !== 204) {
-        throw new SolaceError(response.data);
-      }
-
-      return response.data;
-    },
+    mutationFn: ({ id }: { id: string }) => deleteAirdrop(id, requestInit),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ["airdrops"],
@@ -235,34 +186,22 @@ export function useDeleteAirdrop() {
       });
     },
     onError: (error) => {
-      const [title, message] =
-        error instanceof SolaceError
-          ? [error.error, error.message]
-          : [undefined, error.message];
+      const [title, message] = describeError(error);
       notify({ type: "error", title, description: message });
     },
   });
 }
 
 export function useSetLabel(airdropId: string) {
-  const sdk = useSolace();
+  const { requestInit } = useSolaceAuth();
   const queryClient = useQueryClient();
-  const { publicKey } = useWallet();
-  const queryKey = ["airdrops", "all", publicKey?.toString()];
+  const { account } = useConnector();
+  const queryKey = airdropsQueryKey(account);
 
   return useMutation({
     mutationKey: ["set-label"],
-    mutationFn: async (label: string) => {
-      const response = await sdk.api.setAirdropLabel(airdropId, {
-        label,
-      });
-
-      if (response.status !== 200) {
-        throw new SolaceError(response.data);
-      }
-
-      return response.data;
-    },
+    mutationFn: (label: string) =>
+      setAirdropLabel(airdropId, { label }, requestInit),
     onMutate: async (data) => {
       await queryClient.cancelQueries({ queryKey: ["airdrops"] });
       const previousAirdrops =
@@ -277,10 +216,7 @@ export function useSetLabel(airdropId: string) {
     },
     onError: (error, _label, context) => {
       queryClient.setQueryData(queryKey, context?.previousAirdrops);
-      const [title, message] =
-        error instanceof SolaceError
-          ? [error.error, error.message]
-          : [undefined, error.message];
+      const [title, message] = describeError(error);
       notify({ type: "error", title, description: message });
     },
     onSettled: () => {

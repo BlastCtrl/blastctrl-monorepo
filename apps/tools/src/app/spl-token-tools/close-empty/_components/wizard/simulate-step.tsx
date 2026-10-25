@@ -1,24 +1,20 @@
+import { simulateUnsigned } from "@/connector/simulate";
+import { useKitClient } from "@/connector/use-kit-client";
 import type { ParsedTokenAccount } from "@/state/queries/use-owner-assets";
-import { useWalletConnection } from "@/state/use-wallet-connection";
 import { Button } from "@blastctrl/ui/button";
 import { Dialog } from "@headlessui/react";
-import { createCloseAccountInstruction } from "@solana/spl-token";
-import { useConnection } from "@solana/wallet-adapter-react";
-import {
-  PublicKey,
-  TransactionMessage,
-  VersionedTransaction,
-} from "@solana/web3.js";
 import { useState } from "react";
-import { useCloseAccountsStore } from "./wizard-context";
+import {
+  ACCOUNTS_PER_TRANSACTION,
+  closeAccountInstruction,
+  useCloseAccountsStore,
+} from "./wizard-context";
 
 const btnSecondary =
   "rounded-sm bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-xs ring-1 ring-inset ring-gray-300 hover:bg-gray-50";
 
-const toPubkey = (address: string) => new PublicKey(address);
-
 export const SimulateStep = () => {
-  const { connection } = useConnection();
+  const { client } = useKitClient();
   const accountsToClose = useCloseAccountsStore(
     (store) => store.initialAccounts,
   );
@@ -27,49 +23,28 @@ export const SimulateStep = () => {
   const [hasSimulated, setHasSimulated] = useState(false);
   const [result, setResult] = useState<ParsedTokenAccount[]>([]);
 
-  const { wallet } = useWalletConnection();
-
+  /** Simulates closing each account on its own, keeping the ones that succeed. */
   const simulateCloseTransactions = async (accounts: ParsedTokenAccount[]) => {
-    if (!wallet) return;
-    // Create transactions to close accounts
-    const { value, context } = await connection.getLatestBlockhashAndContext();
+    if (!client) return;
 
-    const transactions = accounts.map((acc) => {
-      const messageV0 = new TransactionMessage({
-        payerKey: wallet,
-        recentBlockhash: value.blockhash,
-        instructions: [
-          createCloseAccountInstruction(
-            toPubkey(acc.token_account),
-            wallet,
-            wallet,
-            [],
-            toPubkey(acc.token_program),
-          ),
-        ],
-      }).compileToV0Message();
-      return new VersionedTransaction(messageV0);
-    });
-
-    const simulationResults = await Promise.allSettled(
-      transactions.map((vt) =>
-        connection.simulateTransaction(vt, {
-          minContextSlot: context.slot,
-          commitment: "confirmed",
-        }),
+    const simulations = await Promise.allSettled(
+      accounts.map((acc) =>
+        simulateUnsigned(client, [closeAccountInstruction(acc, client.payer)]),
       ),
     );
 
     const good: ParsedTokenAccount[] = [];
-    for (let i = 0; i < simulationResults.length; i++) {
-      const result = simulationResults[i];
-      if (!result) continue;
-
-      console.log(simulationResults[i]);
-      if (result.status === "rejected") continue;
-      if (result.value.value.err) continue;
+    simulations.forEach((simulation, i) => {
+      if (simulation.status === "rejected") {
+        console.log(simulation.reason);
+        return;
+      }
+      if (simulation.value.err) {
+        console.log(simulation.value.err, simulation.value.logs);
+        return;
+      }
       good.push(accounts[i]!);
-    }
+    });
 
     setResult(good);
     setHasSimulated(true);
@@ -88,7 +63,10 @@ export const SimulateStep = () => {
           <button className={btnSecondary} onClick={closeDialog}>
             Cancel
           </button>
-          <Button onClick={() => simulateCloseTransactions(accountsToClose)}>
+          <Button
+            disabled={!client}
+            onClick={() => simulateCloseTransactions(accountsToClose)}
+          >
             Simulate
           </Button>
         </div>
@@ -114,10 +92,9 @@ export const SimulateStep = () => {
     );
   }
 
-  // Not all succeeded
-  const ACCOUNTS_PER_TRANSACTION = 4;
   const transactionCount = Math.ceil(result.length / ACCOUNTS_PER_TRANSACTION);
 
+  // Not all succeeded
   if (result.length > 0 && result.length < accountsToClose.length) {
     const failed = accountsToClose.length - result.length;
     return (

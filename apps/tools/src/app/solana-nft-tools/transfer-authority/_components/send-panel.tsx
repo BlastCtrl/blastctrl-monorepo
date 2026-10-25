@@ -1,16 +1,16 @@
 import { notify } from "@/components";
 import {
   WalletRefusedError,
-  errorMessage,
+  kitBatchSender,
   sendBatches,
-} from "@/lib/solana/send-batches";
+} from "@/connector/send-batches";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
 import useQueryContext from "@/state/use-query-context";
 import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
 import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/20/solid";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useState } from "react";
 import type { Batch } from "./transactions";
-import { buildTransaction } from "./transactions";
 
 type Status = "queued" | "signing" | "confirming" | "confirmed" | "failed";
 
@@ -39,8 +39,7 @@ export function SendPanel({
   onSettled,
   onBusyChange,
 }: Props) {
-  const { connection } = useConnection();
-  const wallet = useWallet();
+  const { client } = useKitClient();
   const { fmtUrlWithCluster } = useQueryContext();
   const [progress, setProgress] = useState<Progress[]>([]);
   const [busy, setBusy] = useState(false);
@@ -56,9 +55,7 @@ export function SendPanel({
     );
 
   const send = async () => {
-    const { publicKey } = wallet;
-    if (!publicKey) return;
-    if (batches.length === 0) return;
+    if (!client || batches.length === 0) return;
 
     setProgress(
       batches.map((b) => ({ nfts: b.mints.length, status: "queued" })),
@@ -68,10 +65,8 @@ export function SendPanel({
       await sendBatches(
         batches,
         {
-          connection,
-          wallet,
-          build: (batch, lifetime) =>
-            buildTransaction(batch, publicKey, lifetime),
+          sender: kitBatchSender(client),
+          build: (batch) => batch.instructions,
         },
         {
           onStage: (index, stage) => patch(index, { status: stage }),
@@ -102,7 +97,7 @@ export function SendPanel({
         notify({
           type: "error",
           title: refused ? "Cancelled in your wallet" : "Nothing was sent",
-          description: refused ? undefined : errorMessage(err),
+          description: refused ? undefined : transactionErrorMessage(err),
         });
       }
     } finally {
@@ -124,13 +119,10 @@ export function SendPanel({
           {ready === 0
             ? "Nothing left to send."
             : `${ready} ${ready === 1 ? "NFT" : "NFTs"} in ${transactions} ${transactions === 1 ? "transaction" : "transactions"}.`}
-          {!wallet.signAllTransactions &&
-            transactions > 1 &&
-            " Your wallet will ask you to approve each one."}
         </p>
         <Button
           color="indigo"
-          disabled={disabled || busy || ready === 0 || !wallet.publicKey}
+          disabled={disabled || busy || ready === 0 || !client}
           onClick={send}
         >
           {busy && <SpinnerIcon className="mr-2 -ml-1 size-5 animate-spin" />}

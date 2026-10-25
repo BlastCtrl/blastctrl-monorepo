@@ -1,25 +1,22 @@
+import { compress } from "@/lib/solana";
+import { lamportsToSolString } from "@/lib/solana/common";
+import { useCurrentEpoch } from "@/state/queries/use-epoch";
 import { useUserStakeAccounts } from "@/state/queries/use-user-stake-accounts";
 import type { StakeAccountType } from "@/state/queries/use-user-stake-accounts";
-import { Box } from "./box";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { Button, SpinnerIcon } from "@blastctrl/ui";
-import { compress } from "@/lib/solana";
-import { lamportsToSol, lamportsToSolString } from "@/lib/solana/common";
-import { useState } from "react";
 import { useValidatorData } from "@/state/queries/use-validator-data";
+import { Button, SpinnerIcon } from "@blastctrl/ui";
 import { ArrowTopRightOnSquareIcon } from "@heroicons/react/16/solid";
 import { ChevronRightIcon } from "@heroicons/react/20/solid";
-import { currentEpochQuery } from "@/state/queries/use-epoch";
-import { useQuery } from "@tanstack/react-query";
+import type { Address } from "@solana/kit";
+import { useState } from "react";
+import { Box } from "./box";
 import { useMergeStakesMutation } from "./merge-mutation";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { lamportsToSol } from "@solana/kit";
+import { decimalFixedPointToString } from "@solana/fixed-points";
 
-export function StakeMergeForm() {
-  const { connection } = useConnection();
-  const { publicKey } = useWallet();
-  const { setVisible } = useWalletModal();
-  const epochQuery = useQuery(currentEpochQuery(connection));
-  const stakeAccountsQuery = useUserStakeAccounts(publicKey ?? undefined);
+export function StakeMergeForm({ owner }: { owner: Address }) {
+  const epochQuery = useCurrentEpoch();
+  const stakeAccountsQuery = useUserStakeAccounts(owner);
   const { mutate, isPending } = useMergeStakesMutation();
 
   const [selectedPrimary, setSelectedPrimary] =
@@ -32,8 +29,9 @@ export function StakeMergeForm() {
     setSelectedSecondary(null);
   };
 
-  const handleSecondarySelection = (account: StakeAccountType) => {
-    setSelectedSecondary(account);
+  const reset = () => {
+    setSelectedPrimary(null);
+    setSelectedSecondary(null);
   };
 
   if (!!epochQuery.error || !!stakeAccountsQuery.error) {
@@ -60,8 +58,35 @@ export function StakeMergeForm() {
 
   const data = stakeAccountsQuery.data;
   const stakeAccounts = selectedPrimary
-    ? getMergableStakeAccounts(data, selectedPrimary, epochQuery.data.epoch)
-    : data;
+    ? getMergeableStakeAccounts(data, selectedPrimary, epochQuery.data.epoch)
+    : [...data].sort((a, b) => Number(b.lamports - a.lamports));
+
+  const accountRow = (
+    stake: StakeAccountType,
+    onSelect: (stake: StakeAccountType) => void,
+  ) => (
+    <button
+      key={stake.address}
+      className="grid w-full grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-y-1 rounded-md bg-gray-50 p-4 ring-2 ring-black/10 hover:ring-2 hover:ring-indigo-600"
+      onClick={() => onSelect(stake)}
+    >
+      <span className="justify-self-start">{compress(stake.address, 4)}</span>
+      <span className="justify-self-end text-right">
+        {decimalFixedPointToString(lamportsToSol(stake.lamports))} SOL
+      </span>
+      <div className="justify-self-start">
+        <ValidatorInfo account={stake} />
+      </div>
+      <div className="flex flex-wrap items-start justify-end gap-1 justify-self-end">
+        {stake.meta.authorized.withdrawer === owner && (
+          <AuthorityBadge>Withdrawer</AuthorityBadge>
+        )}
+        {stake.meta.authorized.staker === owner && (
+          <AuthorityBadge>Staker</AuthorityBadge>
+        )}
+      </div>
+    </button>
+  );
 
   return (
     <Box className="scroller mt-4 max-h-[500px]">
@@ -75,39 +100,9 @@ export function StakeMergeForm() {
             {stakeAccounts.length === 0 && (
               <div className="text-zinc-500">No stake accounts were found</div>
             )}
-            {stakeAccounts
-              .sort((a, b) => b.lamports - a.lamports)
-              .map((stake) => (
-                <button
-                  key={stake.accountId.toString()}
-                  className="grid w-full grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-y-1 rounded-md bg-gray-50 p-4 ring-2 ring-black/10 hover:ring-2 hover:ring-indigo-600"
-                  onClick={() => handlePrimarySelection(stake)}
-                >
-                  <span className="justify-self-start">
-                    {compress(stake.accountId.toString(), 4)}
-                  </span>
-                  <span className="justify-self-end text-right">
-                    {lamportsToSol(stake.lamports)} SOL
-                  </span>
-                  <div className="justify-self-start">
-                    <ValidatorInfo account={stake} />
-                  </div>
-                  <div className="flex flex-wrap items-start justify-end gap-1 justify-self-end">
-                    {stake.data.info.meta.authorized.withdrawer ===
-                      publicKey?.toString() && (
-                      <span className="rounded-sm border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold text-gray-700 uppercase">
-                        Withdrawer
-                      </span>
-                    )}
-                    {stake.data.info.meta.authorized.staker ===
-                      publicKey?.toString() && (
-                      <span className="rounded-sm border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold text-gray-700 uppercase">
-                        Staker
-                      </span>
-                    )}
-                  </div>
-                </button>
-              ))}
+            {stakeAccounts.map((stake) =>
+              accountRow(stake, handlePrimarySelection),
+            )}
           </div>
         </div>
       ) : !selectedSecondary ? (
@@ -122,44 +117,16 @@ export function StakeMergeForm() {
                 No mergeable stake accounts were found
                 <Button
                   type="button"
-                  onClick={() => void setSelectedPrimary(null)}
+                  onClick={reset}
                   className="ml-2 inline-block"
                 >
                   Reset
                 </Button>
               </div>
             )}
-            {stakeAccounts.map((stake) => (
-              <button
-                key={stake.accountId.toString()}
-                className="grid w-full grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-y-1 rounded-md bg-gray-50 p-4 ring-2 ring-black/10 hover:ring-2 hover:ring-indigo-600"
-                onClick={() => handleSecondarySelection(stake)}
-              >
-                <span className="justify-self-start">
-                  {compress(stake.accountId.toString(), 4)}
-                </span>
-                <span className="justify-self-end text-right">
-                  {lamportsToSol(stake.lamports)} SOL
-                </span>
-                <div className="justify-self-start">
-                  <ValidatorInfo account={stake} />
-                </div>
-                <div className="flex flex-wrap items-start justify-end gap-1 justify-self-end">
-                  {stake.data.info.meta.authorized.withdrawer ===
-                    publicKey?.toString() && (
-                    <span className="rounded-sm border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold text-gray-700 uppercase">
-                      Withdrawer
-                    </span>
-                  )}
-                  {stake.data.info.meta.authorized.staker ===
-                    publicKey?.toString() && (
-                    <span className="rounded-sm border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold text-gray-700 uppercase">
-                      Staker
-                    </span>
-                  )}
-                </div>
-              </button>
-            ))}
+            {stakeAccounts.map((stake) =>
+              accountRow(stake, setSelectedSecondary),
+            )}
           </div>
         </div>
       ) : (
@@ -168,7 +135,7 @@ export function StakeMergeForm() {
             <div>
               <p className="text-sm font-medium">Secondary</p>
               <p className="text-xs">
-                {compress(selectedSecondary.accountId.toString(), 4)}
+                {compress(selectedSecondary.address, 4)}
               </p>
               <p className="text-sm font-bold">
                 {lamportsToSolString(selectedSecondary.lamports)} SOL
@@ -178,9 +145,7 @@ export function StakeMergeForm() {
             <ChevronRightIcon className="size-7 shrink-0 text-indigo-600" />
             <div>
               <p className="text-sm font-medium">Primary</p>
-              <p className="text-xs">
-                {compress(selectedPrimary.accountId.toString(), 4)}
-              </p>
+              <p className="text-xs">{compress(selectedPrimary.address, 4)}</p>
               <p className="text-sm font-bold">
                 {lamportsToSolString(selectedPrimary.lamports)} SOL
               </p>
@@ -197,70 +162,63 @@ export function StakeMergeForm() {
             </p>
           </div>
 
-          {!publicKey ? (
-            <div className="flex justify-end">
-              <Button
-                onClick={() => void setVisible(true)}
-                type="button"
-                color="indigo"
-              >
-                Connect your wallet
-              </Button>
-            </div>
-          ) : (
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                onClick={() => {
-                  setSelectedPrimary(null);
-                  setSelectedSecondary(null);
-                }}
-                color="dark/zinc"
-                className="flex-1"
-              >
-                Reset
-              </Button>
-              <Button
-                onClick={() => {
-                  mutate(
-                    {
-                      sourceStakePubKey: selectedSecondary.accountId,
-                      stakePubkey: selectedPrimary.accountId,
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              onClick={reset}
+              color="dark/zinc"
+              className="flex-1"
+            >
+              Reset
+            </Button>
+            <Button
+              onClick={() => {
+                mutate(
+                  {
+                    sourceStake: selectedSecondary.address,
+                    destinationStake: selectedPrimary.address,
+                  },
+                  {
+                    onSuccess: () => {
+                      reset();
+                      setTimeout(() => {
+                        void stakeAccountsQuery.refetch();
+                      }, 200);
                     },
-                    {
-                      onSuccess: () => {
-                        setSelectedPrimary(null);
-                        setSelectedSecondary(null);
-                        setTimeout(() => {
-                          void stakeAccountsQuery.refetch();
-                        }, 200);
-                      },
-                    },
-                  );
-                }}
-                type="button"
-                color="indigo"
-                className={`flex-1 ${isPending ? "pointer-events-none" : ""}`}
-              >
-                {isPending && (
-                  <SpinnerIcon className="mr-1 -ml-1 inline size-[1em] animate-spin" />
-                )}
-                Submit
-              </Button>
-            </div>
-          )}
+                  },
+                );
+              }}
+              type="button"
+              color="indigo"
+              className="flex-1"
+              disabled={isPending}
+            >
+              {isPending && (
+                <SpinnerIcon className="mr-1 -ml-1 inline size-[1em] animate-spin" />
+              )}
+              Submit
+            </Button>
+          </div>
         </div>
       )}
     </Box>
   );
 }
 
+function AuthorityBadge({ children }: { children: string }) {
+  return (
+    <span className="rounded-sm border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold text-gray-700 uppercase">
+      {children}
+    </span>
+  );
+}
+
 function ValidatorInfo({ account }: { account: StakeAccountType }) {
   const { data, error, isPending } = useValidatorData(
-    account.data.info.stake?.delegation.voter,
+    account.stake?.delegation.voterPubkey,
   );
 
-  if (account.data.info.stake === null) {
+  if (account.stake === null) {
     return (
       <div className="text-left text-sm">
         This stake account isn&apos;t delegated
@@ -309,71 +267,59 @@ function ValidatorInfo({ account }: { account: StakeAccountType }) {
   );
 }
 
-function getMergableStakeAccounts(
+/**
+ * Accounts that the stake program would accept as a merge source for
+ * `primary`. Mirrors the program's checks: same authorities, compatible
+ * lockups, same vote account when both are delegated, and an inactive account
+ * may only merge with another inactive one or one still in its activation
+ * epoch.
+ */
+function getMergeableStakeAccounts(
   accounts: StakeAccountType[],
   primary: StakeAccountType,
   currentEpoch: number,
 ): StakeAccountType[] {
+  const epoch = BigInt(currentEpoch);
   return accounts.filter((acc) => {
-    if (acc.accountId === primary.accountId) {
-      return false;
-    }
+    if (acc.address === primary.address) return false;
 
-    // First constraints - authorized field must match
     if (
-      primary.data.info.meta.authorized.staker !==
-        acc.data.info.meta.authorized.staker ||
-      primary.data.info.meta.authorized.withdrawer !==
-        acc.data.info.meta.authorized.withdrawer
+      primary.meta.authorized.staker !== acc.meta.authorized.staker ||
+      primary.meta.authorized.withdrawer !== acc.meta.authorized.withdrawer
     ) {
       return false;
     }
 
-    // Second constraint - if the lockup fields differ, stakes can only merge if neither lockup is in-force
-    const canMergeLockups =
-      (primary.data.info.meta.lockup.custodian ===
-        acc.data.info.meta.lockup.custodian &&
-        primary.data.info.meta.lockup.epoch ===
-          acc.data.info.meta.lockup.epoch &&
-        primary.data.info.meta.lockup.unixTimestamp ===
-          acc.data.info.meta.lockup.unixTimestamp) ||
-      (!isLockupInForce(primary.data.info.meta.lockup, currentEpoch) &&
-        !isLockupInForce(primary.data.info.meta.lockup, currentEpoch));
+    const sameLockup =
+      primary.meta.lockup.custodian === acc.meta.lockup.custodian &&
+      primary.meta.lockup.epoch === acc.meta.lockup.epoch &&
+      primary.meta.lockup.unixTimestamp === acc.meta.lockup.unixTimestamp;
+    const neitherLockupInForce =
+      !isLockupInForce(primary.meta.lockup, epoch) &&
+      !isLockupInForce(acc.meta.lockup, epoch);
+    if (!sameLockup && !neitherLockupInForce) return false;
 
-    if (!canMergeLockups) {
+    if (
+      primary.stake &&
+      acc.stake &&
+      primary.stake.delegation.voterPubkey !== acc.stake.delegation.voterPubkey
+    ) {
       return false;
     }
 
-    // Third constraint - if the accounts are delegated, the vote pubkey must match
     if (
-      primary.data.info.stake?.delegation &&
-      acc.data.info.stake?.delegation
+      primary.stake === null &&
+      acc.stake !== null &&
+      acc.stake.delegation.activationEpoch !== epoch
     ) {
-      if (
-        primary.data.info.stake.delegation.voter !==
-        primary.data.info.stake.delegation.voter
-      ) {
-        return false;
-      }
+      return false;
     }
-
-    // Fourth constraint - if one of the accounts is inactive, the other account must also be inactive, or it must be in its activation period
-    if (primary.data.info.stake === null) {
-      if (
-        acc.data.info?.stake !== null &&
-        acc.data.info.stake.delegation.activationEpoch !== String(currentEpoch)
-      ) {
-        return false;
-      }
-    }
-    if (acc.data.info.stake === null) {
-      if (
-        primary.data.info?.stake !== null &&
-        primary.data.info.stake.delegation.activationEpoch !==
-          String(currentEpoch)
-      ) {
-        return false;
-      }
+    if (
+      acc.stake === null &&
+      primary.stake !== null &&
+      primary.stake.delegation.activationEpoch !== epoch
+    ) {
+      return false;
     }
 
     return true;
@@ -381,9 +327,9 @@ function getMergableStakeAccounts(
 }
 
 function isLockupInForce(
-  lockup: StakeAccountType["data"]["info"]["meta"]["lockup"],
-  currentEpoch: number,
+  lockup: StakeAccountType["meta"]["lockup"],
+  currentEpoch: bigint,
 ): boolean {
-  const currentTimestamp = Math.floor(Date.now() / 1000);
-  return lockup.unixTimestamp > currentTimestamp || lockup.epoch > currentEpoch;
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  return lockup.unixTimestamp > now || lockup.epoch > currentEpoch;
 }

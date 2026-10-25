@@ -1,10 +1,13 @@
 import { notify } from "@/components/notification";
+import { useAppRpc } from "@/connector/app-rpc";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { WalletRefusedError } from "@/connector/send-batches";
 import { chunk } from "@/lib/utils";
 import { useReclaimableAccounts } from "@/state/queries/use-reclaimable-accounts";
+import { solBalanceKey } from "@/state/queries/use-sol-balance";
 import { Button, Switch, cn } from "@blastctrl/ui";
 import { Description, Field, Label } from "@headlessui/react";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useConnector } from "@solana/connector/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
@@ -38,8 +41,8 @@ import type {
 } from "./results/types";
 import type { ReclaimableAccount } from "./types";
 import { closes, excessLamports, feeBase, reclaimLamports } from "./types";
-import { WalletRefusedError, useReclaimExcess } from "./use-reclaim-excess";
-import { useRentRate } from "./use-rent-rate";
+import { useReclaimExcess } from "./use-reclaim-excess";
+import { useRentRate } from "@/state/queries/use-rent";
 
 /**
  * A scan always takes at least this long, so the stage has unrolled and
@@ -65,9 +68,40 @@ type Snapshot = Pick<
 const wait = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
 /**
+ * What a scan ticks: everything with excess, and the empty accounts, so
+ * turning closing on finds them ticked.
+ */
+const tickedAfterScan = (a: ReclaimableAccount) =>
+  excessLamports(a) > 0 || closes(a, true);
+
+/**
+ * What the results block shows for a selection: what it returns before
+ * fees, the transactions it takes, the service fee and what's left.
+ */
+function reclaimTotals(
+  selected: ReclaimableAccount[],
+  closeEmpty: boolean,
+) {
+  const lamports = selected.reduce(
+    (sum, a) => sum + reclaimLamports(a, closeEmpty),
+    0,
+  );
+  const transactions = Math.ceil(selected.length / ACCOUNTS_PER_TRANSACTION);
+  const serviceFee = serviceFeeLamports(feeBase(selected));
+  const networkFee = transactions * FEE_PER_TRANSACTION;
+  return {
+    lamports,
+    transactions,
+    serviceFee,
+    networkFee,
+    net: lamports - serviceFee - networkFee,
+  };
+}
+
+/**
  * The whole tool: the intro, the stage with the results block, and the
- * drawer below it. It talks to the chain only through the wallet adapter's
- * connection and wallet, which the demo page swaps for mock ones.
+ * drawer below it. It talks to the chain only through the connector's RPC
+ * and wallet.
  */
 export function ReclaimRent({
   forceReducedMotion = false,
@@ -75,15 +109,14 @@ export function ReclaimRent({
   /** Skip every animation even when the system allows them (the demo). */
   forceReducedMotion?: boolean;
 }) {
-  const { connection } = useConnection();
-  const { connected, publicKey } = useWallet();
-  const { setVisible } = useWalletModal();
+  const { account } = useConnector();
+  const { setOpen } = useConnectorDialog();
+  const { network } = useAppRpc();
   const queryClient = useQueryClient();
   const { lamportsPerByte } = useRentRate();
   const stepsLeft = remainingSteps(lamportsPerByte);
-  const { data, error, refetch } = useReclaimableAccounts(
-    publicKey?.toBase58() ?? "",
-  );
+  const owner = account ?? "";
+  const { data, error, refetch } = useReclaimableAccounts(owner);
   const reduced = !!useReducedMotion() || forceReducedMotion;
 
   const [phase, setPhase] = useState<Phase>("idle");
@@ -123,8 +156,7 @@ export function ReclaimRent({
   // Selection and results belong to one wallet on one network. Start over
   // when either changes: a wallet's token accounts have the same addresses
   // on every cluster, so a reclaimed set from mainnet must not leak to devnet.
-  const owner = publicKey?.toBase58() ?? "";
-  const scope = `${owner} ${connection.rpcEndpoint}`;
+  const scope = `${owner} ${network}`;
   const [stateScope, setStateScope] = useState(scope);
   // For a scan to check, after its wait, that it still has the same scope.
   const latestScope = useRef(scope);
@@ -175,11 +207,12 @@ export function ReclaimRent({
   const open = all.filter(isOpen);
   const selected = open.filter((a) => selectedIds.has(a.id));
   const reclaimed = all.filter((a) => reclaimedIds.has(a.id));
-  const selectedLamports = selected.reduce((sum, a) => sum + worth(a), 0);
-  const transactions = Math.ceil(selected.length / ACCOUNTS_PER_TRANSACTION);
-  const serviceFee = serviceFeeLamports(feeBase(selected));
-  const networkFee = transactions * FEE_PER_TRANSACTION;
-  const net = selectedLamports - serviceFee - networkFee;
+  const {
+    lamports: selectedLamports,
+    transactions,
+    serviceFee,
+    net,
+  } = reclaimTotals(selected, closeEmpty);
   // Whatever the switch says, so its description can say what it would do.
   const emptyCount = scanned.filter(
     (a) => !reclaimedIds.has(a.id) && closes(a, true),
@@ -253,9 +286,7 @@ export function ReclaimRent({
 
   const afterReclaim = () => {
     void refetch();
-    void queryClient.invalidateQueries({
-      queryKey: ["sol-balance", publicKey?.toString()],
-    });
+    void queryClient.invalidateQueries({ queryKey: solBalanceKey(account) });
   };
 
   const markBatch = (index: number, status: BatchStatus) =>
@@ -308,8 +339,8 @@ export function ReclaimRent({
   };
 
   const scan = async () => {
-    if (!connected) {
-      setVisible(true);
+    if (!account) {
+      setOpen(true);
       return;
     }
     const startedIn = scope;
@@ -334,13 +365,7 @@ export function ReclaimRent({
       return;
     }
     // Empty accounts too, so turning closing on finds them ticked.
-    setSelectedIds(
-      new Set(
-        data
-          .filter((a) => excessLamports(a) > 0 || closes(a, true))
-          .map((a) => a.id),
-      ),
-    );
+    setSelectedIds(new Set(data.filter(tickedAfterScan).map((a) => a.id)));
     setRun((r) => r + 1);
     setPhase("shown");
   };
@@ -476,7 +501,7 @@ export function ReclaimRent({
               inert={phase !== "idle"}
             >
               <Button color="indigo" onClick={() => void scan()}>
-                {connected ? "Check my accounts" : "Connect your wallet"}
+                {account ? "Check my accounts" : "Connect your wallet"}
               </Button>
               {error && phase === "idle" && (
                 <p role="alert" className="mt-3 text-sm text-red-700">

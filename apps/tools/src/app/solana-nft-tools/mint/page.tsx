@@ -1,38 +1,26 @@
 "use client";
 
-import { InputGroup } from "@/components";
-import { isPublicKey } from "@/lib/solana/common";
+import { InputGroup, InputMultiline, notify } from "@/components";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
+import { useArweaveUploader } from "@/lib/hooks/use-arweave-uploader";
+import { uploadNftMetadata } from "@/lib/solana/metaplex-json-metadata";
+import { maxBytes } from "@/lib/solana/metaplex-form-rules";
+import { createNftInstructions } from "@/lib/solana/metaplex-token-metadata";
+import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
+import { Switch } from "@headlessui/react";
 import {
   PlusCircleIcon,
   QuestionMarkCircleIcon,
   XMarkIcon,
 } from "@heroicons/react/20/solid";
-import { useWallet } from "@solana/wallet-adapter-react";
-import Link from "next/link";
-import { Controller, useFieldArray, useForm } from "react-hook-form";
-import { InputMultiline, notify } from "@/components";
-import { TurboStorage } from "@/lib/turbo";
-import { mimeTypeToCategory } from "@/lib/utils";
-import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
-import { Switch } from "@headlessui/react";
-import { WalletError } from "@solana/wallet-adapter-base";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { address, generateKeyPairSigner, isAddress } from "@solana/kit";
 import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { Attributes } from "./_components/attributes";
 import { MediaFiles } from "./_components/media-files";
-import useUmi from "@/lib/hooks/use-umi";
-import { createNft } from "@metaplex-foundation/mpl-token-metadata";
-import {
-  generateSigner,
-  percentAmount,
-  publicKey,
-} from "@metaplex-foundation/umi";
-import {
-  setComputeUnitLimit,
-  setComputeUnitPrice,
-} from "@metaplex-foundation/mpl-toolbox";
-import * as base58 from "bs58";
-import { useEffect, useState } from "react";
 
 const MAX_CREATORS = 5;
 
@@ -57,17 +45,28 @@ export type CreateFormInputs = {
   }[];
   sellerFeePercentage: number;
   isCollection: boolean;
-  collectionIsSized: boolean;
   maxSupply: number;
 };
 
+/**
+ * The form reads its defaults from the query string, which Next only lets a
+ * client component do under a Suspense boundary when the page is prerendered.
+ */
 export default function Mint() {
-  const wallet = useWallet();
-  const { setVisible } = useWalletModal();
+  return (
+    <Suspense fallback={null}>
+      <MintForm />
+    </Suspense>
+  );
+}
+
+function MintForm() {
+  const { client } = useKitClient();
+  const { setOpen } = useConnectorDialog();
+  const upload = useArweaveUploader();
   const params = useSearchParams();
   const [isConfirming, setIsConfirming] = useState(false);
   const [createJson, setCreateJson] = useState(true);
-  const umi = useUmi();
 
   const {
     register,
@@ -89,12 +88,9 @@ export default function Mint() {
       creators: [],
       sellerFeePercentage: 0,
       isCollection: false,
-      collectionIsSized: false,
       maxSupply: 0,
     },
   });
-  const watchedIsCollection = watch("isCollection");
-
   const { fields, append, remove } = useFieldArray({
     control,
     name: "creators",
@@ -107,157 +103,69 @@ export default function Mint() {
   const isCreatorAddable = fields.length < MAX_CREATORS;
 
   useEffect(() => {
-    const isCollection = params.get("isCollection");
-    const collectionIsSized = params.get("collectionIsSized");
-
-    if (isCollection) {
+    if (params.get("isCollection")) {
       setValue("isCollection", true);
       setFocus("isCollection");
       window.scrollBy(0, 200);
     }
-    if (collectionIsSized) {
-      setValue("collectionIsSized", true);
-    }
   }, [params, setValue, setFocus]);
 
   const submit = async (data: CreateFormInputs) => {
-    if (!wallet.publicKey) {
-      setVisible(true);
+    if (!client || !upload) {
+      setOpen(true);
       return;
     }
 
-    if (!wallet.signMessage) {
+    // The program rejects other totals; check before paying for uploads.
+    const shareTotal = data.creators.reduce((sum, { share }) => sum + share, 0);
+    if (data.creators.length > 0 && shareTotal !== 100) {
+      setFocus("creators.0.share");
       notify({
-        title: "Error",
-        description: "Selected wallet doesn't support signing messages",
+        type: "error",
+        description: "Creator total shares must equal 100.",
       });
-      return setVisible(true);
+      return;
     }
 
-    // Setup
     setIsConfirming(true);
-
-    const turbo = await TurboStorage.make(wallet);
-
-    // Check if we are uploading a json file
-    let jsonUrl: string;
-
     try {
-      if (createJson) {
-        notify({
-          title: "Uploading external metadata",
-          description:
-            "The metadata JSON file is being uploaded to Arweave via Turbo. This will require multiple wallet confirmations, including payment and signature verification.",
-        });
+      // The uploader's toasts report a failed upload; stop quietly after one.
+      const uri = createJson
+        ? await uploadNftMetadata(data, upload).catch(() => null)
+        : data.uri;
+      if (uri === null) return;
 
-        // Check if we're also uploading media files
-        const { image, animation_url } = data;
-        let imageUrl: string | undefined;
-        let animationUrl: string | undefined;
+      const wallet = client.payer.address;
+      const mint = await generateKeyPairSigner();
+      const { name, symbol, isMutable, isCollection } = data;
+      const sellerFeePercentage =
+        dirtyFields.sellerFeePercentage &&
+        Number.isFinite(data.sellerFeePercentage)
+          ? data.sellerFeePercentage
+          : 0;
 
-        try {
-          if (image)
-            imageUrl = `https://arweave.net/${(await turbo.uploadFile(image)).id}`;
-          if (animation_url)
-            animationUrl = `https://arweave.net/${(await turbo.uploadFile(animation_url)).id}`;
-        } catch (err) {
-          setIsConfirming(false);
-          return notify({
-            type: "error",
-            title: "File upload error",
-            description: (
-              <div className="break-normal">
-                <p>
-                  There has been an error while uploading with the message:{" "}
-                  <span className="font-medium break-all text-yellow-300">
-                    {err instanceof Error ? err.message : String(err)}
-                  </span>
-                  .
-                </p>
-                <p className="mt-2">
-                  You can recover any lost funds on the{" "}
-                  <Link
-                    href="/permanent-storage-tools/file-upload"
-                    className="font-medium text-blue-300"
-                  >
-                    /permanent-storage-tools
-                  </Link>{" "}
-                  page.
-                </p>
-              </div>
-            ),
-          });
-        }
-        const category = animation_url
-          ? mimeTypeToCategory(animation_url)
-          : image
-            ? mimeTypeToCategory(image)
-            : undefined;
-
-        const { name, symbol, description, attributes, external_url } = data;
-        const json = {
+      const result = await client.sendTransaction(
+        await createNftInstructions(client.payer, mint, {
           name,
           symbol,
-          description,
-          external_url,
-        };
+          uri,
+          isMutable,
+          isCollection,
+          maxSupply: data.maxSupply,
+          sellerFeeBasisPoints: Math.round(sellerFeePercentage * 100),
+          // Only the wallet can vouch for itself; everyone else stays unverified.
+          // An empty list must be left out: the program refuses `[]`.
+          creators:
+            data.creators.length > 0
+              ? data.creators.map((creator) => ({
+                  address: address(creator.address),
+                  share: creator.share,
+                  verified: creator.address === wallet,
+                }))
+              : undefined,
+        }),
+      );
 
-        const files: Array<{ type?: string; uri: string }> = [];
-        if (attributes) Object.assign(json, { attributes });
-        if (imageUrl) {
-          Object.assign(json, { image: imageUrl });
-          files.push({ uri: imageUrl, type: image?.type });
-        }
-
-        if (animationUrl) {
-          Object.assign(json, { animation_url: animationUrl });
-          files.push({ uri: animationUrl, type: animation_url?.type });
-        }
-        if (files.length > 0)
-          Object.assign(json, { properties: { category, files } });
-
-        const metadata = new File([JSON.stringify(json)], data.name, {
-          type: "application/json",
-        });
-
-        jsonUrl = `https://arweave.net/${(await turbo.uploadFile(metadata)).id}`;
-      } else {
-        jsonUrl = data.uri;
-      }
-
-      const { name, symbol, isMutable, isCollection, maxSupply } = data;
-
-      const { signature } = await createNft(umi, {
-        mint: generateSigner(umi),
-        uri: jsonUrl,
-        name,
-        symbol,
-        isMutable,
-        isCollection,
-        sellerFeeBasisPoints: percentAmount(
-          dirtyFields.sellerFeePercentage ? data.sellerFeePercentage : 0,
-        ),
-        printSupply:
-          maxSupply === 0
-            ? {
-                __kind: "Zero",
-              }
-            : {
-                __kind: "Limited",
-                fields: [maxSupply],
-              },
-        creators: dirtyFields.creators
-          ? data.creators.map(({ address, share }) => ({
-              address: publicKey(address),
-              share,
-              verified: false,
-            }))
-          : undefined,
-      })
-        .add(setComputeUnitLimit(umi, { units: 1_000_000 }))
-        .add(setComputeUnitPrice(umi, { microLamports: 1_000_000 }))
-        .sendAndConfirm(umi);
-      console.log(base58.encode(signature));
       notify({
         title: "NFT mint successful",
         description: (
@@ -267,18 +175,14 @@ export default function Mint() {
           </>
         ),
         type: "success",
-        txid: base58.encode(signature),
+        txid: result.context.signature,
       });
     } catch (err) {
-      if (err instanceof WalletError) {
-        // The onError callback in the walletconnect context will handle it
-        return;
-      }
       console.log({ err });
       notify({
         type: "error",
         title: "Error minting",
-        description: err instanceof Error ? err.message : String(err),
+        description: transactionErrorMessage(err),
       });
     } finally {
       setIsConfirming(false);
@@ -333,10 +237,7 @@ export default function Mint() {
                 label="Name"
                 type="text"
                 {...register("name", {
-                  maxLength: {
-                    value: 32,
-                    message: "Max name length is 32",
-                  },
+                  validate: maxBytes(32),
                   required: true,
                 })}
                 error={errors?.name}
@@ -347,12 +248,7 @@ export default function Mint() {
               <InputGroup
                 label="Symbol"
                 type="text"
-                {...register("symbol", {
-                  maxLength: {
-                    value: 10,
-                    message: "Max symbol length is 10",
-                  },
-                })}
+                {...register("symbol", { validate: maxBytes(10) })}
                 error={errors?.symbol}
               />
             </div>
@@ -380,10 +276,7 @@ export default function Mint() {
               description="Use an existing link to a metadata file"
               type="text"
               {...register("uri", {
-                maxLength: {
-                  value: 200,
-                  message: "Max URI length is 200",
-                },
+                validate: maxBytes(200),
                 shouldUnregister: createJson,
               })}
               error={errors?.uri}
@@ -410,7 +303,11 @@ export default function Mint() {
                   )}
                   aria-invalid={errors.maxSupply ? "true" : "false"}
                   {...register("maxSupply", {
-                    min: { value: 0, message: "Minimum is 0" },
+                    setValueAs: (value: string) =>
+                      value === "" ? 0 : Number(value),
+                    validate: (value) =>
+                      (Number.isInteger(value) && value >= 0) ||
+                      "Must be a whole number, 0 or more",
                   })}
                 />
               </div>
@@ -501,7 +398,12 @@ export default function Mint() {
                             {...register(`creators.${idx}.address` as const, {
                               required: true,
                               validate: {
-                                pubkey: isPublicKey,
+                                pubkey: isAddress,
+                                // The program refuses duplicate creators.
+                                unique: (value, form) =>
+                                  form.creators.filter(
+                                    (c) => c.address === value,
+                                  ).length === 1,
                               },
                             })}
                             defaultValue=""
@@ -525,6 +427,7 @@ export default function Mint() {
                               required: true,
                               min: 0,
                               max: 100,
+                              valueAsNumber: true,
                             })}
                             className={cn(
                               "relative block w-full rounded-none border border-gray-300 bg-transparent px-3 py-2",
@@ -671,7 +574,9 @@ export default function Mint() {
                     as="span"
                     className="text-sm text-gray-500"
                   >
-                    Does this token represent a collection NFT?
+                    Marks this NFT as a collection parent, so other NFTs can be
+                    verified into it. The program keeps no member count
+                    (collection details V2).
                     <a
                       href="https://docs.metaplex.com/programs/token-metadata/certified-collections"
                       rel="noreferrer"
@@ -684,66 +589,9 @@ export default function Mint() {
                 <Controller
                   control={control}
                   name="isCollection"
-                  rules={{
-                    onChange: (e) =>
-                      !e.target.value && setValue("collectionIsSized", false),
-                  }}
                   render={({ field: { value, ...rest } }) => (
                     <Switch
                       {...rest}
-                      className={cn(
-                        value ? "bg-indigo-600" : "bg-gray-200",
-                        "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden",
-                      )}
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          value ? "translate-x-5" : "translate-x-0",
-                          "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out",
-                        )}
-                      />
-                    </Switch>
-                  )}
-                />
-              </Switch.Group>
-            </div>
-
-            <div className="sm:col-span-5">
-              <Switch.Group
-                as="div"
-                className="flex items-center justify-between"
-              >
-                <span className="flex grow flex-col">
-                  <Switch.Label
-                    as="span"
-                    className="text-sm font-medium text-gray-900"
-                    passive
-                  >
-                    Is a sized collection
-                  </Switch.Label>
-                  <Switch.Description
-                    as="span"
-                    className="text-sm text-gray-500"
-                  >
-                    Is this a &quot;sized&quot; collection NFT?
-                    <a
-                      href="https://docs.metaplex.com/programs/token-metadata/certified-collections"
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      <QuestionMarkCircleIcon className="mb-0.5 ml-2 inline h-4 w-4 text-gray-400" />
-                    </a>
-                  </Switch.Description>
-                </span>
-
-                <Controller
-                  control={control}
-                  name="collectionIsSized"
-                  render={({ field: { value, ...rest } }) => (
-                    <Switch
-                      {...rest}
-                      disabled={!watchedIsCollection}
                       className={cn(
                         value ? "bg-indigo-600" : "bg-gray-200",
                         "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden",

@@ -1,10 +1,9 @@
 import type {
-  Creator,
-  Metadata,
-} from "@metaplex-foundation/mpl-token-metadata";
-import { TokenStandard } from "@metaplex-foundation/mpl-token-metadata";
-import type { PublicKey } from "@metaplex-foundation/umi";
-import { isSome, unwrapOption } from "@metaplex-foundation/umi";
+  NftCreator,
+  TokenMetadata,
+} from "@/lib/solana/metaplex-token-metadata";
+import { TokenStandard } from "@/lib/solana/metaplex-token-metadata";
+import type { Address } from "@solana/kit";
 
 /**
  * What to do with the creators while the update authority moves:
@@ -22,49 +21,48 @@ export type CreatorMode = "swap" | "replace" | "keep";
 
 export type TransferSettings = {
   /** The connected wallet, the current update authority. */
-  wallet: string;
-  newAuthority: string;
+  wallet: Address;
+  newAuthority: Address;
   /** Used in the `swap` and `replace` modes. */
-  newCreator: string;
+  newCreator: Address;
   creatorMode: CreatorMode;
 };
 
-type Base = { mint: string; name: string };
+type Base = { mint: Address; name: string };
 
 export type TransferPlan = Base &
   (
-    | { status: "ready"; metadata: Metadata; creators: Creator[] | null }
+    | {
+        status: "ready";
+        metadata: TokenMetadata;
+        creators: NftCreator[] | null;
+      }
     | { status: "done" }
     | { status: "error"; reason: string }
   );
 
 export type VerifyPlan = Base &
   (
-    | { status: "ready"; metadata: Metadata }
+    | { status: "ready"; metadata: TokenMetadata }
     | { status: "done" }
     | { status: "error"; reason: string }
   );
 
-const nameOf = (metadata: Metadata | null) => metadata?.name ?? "";
+const nameOf = (metadata: TokenMetadata | null) => metadata?.name ?? "";
 
-const creatorsOf = (metadata: Metadata) =>
-  unwrapOption(metadata.creators) ?? [];
+const creatorsOf = (metadata: TokenMetadata) => metadata.creators ?? [];
 
-const isFungible = (metadata: Metadata) => {
-  const standard = unwrapOption(metadata.tokenStandard);
-  return (
-    standard === TokenStandard.Fungible ||
-    standard === TokenStandard.FungibleAsset
-  );
-};
+const isFungible = (metadata: TokenMetadata) =>
+  metadata.tokenStandard === TokenStandard.Fungible ||
+  metadata.tokenStandard === TokenStandard.FungibleAsset;
 
 /**
  * Step 1, for one NFT: whether the connected wallet can hand it over, and
  * the creator list it will have afterwards (`null` leaves it untouched).
  */
 export function planTransfer(
-  mint: string,
-  metadata: Metadata | null,
+  mint: Address,
+  metadata: TokenMetadata | null,
   settings: TransferSettings,
 ): TransferPlan {
   const base = { mint, name: nameOf(metadata) };
@@ -96,9 +94,9 @@ export function planTransfer(
 }
 
 function nextCreators(
-  metadata: Metadata,
+  metadata: TokenMetadata,
   { wallet, newCreator, creatorMode }: TransferSettings,
-): { creators: Creator[] | null } | { error: string } {
+): { creators: NftCreator[] | null } | { error: string } {
   if (creatorMode === "keep") return { creators: null };
 
   const current = creatorsOf(metadata);
@@ -116,7 +114,7 @@ function nextCreators(
     return {
       creators: [
         {
-          address: newCreator as PublicKey,
+          address: newCreator,
           // An existing creator keeps their status; the program rejects
           // any change to it that the creator didn't sign.
           verified: existing?.verified ?? false,
@@ -137,17 +135,11 @@ function nextCreators(
 
   // The new creator takes your place in the list. If they were already in
   // it, they get your share on top of theirs instead.
-  const creators = current.flatMap((c): Creator[] => {
+  const creators = current.flatMap((c): NftCreator[] => {
     if (c.address === wallet) {
       return existing
         ? []
-        : [
-            {
-              address: newCreator as PublicKey,
-              verified: false,
-              share: c.share,
-            },
-          ];
+        : [{ address: newCreator, verified: false, share: c.share }];
     }
     if (c.address === newCreator)
       return [{ ...c, share: c.share + mine.share }];
@@ -158,9 +150,9 @@ function nextCreators(
 
 /** Step 2, for one NFT: whether the connected wallet has a creator to verify. */
 export function planVerify(
-  mint: string,
-  metadata: Metadata | null,
-  wallet: string,
+  mint: Address,
+  metadata: TokenMetadata | null,
+  wallet: Address,
 ): VerifyPlan {
   const base = { mint, name: nameOf(metadata) };
   if (!metadata) {
@@ -171,7 +163,7 @@ export function planVerify(
     return {
       ...base,
       status: "error",
-      reason: isSome(metadata.creators)
+      reason: metadata.creators
         ? "Your wallet isn't one of its creators"
         : "It has no creators",
     };

@@ -2,6 +2,7 @@
 
 import BlastCtrlIcon from "@/../public/blastctrl_icon_white.svg";
 import { navigation } from "@/app/_links";
+import { ConnectorButton } from "@/connector/connector-button";
 import { cn } from "@blastctrl/ui";
 import {
   CloseButton,
@@ -14,16 +15,13 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
 import Image from "next/image";
 import Link from "next/link";
 import { useContext, useEffect, useState } from "react";
-import { BAR_LINK } from "./bar-link";
 import { CommandPaletteContext } from "./command-palette";
-import { DesktopWallet } from "./desktop-wallet";
-import { GASLESS, GaslessMenu } from "./gasless-menu";
-import { MobileWallet } from "./mobile-wallet";
 import { ReclaimLink } from "./reclaim-link";
 
-const SECTIONS = navigation.filter(
-  (nav) => !nav.in && !GASLESS.some((swap) => swap.href === nav.href),
-);
+const BAR_LINK =
+  "rounded-md px-3 py-2 text-base font-medium whitespace-nowrap text-white hover:bg-primary-focus focus:outline-hidden focus-visible:ring-2 focus-visible:ring-white";
+
+const SECTIONS = navigation.filter((nav) => !nav.in);
 
 export function Topbar() {
   const { setIsOpen } = useContext(CommandPaletteContext);
@@ -62,7 +60,6 @@ export function Topbar() {
                     {item.name}
                   </Link>
                 ))}
-                <GaslessMenu />
                 <ReclaimLink className="ml-2" />
               </div>
             </div>
@@ -98,7 +95,8 @@ export function Topbar() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center lg:hidden">
+            <div className="flex items-center gap-2 lg:hidden">
+              <ConnectorButton mobile="icon" />
               {/* Mobile menu button: the bars, or a cross while open */}
               <DisclosureButton
                 className={cn(
@@ -139,8 +137,7 @@ export function Topbar() {
               </DisclosureButton>
             </div>
             <div className="hidden lg:ml-4 lg:flex lg:items-center">
-              {/* Profile dropdown */}
-              <DesktopWallet />
+              <ConnectorButton />
             </div>
           </div>
         </div>
@@ -158,20 +155,8 @@ export function Topbar() {
                 {item.name}
               </CloseButton>
             ))}
-            {GASLESS.map(({ name, href, Icon }) => (
-              <CloseButton
-                key={href}
-                as={Link}
-                href={href}
-                className={cn(BAR_LINK, "inline-flex items-center gap-x-2")}
-              >
-                <Icon className="size-6" />
-                {name}
-              </CloseButton>
-            ))}
             <ReclaimLink className="mt-2 ml-3" />
           </div>
-          <MobileWallet />
         </DisclosurePanel>
       </Disclosure>
     </>

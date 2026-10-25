@@ -12,7 +12,20 @@ minimumReleaseAgeExclude:
   - "@next/*"
 peerDependencyRules:
   allowedVersions:
-    "@solana/kit": "2 || 5"
+    # x402, under @ardrive/turbo-sdk, pins its own kit 5; the app is on 8.
+    "@solana/kit": "5"
+    # Type-level peers: the x402 tree under @ardrive/turbo-sdk (its own kit
+    # 5.5) and tsconfck under vite-tsconfig-paths ask for 5; 6 works.
+    typescript: "5 || 6"
+    # isows, in the same x402 tree, asks for ws 7; the ws 8 the override
+    # installs is what it gets everywhere else too.
+    ws: "7 || 8"
+    # valtio (walletconnect, under the same x402 tree) ships a React 18 shim
+    # for an API React 19 has natively.
+    react: "18 || 19"
+    # porto (wagmi, same tree) asks for a newer react-native than the
+    # connector's mobile wallet adapter installs; this is a web app.
+    react-native: "0.79 || >=0.81"
 overrides:
   "elliptic@<=6.6.0": "^6.6.1"
   "protobufjs@<7.5.5": "^7.5.5"
@@ -20,6 +33,14 @@ overrides:
   "ws@<7.5.10": "^7.5.10"
   "secp256k1@5.0.0": "^5.0.1"
   "shell-quote@<1.8.4": "^1.8.4"
+packageExtensions:
+  # The connector's compat bridge (file uploads through the Turbo SDK) turns
+  # signed bytes back into a web3.js 1 transaction with whatever web3.js it
+  # resolves. web3.js is only an optional peer of the connector and the app
+  # doesn't depend on it, so give the connector its own web3.js 1.
+  "@solana/connector":
+    dependencies:
+      "@solana/web3.js": "^1.99.0"
 allowBuilds:
   bigint-buffer: true
   bufferutil: true

@@ -1,20 +1,21 @@
 import {
-  findMetadataPda,
-  updateV1,
-  verifyCreatorV1,
-} from "@metaplex-foundation/mpl-token-metadata";
-import type { Context, Instruction } from "@metaplex-foundation/umi";
+  updateNftInstructions,
+  verifyCreatorInstructions,
+} from "@/lib/solana/metaplex-token-metadata";
 import {
-  createNoopSigner,
-  none,
-  publicKey,
-  some,
-} from "@metaplex-foundation/umi";
-import {
-  PublicKey,
-  Transaction,
-  TransactionInstruction,
-} from "@solana/web3.js";
+  appendTransactionMessageInstructions,
+  compileTransaction,
+  createTransactionMessage,
+  fillTransactionMessageProvisoryResourceLimits,
+  getTransactionSize,
+  pipe,
+  setTransactionMessageFeePayer,
+  setTransactionMessageLifetimeUsingBlockhash,
+  type Address,
+  type Blockhash,
+  type Instruction,
+  type TransactionSigner,
+} from "@solana/kit";
 import type { TransferPlan, VerifyPlan } from "./plan";
 
 /**
@@ -31,88 +32,81 @@ export const MAX_TRANSACTION_BYTES = 900;
  */
 export const MAX_NFTS_PER_TRANSACTION = 10;
 
-type UmiContext = Pick<Context, "eddsa" | "identity" | "payer" | "programs">;
-
 export type ReadyTransfer = Extract<TransferPlan, { status: "ready" }>;
 export type ReadyVerify = Extract<VerifyPlan, { status: "ready" }>;
 
-/** Step 1: one `UpdateV1` signed and paid for by the current authority. */
-export function transferInstruction(
-  umi: UmiContext,
+/**
+ * Step 1: one `UpdateV1` signed and paid for by the current authority: the
+ * wallet's signer, or a noop signer for a Squads vault, which signs through
+ * the proposal.
+ */
+export async function transferInstruction(
   plan: ReadyTransfer,
-  wallet: string,
-  newAuthority: string,
-) {
-  const signer = createNoopSigner(publicKey(wallet));
+  authority: TransactionSigner,
+  newAuthority: Address,
+): Promise<Instruction> {
   const { metadata, creators } = plan;
-  const [instruction] = updateV1(umi, {
-    mint: publicKey(plan.mint),
-    metadata: metadata.publicKey,
-    authority: signer,
-    payer: signer,
-    newUpdateAuthority: some(publicKey(newAuthority)),
+  const [instruction] = await updateNftInstructions(authority, plan.mint, {
+    newUpdateAuthority: newAuthority,
     // `data` is all or nothing, so changing the creators means sending the
-    // rest of it unchanged. Umi reads the strings without the null padding
-    // they're stored with, and the program pads them again.
+    // rest of it unchanged.
     data: creators
-      ? some({
+      ? {
           name: metadata.name,
           symbol: metadata.symbol,
           uri: metadata.uri,
           sellerFeeBasisPoints: metadata.sellerFeeBasisPoints,
-          creators: some(creators),
-        })
-      : none(),
-  }).getInstructions();
-  return toWeb3(instruction!);
+          creators,
+        }
+      : undefined,
+  });
+  return instruction!;
 }
 
 /** Step 2: one `VerifyCreatorV1` signed by the creator. */
-export function verifyInstruction(
-  umi: UmiContext,
+export async function verifyInstruction(
   plan: ReadyVerify,
-  wallet: string,
-) {
-  const [instruction] = verifyCreatorV1(umi, {
-    metadata: findMetadataPda(umi, { mint: publicKey(plan.mint) }),
-    authority: createNoopSigner(publicKey(wallet)),
-  }).getInstructions();
-  return toWeb3(instruction!);
-}
-
-function toWeb3(instruction: Instruction) {
-  return new TransactionInstruction({
-    programId: new PublicKey(instruction.programId),
-    keys: instruction.keys.map((key) => ({
-      pubkey: new PublicKey(key.pubkey),
-      isSigner: key.isSigner,
-      isWritable: key.isWritable,
-    })),
-    data: Buffer.from(instruction.data),
-  });
+  creator: TransactionSigner,
+): Promise<Instruction> {
+  const [instruction] = await verifyCreatorInstructions(creator, plan.mint);
+  return instruction!;
 }
 
 export type Batch = {
   index: number;
-  mints: string[];
-  instructions: TransactionInstruction[];
+  mints: Address[];
+  instructions: Instruction[];
 };
 
 /** Stands in for the blockhash while measuring; any 32 bytes do. */
-const PLACEHOLDER_BLOCKHASH = PublicKey.default.toBase58();
+const PLACEHOLDER_LIFETIME = {
+  blockhash: "11111111111111111111111111111111" as Blockhash,
+  lastValidBlockHeight: 0n,
+};
 
+/**
+ * Bytes on the wire as the kit client sends it: one signature slot, and the
+ * compute-limit instruction the client adds.
+ */
 export function transactionSize(
-  instructions: TransactionInstruction[],
-  feePayer: PublicKey,
+  instructions: Instruction[],
+  feePayer: Address,
 ) {
-  return new Transaction({
-    feePayer,
-    blockhash: PLACEHOLDER_BLOCKHASH,
-    lastValidBlockHeight: 0,
-  })
-    .add(...instructions)
-    .serialize({ requireAllSignatures: false, verifySignatures: false }).length;
+  return getTransactionSize(
+    compileTransaction(
+      pipe(
+        createTransactionMessage({ version: 0 }),
+        (m) => setTransactionMessageFeePayer(feePayer, m),
+        (m) =>
+          setTransactionMessageLifetimeUsingBlockhash(PLACEHOLDER_LIFETIME, m),
+        (m) => appendTransactionMessageInstructions(instructions, m),
+        fillTransactionMessageProvisoryResourceLimits,
+      ),
+    ),
+  );
 }
+
+export type PackOptions = { maxBytes?: number; maxPerTransaction?: number };
 
 /**
  * Packs one instruction per NFT into as few transactions as fit under
@@ -120,12 +114,12 @@ export function transactionSize(
  * transaction gets one to itself.
  */
 export function packBatches(
-  items: { mint: string; instruction: TransactionInstruction }[],
-  feePayer: PublicKey,
+  items: { mint: Address; instruction: Instruction }[],
+  feePayer: Address,
   {
     maxBytes = MAX_TRANSACTION_BYTES,
     maxPerTransaction = MAX_NFTS_PER_TRANSACTION,
-  } = {},
+  }: PackOptions = {},
 ): Batch[] {
   const batches: Batch[] = [];
   let current: Batch | null = null;
@@ -150,10 +144,33 @@ export function packBatches(
   return batches;
 }
 
-export function buildTransaction(
-  batch: Batch,
-  feePayer: PublicKey,
-  lifetime: { blockhash: string; lastValidBlockHeight: number },
-) {
-  return new Transaction({ feePayer, ...lifetime }).add(...batch.instructions);
+/** Step 1 for every ready NFT, packed with {@link packBatches}. */
+export async function transferBatches(
+  plans: ReadyTransfer[],
+  authority: TransactionSigner,
+  newAuthority: Address,
+  options?: PackOptions,
+): Promise<Batch[]> {
+  const items = await Promise.all(
+    plans.map(async (plan) => ({
+      mint: plan.mint,
+      instruction: await transferInstruction(plan, authority, newAuthority),
+    })),
+  );
+  return packBatches(items, authority.address, options);
+}
+
+/** Step 2 for every ready NFT, packed with {@link packBatches}. */
+export async function verifyBatches(
+  plans: ReadyVerify[],
+  creator: TransactionSigner,
+  options?: PackOptions,
+): Promise<Batch[]> {
+  const items = await Promise.all(
+    plans.map(async (plan) => ({
+      mint: plan.mint,
+      instruction: await verifyInstruction(plan, creator),
+    })),
+  );
+  return packBatches(items, creator.address, options);
 }

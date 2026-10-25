@@ -1,5 +1,6 @@
 import { useOwnerNfts } from "@/state/queries/use-owner-nfts";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnector } from "@solana/connector/react";
+import { isAddress } from "@solana/kit";
 import { useState } from "react";
 import type { FieldError, UseControllerProps } from "react-hook-form";
 import { useController } from "react-hook-form";
@@ -13,12 +14,11 @@ import {
 } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
 import { cn } from "@blastctrl/ui";
-import { isPublicKey } from "@/lib/solana/common";
 
 export const NftSelector = ({ control }: UseControllerProps<FormInputs>) => {
-  const { publicKey } = useWallet();
+  const { account } = useConnector();
   const [query, setQuery] = useState("");
-  const { data } = useOwnerNfts(publicKey?.toString() ?? "");
+  const { data } = useOwnerNfts(account ?? "");
 
   const {
     field: { ref, value, onChange },
@@ -28,7 +28,7 @@ export const NftSelector = ({ control }: UseControllerProps<FormInputs>) => {
     control,
     rules: {
       required: "Select an NFT or enter the mint address",
-      validate: (value) => isPublicKey(value ?? "") || "Not a valid address",
+      validate: (value) => isAddress(value ?? "") || "Not a valid address",
     },
   });
 
@@ -38,12 +38,7 @@ export const NftSelector = ({ control }: UseControllerProps<FormInputs>) => {
 
   return (
     <>
-      <Combobox
-        as="div"
-        ref={ref}
-        name={"mint"}
-        onChange={onChange}
-      >
+      <Combobox as="div" ref={ref} name={"mint"} onChange={onChange}>
         <NftComboboxInput
           selectedMint={value}
           onChange={setQuery}
@@ -77,13 +72,13 @@ export const NftSelector = ({ control }: UseControllerProps<FormInputs>) => {
               <span className="flex items-center gap-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={userNft.content.links.image}
+                  src={userNft.content?.links?.image}
                   alt=""
                   height={24}
                   width={24}
                   className="size-5 rounded-full"
                 />
-                {userNft.content.metadata.name}
+                {userNft.content?.metadata.name}
               </span>
               <span
                 aria-hidden="true"
@@ -114,8 +109,8 @@ const NftComboboxInput = ({
   selectedMint: string;
   error?: FieldError;
 }) => {
-  const { publicKey } = useWallet();
-  const { data } = useOwnerNfts(publicKey?.toString() ?? "");
+  const { account } = useConnector();
+  const { data } = useOwnerNfts(account ?? "");
 
   const selectedNft = data?.find(({ id }) => id === selectedMint);
 

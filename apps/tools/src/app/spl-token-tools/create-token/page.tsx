@@ -7,28 +7,36 @@ import {
   notify,
   notifyPromise,
 } from "@/components";
-import { TurboStorage } from "@/lib/turbo";
-import { useWalletConnection } from "@/state/use-wallet-connection";
+import { useConnectorDialog } from "@/connector/connector-dialog";
 import {
-  createMetadataInstruction,
-  updateMetadataInstruction,
-} from "@/lib/solana";
-import { compress, isPublicKey } from "@/lib/solana/common";
-import { cn } from "@blastctrl/ui";
+  simulateUnsigned,
+  simulationFailureMessage,
+} from "@/connector/simulate";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
+import { useArweaveUploader } from "@/lib/hooks/use-arweave-uploader";
+import { compress } from "@/lib/solana/common";
+import { maxBytes } from "@/lib/solana/metaplex-form-rules";
+import {
+  createMetadataInstructions,
+  fetchTokenMetadata,
+  updateMetadataInstructions,
+  type TokenMetadata,
+  type TokenMetadataFields,
+} from "@/lib/solana/metaplex-token-metadata";
+import { isMintAccountData } from "@/lib/solana/token-2022";
+import { Button, cn } from "@blastctrl/ui";
+import {
+  Dialog,
+  DialogBackdrop,
+  DialogPanel,
+  DialogTitle,
+} from "@headlessui/react";
 import { ChevronUpDownIcon } from "@heroicons/react/20/solid";
-import { WalletError } from "@solana/wallet-adapter-base";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { TransactionInstruction } from "@solana/web3.js";
-import { PublicKey } from "@solana/web3.js";
-import Link from "next/link";
+import { address, fetchEncodedAccount, isAddress } from "@solana/kit";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { UploadFile } from "./_components/upload-file";
-import useUmi from "@/lib/hooks/use-umi";
-import type { Instruction, TransactionBuilder } from "@metaplex-foundation/umi";
-import { publicKey } from "@metaplex-foundation/umi";
-import * as base58 from "bs58";
 
 type TokenData = {
   mint: string;
@@ -42,219 +50,173 @@ type TokenData = {
 const actions = ["Add", "Update"] as const;
 type Actions = (typeof actions)[number];
 
+/**
+ * What an update resets: `updateMetadataAccountV2` replaces the whole data
+ * struct, and this form only has name, symbol and URI, so the rest goes back
+ * to its defaults. Human-readable, for the warning; empty when nothing is
+ * lost.
+ */
+function wipedByUpdate(current: TokenMetadata): string[] {
+  const wiped: string[] = [];
+  if (current.creators?.length) {
+    wiped.push(
+      `${current.creators.length} creator${current.creators.length > 1 ? "s" : ""}`,
+    );
+  }
+  if (current.sellerFeeBasisPoints > 0) {
+    wiped.push(`royalties of ${current.sellerFeeBasisPoints / 100}%`);
+  }
+  if (current.collection) {
+    wiped.push(`the collection ${compress(current.collection.key, 4)}`);
+  }
+  return wiped;
+}
+
 export default function CreateToken() {
-  const wallet = useWallet();
-  const { setVisible } = useWalletModal();
-  const { simulateVersionedTransaction } = useWalletConnection();
+  const { client } = useKitClient();
+  const upload = useArweaveUploader();
+  const { setOpen } = useConnectorDialog();
   const [isConfirming, setIsConfirming] = useState(false);
   const [selectedAction, setSelectedAction] = useState<Actions>(actions[0]);
+  const [wipeWarning, setWipeWarning] = useState<{
+    fields: string[];
+    answer: (proceed: boolean) => void;
+  } | null>(null);
+  /** Opens the warning and resolves with the user's choice. */
+  const confirmWipe = (fields: string[]) =>
+    new Promise<boolean>((resolve) => {
+      setWipeWarning({
+        fields,
+        answer: (proceed) => {
+          setWipeWarning(null);
+          resolve(proceed);
+        },
+      });
+    });
   const {
     register,
     formState: { errors },
     handleSubmit,
     setValue,
   } = useForm<TokenData>({});
-  const umi = useUmi();
 
   const onSubmit = async (data: TokenData) => {
-    if (!wallet.publicKey) {
-      setVisible(true);
+    if (!client || !upload) {
+      setOpen(true);
       return;
     }
 
     setIsConfirming(true);
-    const turbo = await TurboStorage.make(wallet);
-
-    // Test if creating metadata is possible
-    const ixs: Instruction[] =
-      selectedAction === "Add"
-        ? createMetadataInstruction(
-            umi,
-            publicKey(wallet.publicKey.toBase58()),
-            publicKey(data.mint),
-            {},
-          ).getInstructions()
-        : updateMetadataInstruction(
-            umi,
-            publicKey(wallet.publicKey.toBase58()),
-            publicKey(data.mint),
-            {},
-          ).getInstructions();
-    const { value } = await simulateVersionedTransaction(
-      ixs.map(
-        (ix) =>
-          new TransactionInstruction({
-            keys: ix.keys.map((key) => ({
-              ...key,
-              pubkey: new PublicKey(key.pubkey),
-            })),
-            programId: new PublicKey(ix.programId),
-            data: Buffer.from(ix.data),
-          }),
-      ),
-    );
-
-    if (value.err) {
-      setIsConfirming(false);
-
-      return notify({
-        type: "error",
-        title: `${selectedAction} Metadata Error`,
-        description: (
-          <>
-            <p className="mb-1.5">
-              {selectedAction === "Add" ? "Adding" : "Updating"} metadata to
-              this token is not possible due to the error:{" "}
-            </p>
-            <code className="py-6 break-all">{JSON.stringify(value.err)}</code>
-          </>
-        ),
-      });
-    }
-
-    // Upload image
-    let imageUri: string | undefined;
-
-    if (data.image) {
-      imageUri = await notifyPromise(
-        turbo.uploadFile(data.image).then((r) => `https://arweave.net/${r.id}`),
-        {
-          loading: { description: "Uploading image to Arweave..." },
-          success: { description: "Image upload complete" },
-          error: (err) => {
-            setIsConfirming(false);
-            console.log(err);
-            return {
-              title: "Image Upload Error",
-              description: (
-                <div className="break-normal">
-                  <p>
-                    There has been an error while uploading with the message:{" "}
-                    <span className="font-medium break-all text-yellow-300">
-                      {err?.message}
-                    </span>
-                    .
-                  </p>
-                  <p className="mt-2">
-                    You can recover any lost funds on the{" "}
-                    <Link
-                      href="/permanent-storage-tools/file-upload"
-                      className="font-medium text-blue-300"
-                    >
-                      /permanent-storage-tools
-                    </Link>{" "}
-                    page.
-                  </p>
-                </div>
-              ),
-            };
-          },
-        },
-      );
-    }
-
-    const json = {
-      name: data.name,
-      symbol: data.symbol,
-      image: imageUri,
-      description: data?.description,
-      external_url: data.external_url,
-    };
-    const metadataFile = new File([JSON.stringify(json)], "metadata.json", {
-      type: "application/json",
-    });
-
-    const metadataUri = await notifyPromise(
-      turbo.uploadFile(metadataFile).then((r) => `https://arweave.net/${r.id}`),
-      {
-        loading: { description: "Uploading metadata file to Arweave..." },
-        success: { description: "JSON upload complete" },
-        error: (err) => {
-          setIsConfirming(false);
-          console.log({ err });
-          return {
-            title: "JSON upload error",
-            description: (
-              <div className="break-normal">
-                <p>
-                  There has been an error while uploading with the message:{" "}
-                  <span className="font-medium break-all text-yellow-300">
-                    {err?.message}
-                  </span>
-                  .
-                </p>
-                <p className="mt-2">
-                  You can recover any lost funds on the{" "}
-                  <Link
-                    href="/permanent-storage-tools/file-upload"
-                    className="font-medium text-blue-300"
-                  >
-                    /storage
-                  </Link>{" "}
-                  page.
-                </p>
-              </div>
-            ),
-          };
-        },
-      },
-    );
-
     try {
-      let tx: TransactionBuilder;
-      if (selectedAction === "Add") {
-        tx = createMetadataInstruction(
-          umi,
-          publicKey(wallet.publicKey),
-          publicKey(data.mint),
-          {
-            name: data.name,
-            symbol: data.symbol,
-            uri: metadataUri,
-          },
-        );
-      } else {
-        tx = updateMetadataInstruction(
-          umi,
-          publicKey(wallet.publicKey),
-          publicKey(data.mint),
-          {
-            name: data.name,
-            symbol: data.symbol,
-            uri: metadataUri,
-          },
-        );
-      }
-      await notifyPromise(tx.sendAndConfirm(umi), {
-        loading: { description: "Confirming transaction" },
-        success: (value) => ({
-          txid: base58.encode(value.signature),
-          title: `${selectedAction} Metadata Success`,
-          description: (
-            <>
-              Metadata {selectedAction === "Add" ? "created" : "updated"} for
-              token{" "}
-              <span className="font-medium text-blue-300">
-                {compress(data.mint, 4)}
-              </span>
-            </>
-          ),
-        }),
-        error: (err) => ({
-          title: "Error Creating Metadata",
-          description: err?.message,
-        }),
-      });
-    } catch (err) {
-      if (err instanceof WalletError) {
-        // The onError callback in the walletconnect context will handle it
+      const owner = client.payer;
+      const mint = address(data.mint);
+
+      // The mint's program (Token or Token-2022) goes into the instruction.
+      const mintAccount = await fetchEncodedAccount(client.rpc, mint);
+      if (!mintAccount.exists || !isMintAccountData(mintAccount.data)) {
+        notify({
+          type: "error",
+          title: "Not a token mint",
+          description: `${compress(data.mint, 4)} is not a token mint account.`,
+        });
         return;
       }
+      const build = (fields: Partial<TokenMetadataFields>) =>
+        selectedAction === "Add"
+          ? createMetadataInstructions(
+              owner,
+              mint,
+              fields,
+              mintAccount.programAddress,
+            )
+          : updateMetadataInstructions(owner, mint, fields);
+
+      // Simulate with empty fields first: this fails fast when the wallet is
+      // not the authority, before anything is uploaded.
+      const simulation = await simulateUnsigned(client, await build({}));
+      if (simulation.err) {
+        notify({
+          type: "error",
+          title: `${selectedAction} Metadata Error`,
+          description: (
+            <>
+              <p className="mb-1.5">
+                {selectedAction === "Add" ? "Adding" : "Updating"} metadata to
+                this token is not possible due to the error:{" "}
+              </p>
+              <code className="py-6 break-all">
+                {simulationFailureMessage(simulation)}
+              </code>
+            </>
+          ),
+        });
+        return;
+      }
+
+      // An update rewrites the whole data struct; say what that resets.
+      if (selectedAction === "Update") {
+        const current = await fetchTokenMetadata(client.rpc, mint);
+        const wiped = current ? wipedByUpdate(current) : [];
+        if (wiped.length > 0 && !(await confirmWipe(wiped))) return;
+      }
+
+      // The uploader's toasts report failures; stop quietly after one.
+      let imageUri: string | undefined;
+      if (data.image) {
+        imageUri = await upload(data.image, "image").catch(() => undefined);
+        if (!imageUri) return;
+      }
+
+      const json = {
+        name: data.name,
+        symbol: data.symbol,
+        image: imageUri,
+        description: data.description,
+        external_url: data.external_url,
+      };
+      const metadataUri = await upload(
+        new File([JSON.stringify(json)], "metadata.json", {
+          type: "application/json",
+        }),
+        "metadata",
+      ).catch(() => undefined);
+      if (!metadataUri) return;
+
+      await notifyPromise(
+        client.sendTransaction(
+          await build({
+            name: data.name,
+            symbol: data.symbol,
+            uri: metadataUri,
+          }),
+        ),
+        {
+          loading: { description: "Confirming transaction" },
+          success: (result) => ({
+            txid: result.context.signature,
+            title: `${selectedAction} Metadata Success`,
+            description: (
+              <>
+                Metadata {selectedAction === "Add" ? "created" : "updated"} for
+                token{" "}
+                <span className="font-medium text-blue-300">
+                  {compress(data.mint, 4)}
+                </span>
+              </>
+            ),
+          }),
+          error: (err) => ({
+            title: "Error Creating Metadata",
+            description: transactionErrorMessage(err),
+          }),
+        },
+      ).catch(() => undefined);
+    } catch (err) {
       console.log({ err });
       notify({
         type: "error",
         title: "Error Creating Metadata",
-        description: err instanceof Error ? err.message : String(err),
+        description: transactionErrorMessage(err),
       });
     } finally {
       setIsConfirming(false);
@@ -284,7 +246,9 @@ export default function CreateToken() {
               Basic Information
             </h3>
             <p className="text-sm text-gray-500">
-              You need to have the mint authority over the token.
+              {selectedAction === "Add"
+                ? "You need to be the mint authority of the token."
+                : "You need to be the update authority of the token's metadata."}
             </p>
           </div>
 
@@ -310,8 +274,9 @@ export default function CreateToken() {
                   required: true,
                   validate: {
                     isValid: (value) =>
-                      isPublicKey(value) ?? "Not a valid public key",
+                      isAddress(value.trim()) || "Not a valid address",
                   },
+                  setValueAs: (value: string) => value.trim(),
                 })}
                 error={errors?.mint}
               />
@@ -322,10 +287,7 @@ export default function CreateToken() {
               type="text"
               {...register("name", {
                 required: true,
-                maxLength: {
-                  value: 32,
-                  message: "Max name length is 32",
-                },
+                validate: maxBytes(32),
               })}
               error={errors?.name}
             />
@@ -335,10 +297,7 @@ export default function CreateToken() {
               type="text"
               {...register("symbol", {
                 required: true,
-                maxLength: {
-                  value: 10,
-                  message: "Max symbol length is",
-                },
+                validate: maxBytes(10),
               })}
               error={errors?.symbol}
             />
@@ -356,7 +315,7 @@ export default function CreateToken() {
               {...register("external_url", {
                 required: false,
               })}
-              error={errors?.symbol}
+              error={errors?.external_url}
             />
             <InputMultiline
               label="Description"
@@ -436,6 +395,45 @@ export default function CreateToken() {
           </div>
         </div>
       </form>
+      <Dialog
+        open={wipeWarning !== null}
+        onClose={() => wipeWarning?.answer(false)}
+        className="relative z-50"
+      >
+        <DialogBackdrop
+          transition
+          className="fixed inset-0 bg-black/50 transition duration-300 data-closed:opacity-0"
+        />
+        <div className="fixed inset-0 flex w-screen items-center justify-center p-4">
+          <DialogPanel
+            transition
+            className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl transition data-closed:scale-95 data-closed:opacity-0"
+          >
+            <DialogTitle className="text-lg font-medium text-gray-900">
+              This update resets other fields
+            </DialogTitle>
+            <p className="mt-2 text-sm text-gray-600">
+              Updating writes the whole metadata, and this form only sets the
+              name, symbol and URI. The token currently has{" "}
+              {formatList(wipeWarning?.fields ?? [])}, which will be removed.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <Button outline onClick={() => wipeWarning?.answer(false)}>
+                Cancel
+              </Button>
+              <Button color="red" onClick={() => wipeWarning?.answer(true)}>
+                Update anyway
+              </Button>
+            </div>
+          </DialogPanel>
+        </div>
+      </Dialog>
     </div>
   );
 }
+
+/** "a", "a and b", "a, b and c". */
+const formatList = (items: string[]) =>
+  items.length <= 1
+    ? (items[0] ?? "")
+    : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;

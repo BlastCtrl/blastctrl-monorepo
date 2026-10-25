@@ -1,9 +1,9 @@
-import { isPublicKey } from "@/lib/solana/common";
-import { useConnection } from "@solana/wallet-adapter-react";
+import { useAppRpc } from "@/connector/app-rpc";
+import { fetchSquadsMultisig } from "@/lib/solana/squads-multisig";
+import { address, isAddress } from "@solana/kit";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { AddressInput, Label } from "./address-input";
-import { fetchSquadsMultisig } from "./squads";
 
 /**
  * Who signs a step: the connected wallet, or a Squads vault through one
@@ -59,16 +59,19 @@ export function SignerModePicker({
 }
 
 /** A multisig's settings, and what's wrong with the address if anything. */
-export function useSquadsMultisigInfo(address: string, enabled: boolean) {
-  const { connection } = useConnection();
+export function useSquadsMultisigInfo(candidate: string, enabled: boolean) {
+  const { rpc, network } = useAppRpc();
   const query = useQuery({
-    queryKey: ["squads-info", connection.rpcEndpoint, address],
-    queryFn: () => fetchSquadsMultisig(connection, address),
-    enabled: enabled && isPublicKey(address),
+    queryKey: ["squads-info", network, candidate],
+    queryFn: () => {
+      if (!rpc) throw Error("RPC not available");
+      return fetchSquadsMultisig(rpc, address(candidate));
+    },
+    enabled: enabled && !!rpc && isAddress(candidate),
   });
-  const error = !address
+  const error = !candidate
     ? "Enter the multisig address"
-    : !isPublicKey(address)
+    : !isAddress(candidate)
       ? "Not a valid address"
       : query.isPending
         ? "Checking the address"

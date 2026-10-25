@@ -116,3 +116,15 @@ describe("reclaim domain routing", () => {
     },
   );
 });
+
+describe("gasless BONK swap", () => {
+  it("redirects the old page to the gasless swap with BONK selected", async () => {
+    const response = await resolve(
+      "https://tools.blastctrl.com/gasless-bonk-swap",
+    );
+    expect(response.status).toBe(308);
+    expect(getRedirectUrl(response)).toBe(
+      "https://tools.blastctrl.com/gasless-swap?token=bonk",
+    );
+  });
+});

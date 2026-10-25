@@ -1,28 +1,32 @@
 "use client";
 
 import { notify } from "@/components";
+import { useAppRpc } from "@/connector/app-rpc";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { isWalletRefusal } from "@/connector/send-batches";
+import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useDebounce } from "@/lib/hooks/use-debounce";
-import * as Octane from "@/lib/octane";
-import { lamportsToSol } from "@/lib/solana/common";
+import { useGaslessSwap } from "@/lib/hooks/use-gasless-swap";
+import type { JupiterQuote, SwapTransaction } from "@/lib/octane";
 import { formatNumber, numberFormatter } from "@/lib/utils";
 import { useJupQuery } from "@/state/queries/use-jup-quote";
+import { jupTokensQuery } from "@/state/queries/use-jup-tokens";
 import { useTokenBalance } from "@/state/queries/use-token-balance";
-import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
-import { Button } from "@blastctrl/ui";
+import { Button, cn } from "@blastctrl/ui";
 import { ChevronRightIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
-import { WalletSignTransactionError } from "@solana/wallet-adapter-base";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import type { VersionedTransaction } from "@solana/web3.js";
+import { useCluster, useConnector } from "@solana/connector/react";
+import { useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
-import Link from "next/link";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { CheemsImage } from "./_components/cheems-image";
 import { Popover, PopoverButton, PopoverPanel } from "./_components/popover";
+import { SlippageSelect, toSlippageBps } from "./_components/slippage-select";
 import { TokenQuote } from "./_components/token-quote";
 import { TokenSelectPanel } from "./_components/token-select-panel";
-import { useQueryClient } from "@tanstack/react-query";
-import { jupTokensQuery } from "@/state/queries/use-jup-tokens";
+import { lamports, lamportsToSol } from "@solana/kit";
+import { decimalFixedPointToNumber } from "@solana/fixed-points";
 
 type FormData = {
   swapAmount: number;
@@ -36,23 +40,49 @@ type SelectToken = {
   address: string;
 };
 
+const BONK: SelectToken = {
+  name: "Bonk",
+  decimals: 5,
+  symbol: "Bonk",
+  address: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+};
+
+// The form reads the preselected token from the query string, which Next only
+// lets a client component do under a Suspense boundary when the page is
+// prerendered.
 export default function GaslessSwap() {
-  const { network } = useNetworkConfigurationStore();
-  const { publicKey, signTransaction } = useWallet();
-  const { setVisible } = useWalletModal();
+  return (
+    <Suspense fallback={null}>
+      <GaslessSwapForm />
+    </Suspense>
+  );
+}
+
+function GaslessSwapForm() {
+  const params = useSearchParams();
+  const { type: network } = useCluster();
+  const { account } = useConnector();
+  const { rpc: appRpc } = useAppRpc();
+  const { setOpen } = useConnectorDialog();
+  const { prepare, send } = useGaslessSwap();
   const {
     register,
     handleSubmit,
     setValue,
     watch,
+    control,
     formState: { errors },
   } = useForm<FormData>({
     defaultValues: { slippage: 0.5 },
     mode: "onSubmit",
   });
   const swapAmount = watch("swapAmount");
+  const slippageBps = toSlippageBps(watch("slippage"));
   const debouncedSwapAmount = useDebounce(swapAmount, 400);
-  const [selectToken, setSelectToken] = useState<SelectToken | null>(null);
+  const [selectToken, setSelectToken] = useState<SelectToken | null>(() =>
+    params.get("token")?.toLowerCase() === "bonk" ? BONK : null,
+  );
+  const isBonk = selectToken?.address === BONK.address;
   const [isSwapping, setIsSwapping] = useState(false);
 
   const balanceQuery = useTokenBalance(selectToken?.address ?? "");
@@ -61,47 +91,39 @@ export default function GaslessSwap() {
     amount: selectToken
       ? debouncedSwapAmount * Math.pow(10, selectToken?.decimals)
       : 0,
+    slippageBps,
   });
-  const { connection } = useConnection();
   const queryClient = useQueryClient();
 
   const prefetchJupTokens = () => {
     void queryClient.prefetchQuery(
-      jupTokensQuery(publicKey?.toString() ?? "", false),
+      jupTokensQuery(appRpc, account ?? "", false),
     );
   };
 
   const submitSwap = async (data: FormData) => {
-    if (!selectToken || !publicKey || !signTransaction) return;
-    const { swapAmount, slippage } = data;
+    if (!selectToken || !account) return;
     const amountAsDecimals = Math.floor(
-      swapAmount * 10 ** selectToken.decimals,
+      data.swapAmount * 10 ** selectToken.decimals,
     );
 
-    let transaction: VersionedTransaction;
-    let quote: Octane.WhirlpoolsQuote;
+    let signed: SwapTransaction;
+    let quote: JupiterQuote;
 
     setIsSwapping(true);
     try {
-      const swap = await Octane.buildWhirlpoolsSwapTransaction(
-        publicKey,
+      ({ signed, quote } = await prepare(
         selectToken.address,
         amountAsDecimals,
-        slippage,
-      );
-
-      // The fee payer has already signed, so only ask the wallet to sign and
-      // send it ourselves. Phantom blocks sign-and-send requests for
-      // transactions with another signer as possibly malicious.
-      transaction = await signTransaction(swap.transaction);
-      quote = swap.quote;
+        toSlippageBps(data.slippage),
+      ));
     } catch (err) {
       setIsSwapping(false);
-      if (err instanceof WalletSignTransactionError) return;
+      if (isWalletRefusal(err)) return;
       return notify({
         type: "error",
         title: "Error Creating Swap Transaction",
-        description: err instanceof Error ? err.message : String(err),
+        description: transactionErrorMessage(err),
       });
     }
 
@@ -110,39 +132,28 @@ export default function GaslessSwap() {
       description: "Confirming transaction",
     });
     try {
-      const signature = await connection.sendRawTransaction(
-        transaction.serialize(),
+      const signature = await send(signed);
+      const amountOut = formatNumber.format(
+        decimalFixedPointToNumber(
+          lamportsToSol(lamports(BigInt(quote.outAmount))),
+        ),
+        5,
       );
-      const { value } = await connection.getLatestBlockhashAndContext();
-      const res = await connection.confirmTransaction(
-        { signature, ...value },
-        "confirmed",
-      );
-
-      if (res.value.err) {
-        throw Error("Error while confirming swap");
-      }
-
-      const amountOut = quote.estimatedAmountOut
-        ? `- receiving ${quote.estimatedAmountOut} SOL`
-        : "";
-
       notify(
         {
           type: "success",
-          title: `${selectToken.name} Swap Success ${amountOut}`,
+          title: `${selectToken.name} Swap Success - receiving ${amountOut} SOL`,
           txid: signature,
           testId: "swap-success-toast",
         },
         id,
       );
     } catch (err) {
-      if (err instanceof WalletSignTransactionError) return;
       notify(
         {
           type: "error",
           title: "Swap Error",
-          description: err instanceof Error ? err.message : String(err),
+          description: transactionErrorMessage(err),
         },
         id,
       );
@@ -152,7 +163,7 @@ export default function GaslessSwap() {
     }
   };
 
-  if (network === "devnet") {
+  if (network && network !== "mainnet") {
     return (
       <div className="mx-auto text-lg">
         This page is only available on mainnet! Switch your network in the
@@ -162,7 +173,12 @@ export default function GaslessSwap() {
   }
 
   return (
-    <div className="mx-auto max-w-lg overflow-visible bg-white px-4 py-4 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow-sm">
+    <div
+      className={cn(
+        "mx-auto overflow-visible bg-white px-4 py-4 sm:mb-6 sm:rounded-lg sm:p-6 sm:shadow-sm",
+        isBonk ? "max-w-3xl" : "max-w-lg",
+      )}
+    >
       <div className="border-b border-gray-200 pb-6">
         <h1 className="mb-4 text-center font-display text-3xl font-semibold">
           Gasless Swap
@@ -174,155 +190,169 @@ export default function GaslessSwap() {
           <br />
           Just connect your wallet, enter the swap amount and we&apos;ll fund
           your trade for you.
-          <br />
-          <br />
-          You can swap $BONK with our{" "}
-          <Link
-            href="/gasless-bonk-swap"
-            className="font-medium whitespace-nowrap text-blue-600 hover:underline"
-          >
-            gasless BONK Swap utility &rarr;
-          </Link>
         </p>
       </div>
 
-      <form
-        onSubmit={handleSubmit(submitSwap)}
-        className="mx-auto flex w-[95%] flex-1 flex-col justify-start sm:w-4/5"
-      >
-        <button
-          aria-disabled={balanceQuery.status !== "success"}
-          onClick={() => {
-            if (balanceQuery.data?.uiAmount) {
-              setValue("swapAmount", Number(balanceQuery.data.uiAmount));
-            }
-          }}
-          className="w-full py-2 text-right text-base whitespace-pre"
-        >
-          <span className="text-xs text-gray-600">Balance </span>
-          {balanceQuery.data?.uiAmount ? (
-            <span className="font-medium text-indigo-600">
-              {numberFormatter.format(balanceQuery.data.uiAmount)}
-            </span>
-          ) : (
-            <span className="font-medium">0</span>
+      <div className="flex gap-x-8">
+        {isBonk && (
+          // Cheems drops its BONK bubbles into this wrapper.
+          <div className="relative mt-4 hidden flex-1 shrink-0 px-2 sm:block">
+            <CheemsImage />
+          </div>
+        )}
+
+        <form
+          onSubmit={handleSubmit(submitSwap)}
+          className={cn(
+            "mx-auto flex w-[95%] flex-1 flex-col justify-start",
+            isBonk ? "sm:mt-4 sm:w-auto" : "sm:w-4/5",
           )}
-        </button>
+        >
+          <button
+            aria-disabled={balanceQuery.status !== "success"}
+            onClick={() => {
+              if (balanceQuery.data?.uiAmount) {
+                setValue("swapAmount", Number(balanceQuery.data.uiAmount));
+              }
+            }}
+            className="w-full py-2 text-right text-base whitespace-pre"
+          >
+            <span className="text-xs text-gray-600">Balance </span>
+            {balanceQuery.data?.uiAmount ? (
+              <span className="font-medium text-indigo-600">
+                {numberFormatter.format(balanceQuery.data.uiAmount)}
+              </span>
+            ) : (
+              <span className="font-medium">0</span>
+            )}
+          </button>
 
-        <div>
-          <span className="block font-medium text-gray-600">
-            You will sell:
-          </span>
-          <div className="mt-2 flex gap-x-2 sm:mt-1">
-            <Popover as="div" className="relative xs:w-32">
-              <PopoverButton
-                onMouseEnter={prefetchJupTokens}
-                data-testid="token-selector-popover-trigger"
-                className="inline-flex size-full items-center justify-between rounded-md border border-transparent bg-gray-200 px-3 font-medium text-gray-800"
-              >
-                <span className="mr-2 block xs:mr-0">
-                  {selectToken?.symbol ?? "Name"}
-                </span>
-                <ChevronUpDownIcon className="h-4 w-4 text-gray-700" />
-              </PopoverButton>
-              <PopoverPanel>
-                <TokenSelectPanel onSelect={(token) => setSelectToken(token)} />
-              </PopoverPanel>
-            </Popover>
-            <input
-              type="number"
-              step="any"
-              inputMode="numeric"
-              autoComplete="off"
-              {...register("swapAmount", {
-                required: true,
-                validate: {
-                  notEnoughTokens: (value) =>
-                    balanceQuery.data?.uiAmount
-                      ? value <= balanceQuery.data.uiAmount ||
-                        `Not enough ${selectToken?.name}`
-                      : true,
-                },
-              })}
-              placeholder="0.00"
-              className="min-w-0 grow rounded-md border-transparent bg-gray-200 px-3 py-2 text-right font-medium text-gray-600 placeholder:text-gray-400 focus:ring-0 focus:outline-hidden"
-            />
-          </div>
-          <span className="text-sm text-red-600">
-            {errors?.swapAmount?.message}
-          </span>
-        </div>
-
-        {/* Price quote */}
-
-        <div className="mt-6">
-          <div className="flex w-full flex-wrap items-center justify-between">
-            <span className="text-base font-medium text-gray-600">
-              You will receive:
+          <div>
+            <span className="block font-medium text-gray-600">
+              You will sell:
             </span>
-          </div>
-          <div className="pointer-events-none relative mt-2 flex h-10 w-full items-center justify-between rounded-md bg-gray-200 px-3 shadow-xs sm:mt-1">
-            <div className="inline-flex items-center">
-              <Image
-                unoptimized={true}
-                src="/sol_coin.png"
-                alt=""
-                className="rounded-full"
-                height={20}
-                width={20}
+            <div className="mt-2 flex gap-x-2 sm:mt-1">
+              <Popover as="div" className="relative xs:w-32">
+                <PopoverButton
+                  onMouseEnter={prefetchJupTokens}
+                  data-testid="token-selector-popover-trigger"
+                  className="inline-flex size-full items-center justify-between rounded-md border border-transparent bg-gray-200 px-3 font-medium text-gray-800"
+                >
+                  <span className="mr-2 block xs:mr-0">
+                    {selectToken?.symbol ?? "Name"}
+                  </span>
+                  <ChevronUpDownIcon className="h-4 w-4 text-gray-700" />
+                </PopoverButton>
+                <PopoverPanel>
+                  <TokenSelectPanel
+                    onSelect={(token) => setSelectToken(token)}
+                  />
+                </PopoverPanel>
+              </Popover>
+              <input
+                type="number"
+                step="any"
+                inputMode="numeric"
+                autoComplete="off"
+                {...register("swapAmount", {
+                  required: true,
+                  validate: {
+                    notEnoughTokens: (value) =>
+                      balanceQuery.data?.uiAmount
+                        ? value <= balanceQuery.data.uiAmount ||
+                          `Not enough ${selectToken?.name}`
+                        : true,
+                  },
+                })}
+                placeholder="0.00"
+                className="min-w-0 grow rounded-md border-transparent bg-gray-200 px-3 py-2 text-right font-medium text-gray-600 placeholder:text-gray-400 focus:ring-0 focus:outline-hidden"
               />
-              <span className="pl-2 font-medium tracking-wider text-gray-500">
-                SOL
+            </div>
+            <span className="text-sm text-red-600">
+              {errors?.swapAmount?.message}
+            </span>
+          </div>
+
+          {/* Price quote */}
+
+          <div className="mt-6">
+            <div className="flex w-full flex-wrap items-center justify-between">
+              <span className="text-base font-medium text-gray-600">
+                You will receive:
               </span>
             </div>
-            <div className="inline-flex items-center gap-x-2">
-              <span className="font-medium text-gray-600">
-                {quoteQuery.data
-                  ? formatNumber.format(
-                      lamportsToSol(
-                        parseFloat(quoteQuery.data?.outAmount || ""),
-                      ),
-                      5,
-                    )
-                  : "0.00"}
-              </span>
+            <div className="pointer-events-none relative mt-2 flex h-10 w-full items-center justify-between rounded-md bg-gray-200 px-3 shadow-xs sm:mt-1">
+              <div className="inline-flex items-center">
+                <Image
+                  unoptimized={true}
+                  src="/sol_coin.png"
+                  alt=""
+                  className="rounded-full"
+                  height={20}
+                  width={20}
+                />
+                <span className="pl-2 font-medium tracking-wider text-gray-500">
+                  SOL
+                </span>
+              </div>
+              <div className="inline-flex items-center gap-x-2">
+                <span className="font-medium text-gray-600">
+                  {quoteQuery.data
+                    ? formatNumber.format(
+                        decimalFixedPointToNumber(
+                          lamportsToSol(
+                            lamports(BigInt(quoteQuery.data.outAmount)),
+                          ),
+                        ),
+                        5,
+                      )
+                    : "0.00"}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <TokenQuote quoteToken={selectToken} />
+          <TokenQuote quoteToken={selectToken} />
 
-        <div className="mt-6 flex w-full gap-x-2">
-          {publicKey ? (
-            <Button
-              color="indigo"
-              type="submit"
-              className="w-full"
-              disabled={isSwapping}
-            >
-              <ChevronRightIcon className="size-5 text-white" />
-              Submit
-            </Button>
-          ) : (
-            <Button
-              color="indigo"
-              type="button"
-              className="w-full"
-              onClick={() => setVisible(true)}
-            >
-              Connect your wallet
-            </Button>
-          )}
-        </div>
-        <a
-          target="_blank"
-          rel="noreferrer"
-          href="https://station.jup.ag/docs"
-          className="mt-1 text-right text-sm text-gray-600 hover:underline"
-        >
-          Swap is powered by Jupiter
-        </a>
-      </form>
+          <div className="mt-6 flex w-full gap-x-2">
+            <Controller
+              name="slippage"
+              control={control}
+              render={({ field }) => (
+                <SlippageSelect value={field.value} onChange={field.onChange} />
+              )}
+            />
+            {account ? (
+              <Button
+                color="indigo"
+                type="submit"
+                className="w-full"
+                disabled={isSwapping}
+              >
+                <ChevronRightIcon className="size-5 text-white" />
+                Submit
+              </Button>
+            ) : (
+              <Button
+                color="indigo"
+                type="button"
+                className="w-full"
+                onClick={() => setOpen(true)}
+              >
+                Connect your wallet
+              </Button>
+            )}
+          </div>
+          <a
+            target="_blank"
+            rel="noreferrer"
+            href="https://station.jup.ag/docs"
+            className="mt-1 text-right text-sm text-gray-600 hover:underline"
+          >
+            Swap is powered by Jupiter
+          </a>
+        </form>
+      </div>
     </div>
   );
 }

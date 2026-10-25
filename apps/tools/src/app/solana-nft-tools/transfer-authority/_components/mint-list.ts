@@ -1,9 +1,9 @@
-import { isPublicKey } from "@/lib/solana/common";
+import { isAddress, type Address } from "@solana/kit";
 
 export type MintList = {
   /** Valid, unique mint addresses in the order they were given. */
-  mints: string[];
-  /** Lines that aren't a single public key. */
+  mints: Address[];
+  /** Lines that aren't a single address. */
   invalid: string[];
   /** How many repeated mints were dropped. */
   duplicates: number;
@@ -15,13 +15,13 @@ export type MintList = {
  */
 export function parseMintList(text: string): MintList {
   const seen = new Set<string>();
-  const mints: string[] = [];
+  const mints: Address[] = [];
   const invalid: string[] = [];
   let duplicates = 0;
   for (const line of text.split(/\r?\n/)) {
     const entry = line.trim();
     if (!entry) continue;
-    if (!isPublicKey(entry)) {
+    if (!isAddress(entry)) {
       invalid.push(entry);
     } else if (seen.has(entry)) {
       duplicates++;

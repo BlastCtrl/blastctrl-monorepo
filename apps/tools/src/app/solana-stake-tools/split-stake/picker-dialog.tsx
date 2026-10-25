@@ -1,8 +1,4 @@
-import {
-  compress,
-  lamportsToSol,
-  lamportsToSolString,
-} from "@/lib/solana/common";
+import { compress, lamportsToSolString } from "@/lib/solana/common";
 import type { StakeAccountType } from "@/state/queries/use-user-stake-accounts";
 import { useValidatorData } from "@/state/queries/use-validator-data";
 import {
@@ -15,23 +11,28 @@ import {
   ArrowTopRightOnSquareIcon,
   ChevronUpDownIcon,
 } from "@heroicons/react/16/solid";
-import { useWallet } from "@solana/wallet-adapter-react";
-
+import type { Address } from "@solana/kit";
 import { useState } from "react";
+import { lamportsToSol } from "@solana/kit";
+import { decimalFixedPointToString } from "@solana/fixed-points";
 
 type PickerDialogProps = {
+  owner: Address;
   data: StakeAccountType[] | undefined;
   selectedAccount: StakeAccountType | null;
   setSelectedAccount: (account: StakeAccountType | null) => void;
 };
 
 export function PickerDialog({
+  owner,
   data,
   selectedAccount,
   setSelectedAccount,
 }: PickerDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const { publicKey } = useWallet();
+  const sorted = data
+    ? [...data].sort((a, b) => Number(b.lamports - a.lamports))
+    : [];
 
   return (
     <>
@@ -45,7 +46,7 @@ export function PickerDialog({
         ) : (
           <div className="flex w-full items-center gap-2.5 overflow-hidden">
             <span className="min-w-0 grow truncate text-left">
-              {compress(selectedAccount.accountId.toString(), 4)}
+              {compress(selectedAccount.address, 4)}
             </span>
             <span className="whitespace-nowrap">
               ({lamportsToSolString(selectedAccount.lamports)} SOL)
@@ -70,39 +71,38 @@ export function PickerDialog({
               className="relative transform overflow-hidden rounded-lg bg-white px-4 pt-5 pb-4 text-left shadow-xl transition-all data-closed:translate-y-4 data-closed:opacity-0 data-enter:duration-300 data-enter:ease-out data-leave:duration-200 data-leave:ease-in sm:my-8 sm:w-full sm:max-w-lg sm:p-6 sm:data-closed:translate-y-0 sm:data-closed:scale-95"
             >
               <div className="space-y-4">
-                {data
-                  ?.sort((a, b) => b.lamports - a.lamports)
-                  ?.map((stake) => (
-                    <CloseButton
-                      key={stake.accountId.toString()}
-                      className="w-full flex-col items-start justify-between rounded-md bg-gray-50 p-4 ring-2 ring-black/10 hover:ring-2 hover:ring-indigo-600"
-                      onClick={() => {
-                        setSelectedAccount(stake);
-                      }}
-                    >
-                      <div className="flex w-full justify-between">
-                        <div className="flex flex-wrap items-center gap-y-1">
-                          <span className="mr-1.5">
-                            {compress(stake.accountId.toString(), 4)}
+                {sorted.map((stake) => (
+                  <CloseButton
+                    key={stake.address}
+                    className="w-full flex-col items-start justify-between rounded-md bg-gray-50 p-4 ring-2 ring-black/10 hover:ring-2 hover:ring-indigo-600"
+                    onClick={() => setSelectedAccount(stake)}
+                  >
+                    <div className="flex w-full justify-between">
+                      <div className="flex flex-wrap items-center gap-y-1">
+                        <span className="mr-1.5">
+                          {compress(stake.address, 4)}
+                        </span>
+                        {stake.meta.authorized.withdrawer === owner && (
+                          <span className="mr-0.5 rounded-sm border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold text-gray-700 uppercase">
+                            Withdrawer
                           </span>
-                          {stake.data.info.meta.authorized.withdrawer ===
-                            publicKey?.toString() && (
-                            <span className="mr-0.5 rounded-sm border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold text-gray-700 uppercase">
-                              Withdrawer
-                            </span>
-                          )}
-                          {stake.data.info.meta.authorized.staker ===
-                            publicKey?.toString() && (
-                            <span className="rounded-sm border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold text-gray-700 uppercase">
-                              Staker
-                            </span>
-                          )}
-                        </div>
-                        <span>{lamportsToSol(stake.lamports)} SOL</span>
+                        )}
+                        {stake.meta.authorized.staker === owner && (
+                          <span className="rounded-sm border border-gray-400 bg-gray-100 px-1 py-0.5 text-[10px]/3 font-semibold text-gray-700 uppercase">
+                            Staker
+                          </span>
+                        )}
                       </div>
-                      <ValidatorInfo account={stake} />
-                    </CloseButton>
-                  ))}
+                      <span>
+                        {decimalFixedPointToString(
+                          lamportsToSol(stake.lamports),
+                        )}{" "}
+                        SOL
+                      </span>
+                    </div>
+                    <ValidatorInfo account={stake} />
+                  </CloseButton>
+                ))}
               </div>
             </DialogPanel>
           </div>
@@ -114,10 +114,10 @@ export function PickerDialog({
 
 function ValidatorInfo({ account }: { account: StakeAccountType }) {
   const { data, error } = useValidatorData(
-    account.data.info.stake?.delegation.voter,
+    account.stake?.delegation.voterPubkey,
   );
 
-  if (account.data.info.stake === null) {
+  if (account.stake === null) {
     return (
       <div className="mt-3 text-left text-sm">
         This stake account isn&apos;t delegated

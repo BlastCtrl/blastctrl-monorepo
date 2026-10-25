@@ -34,16 +34,6 @@ export const zipMap = <T, U, V>(
   fn: (t: T, u: U | null, i: number) => V,
 ): V[] => left.map((t: T, index) => fn(t, right?.[index] ?? null, index));
 
-export async function fetcher<T>(url: string, options?: RequestInit) {
-  const res = await fetch(url, options);
-
-  if (res.status !== 200) {
-    throw new Error(res.statusText);
-  }
-
-  return (await res.json()) as T;
-}
-
 export const iife = <T>(fn: () => T): T => fn();
 
 export async function retryWithBackoff<T>(fn: () => Promise<T>, retries = 5) {

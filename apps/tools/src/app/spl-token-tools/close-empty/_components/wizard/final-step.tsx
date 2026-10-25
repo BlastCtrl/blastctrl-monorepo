@@ -1,13 +1,13 @@
 import { ownerAssetsKey } from "@/state/queries/use-owner-assets";
 import { Button } from "@blastctrl/ui/button";
 import { Dialog } from "@headlessui/react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnector } from "@solana/connector/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCloseAccountsStore } from "./wizard-context";
 
 export const FinalStep = () => {
   const queryClient = useQueryClient();
-  const { publicKey } = useWallet();
+  const { account } = useConnector();
   const closeDialog = useCloseAccountsStore((store) => store.closeDialog);
   const simulatedAccounts = useCloseAccountsStore(
     (store) => store.simulatedAccounts,
@@ -16,15 +16,13 @@ export const FinalStep = () => {
   const error = useCloseAccountsStore((store) => store.error);
 
   const handleCloseDialog = async () => {
-    if (!publicKey) {
+    if (!account) {
       closeDialog();
       return;
     }
-    queryClient.setQueryData(ownerAssetsKey(publicKey.toBase58()), undefined);
+    queryClient.setQueryData(ownerAssetsKey(account), undefined);
     // small delay
-    void queryClient.fetchQuery({
-      queryKey: ownerAssetsKey(publicKey.toBase58()),
-    });
+    void queryClient.fetchQuery({ queryKey: ownerAssetsKey(account) });
     closeDialog();
   };
 

@@ -2,7 +2,7 @@
 
 import { remainingSteps } from "@/app/spl-token-tools/reclaim-rent/_components/rent";
 import { RentScheduleChart } from "@/app/spl-token-tools/reclaim-rent/_components/rent-schedule-chart";
-import { useRentRate } from "@/app/spl-token-tools/reclaim-rent/_components/use-rent-rate";
+import { useRentRate } from "@/state/queries/use-rent";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { SiteFooter } from "./site-footer";

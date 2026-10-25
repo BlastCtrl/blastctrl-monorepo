@@ -1,52 +1,48 @@
-import { Keypair, SystemProgram } from "@solana/web3.js";
+import {
+  getTransferSolInstructionDataDecoder,
+  SYSTEM_PROGRAM_ADDRESS,
+} from "@solana-program/system";
+import {
+  AccountRole,
+  address,
+  createNoopSigner,
+  getAddressDecoder,
+  type Address,
+} from "@solana/kit";
 import { describe, expect, it } from "vitest";
-import { parseServiceFee, serviceFeeLamports } from "./fee";
+import { serviceFeeLamports, type ServiceFee } from "./fee";
+import { buildReclaimInstructions } from "./reclaim-instructions";
 import type { ReclaimableAccount } from "./types";
-import { buildReclaimTransaction } from "./use-reclaim-excess";
 
-const recipient = Keypair.generate().publicKey.toBase58();
-
-describe("parseServiceFee", () => {
-  it("reads the recipient and the rate", () => {
-    const fee = parseServiceFee(recipient, "500");
-    expect(fee?.recipient.toBase58()).toBe(recipient);
-    expect(fee?.basisPoints).toBe(500);
-  });
-
-  it("is off when either variable is missing or the rate is not usable", () => {
-    expect(parseServiceFee(undefined, "500")).toBeNull();
-    expect(parseServiceFee(recipient, undefined)).toBeNull();
-    expect(parseServiceFee(recipient, "")).toBeNull();
-    expect(parseServiceFee(recipient, "0")).toBeNull();
-    expect(parseServiceFee(recipient, "abc")).toBeNull();
-    expect(parseServiceFee(recipient, "1.5")).toBeNull();
-    expect(parseServiceFee(recipient, "10001")).toBeNull();
-  });
-});
+/** 5% to the wrapped SOL mint, as good an address as any. */
+const fee: ServiceFee = {
+  recipient: address("So11111111111111111111111111111111111111112"),
+  basisPoints: 500,
+};
 
 describe("serviceFeeLamports", () => {
   it("takes a share of the excess, rounded down", () => {
-    const fee = parseServiceFee(recipient, "500");
     expect(serviceFeeLamports(550_840, fee)).toBe(27_542);
     expect(serviceFeeLamports(19, fee)).toBe(0);
     expect(serviceFeeLamports(550_840, null)).toBe(0);
   });
 });
 
-describe("buildReclaimTransaction", () => {
-  const wallet = Keypair.generate().publicKey;
-  const lifetime = {
-    blockhash: "11111111111111111111111111111111",
-    lastValidBlockHeight: 1,
-  };
+describe("buildReclaimInstructions", () => {
+  const wallet = createNoopSigner(
+    address("BWia4unXYeEZAeZeTQFQ2sKoeQQmeGhGmVQ7z4GZJJnx"),
+  );
+  let counter = 0;
+  const freshAddress = (): Address =>
+    getAddressDecoder().decode(new Uint8Array(32).fill(++counter));
   const account = (
     program: "token" | "token-2022",
     lamports = 2_039_280,
   ): ReclaimableAccount => ({
-    id: Keypair.generate().publicKey.toBase58(),
+    id: freshAddress(),
     kind: "token-account",
-    address: Keypair.generate().publicKey.toBase58(),
-    mint: Keypair.generate().publicKey.toBase58(),
+    address: freshAddress(),
+    mint: freshAddress(),
     symbol: "TST",
     name: "Test",
     program,
@@ -58,39 +54,41 @@ describe("buildReclaimTransaction", () => {
   });
 
   it("adds one fee transfer for the batch after the withdrawals", () => {
-    const fee = parseServiceFee(recipient, "500")!;
-    const tx = buildReclaimTransaction(
+    const instructions = buildReclaimInstructions(
       [account("token"), account("token-2022"), account("token")],
       wallet,
-      lifetime,
       fee,
       false,
     );
-    expect(tx.instructions).toHaveLength(4);
-    const transfer = tx.instructions[3]!;
-    expect(transfer.programId.equals(SystemProgram.programId)).toBe(true);
-    expect(transfer.keys[0]!.pubkey.equals(wallet)).toBe(true);
-    expect(transfer.keys[1]!.pubkey.equals(fee.recipient)).toBe(true);
-    // Transfer data: u32 index (2) + u64 lamports, little endian.
-    expect(transfer.data.readUInt32LE(0)).toBe(2);
+    expect(instructions).toHaveLength(4);
+    const transfer = instructions[3]!;
+    expect(transfer.programAddress).toBe(SYSTEM_PROGRAM_ADDRESS);
+    expect(transfer.accounts![0]).toMatchObject({
+      address: wallet.address,
+      role: AccountRole.WRITABLE_SIGNER,
+      signer: wallet,
+    });
+    expect(transfer.accounts![1]).toMatchObject({
+      address: fee.recipient,
+      role: AccountRole.WRITABLE,
+    });
     // 5% of 3 × 550,840 lamports of excess.
-    expect(Number(transfer.data.readBigUInt64LE(4))).toBe(82_626);
+    expect(
+      getTransferSolInstructionDataDecoder().decode(transfer.data!),
+    ).toEqual({ discriminator: 2, amount: 82_626n });
   });
 
   it("adds nothing when there is no fee or it rounds to zero", () => {
-    const fee = parseServiceFee(recipient, "500")!;
     expect(
-      buildReclaimTransaction([account("token")], wallet, lifetime, null, false)
-        .instructions,
+      buildReclaimInstructions([account("token")], wallet, null, false),
     ).toHaveLength(1);
     expect(
-      buildReclaimTransaction(
+      buildReclaimInstructions(
         [account("token", 1_488_450)],
         wallet,
-        lifetime,
         fee,
         false,
-      ).instructions,
+      ),
     ).toHaveLength(1);
   });
 });

@@ -1,37 +1,34 @@
 "use client";
 
 import { notify } from "@/components";
-import { retryWithBackoff } from "@/lib/utils";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
 import { useOwnerAssets } from "@/state/queries/use-owner-assets";
 import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
-import {
-  createAssociatedTokenAccountInstruction,
-  getAssociatedTokenAddressSync,
-} from "@solana/spl-token";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { PublicKey, Transaction } from "@solana/web3.js";
+import { getCreateAssociatedTokenIdempotentInstructionAsync } from "@solana-program/token";
+import { useConnector } from "@solana/connector/react";
+import { address } from "@solana/kit";
 import { AccountList } from "./_components/account-list";
 
 export default function CloseEmpty() {
-  const { connection } = useConnection();
-  const { connected, publicKey, sendTransaction } = useWallet();
-  const { setVisible } = useWalletModal();
-  const { data, isFetching, refetch } = useOwnerAssets(
-    publicKey?.toString() ?? "",
-  );
+  const { isConnected, account } = useConnector();
+  const { client } = useKitClient();
+  const { setOpen } = useConnectorDialog();
+  const { data, isFetching, refetch } = useOwnerAssets(account ?? "");
 
   const handleLoad = async () => {
-    if (!connected) {
-      setVisible(true);
+    if (!isConnected) {
+      setOpen(true);
       return;
     }
     void refetch();
   };
 
+  /** Dev only: create a few empty token accounts to have something to close. */
   const handleCreateAccounts = async () => {
-    if (!publicKey || !sendTransaction) return;
-    const tokens = [
+    if (!client) return;
+    const mints = [
       "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL",
       "C8yhZZpzz2rZ4XfGkikou7JksaL1UZj6DndZVudebno4",
       "WENWENvqqNya429ubCdR81ZmD69brwQaaBYY6p3LCpk",
@@ -40,35 +37,33 @@ export default function CloseEmpty() {
       "3psH1Mj1f7yUfaD5gh6Zj7epE8hhrMkMETgv5TshQA4o",
     ];
 
-    const { value } = await retryWithBackoff(() =>
-      connection.getLatestBlockhashAndContext({ commitment: "confirmed" }),
-    );
-
-    const tx = new Transaction().add(
-      ...tokens.map((t) => createTokenAccount(new PublicKey(t), publicKey)),
-    );
-    tx.recentBlockhash = value.blockhash;
-    tx.feePayer = publicKey;
-    const signature = await sendTransaction(tx, connection, {
-      preflightCommitment: "confirmed",
-      skipPreflight: true,
-      maxRetries: 0,
-    });
-    await connection.confirmTransaction({
-      blockhash: value.blockhash,
-      lastValidBlockHeight: value.lastValidBlockHeight,
-      signature,
-    });
-
-    notify({
-      type: "success",
-      title: "Transaction confirmed",
-      txid: signature,
-    });
+    try {
+      const instructions = await Promise.all(
+        mints.map((mint) =>
+          getCreateAssociatedTokenIdempotentInstructionAsync({
+            payer: client.payer,
+            owner: client.payer.address,
+            mint: address(mint),
+          }),
+        ),
+      );
+      const result = await client.sendTransaction(instructions);
+      notify({
+        type: "success",
+        title: "Transaction confirmed",
+        txid: result.context.signature,
+      });
+    } catch (error) {
+      notify({
+        type: "error",
+        title: "Transaction error",
+        description: transactionErrorMessage(error),
+      });
+    }
   };
 
   const buttonText = () => {
-    if (!connected) return "Connect your wallet";
+    if (!isConnected) return "Connect your wallet";
     if (isFetching)
       return (
         <>
@@ -117,7 +112,7 @@ export default function CloseEmpty() {
               {buttonText()}
             </Button>
             {process.env.NODE_ENV === "development" && (
-              <Button onClick={handleCreateAccounts}>
+              <Button onClick={handleCreateAccounts} disabled={!client}>
                 DEV: create token accounts
               </Button>
             )}
@@ -131,12 +126,3 @@ export default function CloseEmpty() {
     </div>
   );
 }
-
-const createTokenAccount = (token: PublicKey, wallet: PublicKey) => {
-  return createAssociatedTokenAccountInstruction(
-    wallet,
-    getAssociatedTokenAddressSync(token, wallet),
-    wallet,
-    token,
-  );
-};

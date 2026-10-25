@@ -1,6 +1,15 @@
 "use client";
 
-import { isPublicKey, lamportsToSolString } from "@/lib/solana/common";
+import {
+  DescriptionDetails,
+  DescriptionList,
+  DescriptionTerm,
+} from "@/components/description-list";
+import { notify } from "@/components/notification";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
+import { lamportsToSolString } from "@/lib/solana/common";
 import type { StakeAccountType } from "@/state/queries/use-stake-account";
 import { useStakeAccount } from "@/state/queries/use-stake-account";
 import { Button, cn, SpinnerIcon } from "@blastctrl/ui";
@@ -12,25 +21,11 @@ import {
   Label,
   Legend,
 } from "@headlessui/react";
+import { getAuthorizeInstruction, StakeAuthorize } from "@solana-program/stake";
+import { address, isAddress, type Address } from "@solana/kit";
 import { useQueryClient } from "@tanstack/react-query";
 import type { FormEvent } from "react";
 import { useState } from "react";
-import {
-  DescriptionDetails,
-  DescriptionList,
-  DescriptionTerm,
-} from "@/components/description-list";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { notify } from "@/components/notification";
-import { retryWithBackoff } from "@/lib/utils";
-import {
-  ComputeBudgetProgram,
-  PublicKey,
-  StakeAuthorizationLayout,
-  StakeProgram,
-  Transaction,
-} from "@solana/web3.js";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 
 const DISABLE_OVERRIDE = true;
 
@@ -43,15 +38,11 @@ export function AuthorizeFormsContainer() {
   );
 
   const isSuccess = !!stakeAccAddr && !!data;
-  const isInvalid = stakeAccAddr !== "" && !isPublicKey(stakeAccAddr);
+  const isInvalid = stakeAccAddr !== "" && !isAddress(stakeAccAddr);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    console.log("Submit attempt");
     e.preventDefault();
-    if (isSuccess || isInvalid) {
-      console.log(isSuccess, isInvalid, "early return");
-      return;
-    }
+    if (isSuccess || isInvalid) return;
     await refetch();
   };
 
@@ -110,7 +101,8 @@ export function AuthorizeFormsContainer() {
 
           <AuthorizeTransactionBuilder
             reset={reset}
-            stakePubkey={new PublicKey(stakeAccAddr)}
+            stakeAddress={address(stakeAccAddr)}
+            stakeData={data}
           />
         </>
       )}
@@ -123,6 +115,7 @@ function StakeAccountDescription({
 }: {
   stakeData: StakeAccountType;
 }) {
+  const { lockup } = stakeData.meta;
   return (
     <DescriptionList className="w-[min(100%,350px)] rounded-lg border border-zinc-200 px-4">
       <DescriptionTerm>Balance</DescriptionTerm>
@@ -131,33 +124,31 @@ function StakeAccountDescription({
       </DescriptionDetails>
       <DescriptionTerm>Delegated Voter</DescriptionTerm>
       <DescriptionDetails className="truncate">
-        {stakeData.data.info.stake
-          ? stakeData.data.info.stake.delegation.voter
+        {stakeData.stake
+          ? stakeData.stake.delegation.voterPubkey
           : "Not delegated"}
       </DescriptionDetails>
       <DescriptionTerm>Withdraw Auth</DescriptionTerm>
       <DescriptionDetails className="truncate">
-        {stakeData.data.info.meta.authorized.withdrawer}
+        {stakeData.meta.authorized.withdrawer}
       </DescriptionDetails>
       <DescriptionTerm>Staking Auth</DescriptionTerm>
       <DescriptionDetails className="truncate">
-        {stakeData.data.info.meta.authorized.staker}
+        {stakeData.meta.authorized.staker}
       </DescriptionDetails>
       <DescriptionTerm>Lockup Auth</DescriptionTerm>
       <DescriptionDetails className="truncate">
-        {stakeData.data.info.meta.lockup.custodian ?? "None"}
+        {lockup.custodian ?? "None"}
       </DescriptionDetails>
-      {stakeData.data.info.meta.lockup.unixTimestamp > 0 ? (
+      {lockup.unixTimestamp > 0n ? (
         <>
           <DescriptionTerm>Lockup (Local time)</DescriptionTerm>
           <DescriptionDetails className="truncate">
-            {new Date(
-              stakeData.data.info.meta.lockup.unixTimestamp * 1000,
-            ).toLocaleString()}
+            {new Date(Number(lockup.unixTimestamp) * 1000).toLocaleString()}
           </DescriptionDetails>
           <DescriptionTerm>Lockup Timestamp</DescriptionTerm>
           <DescriptionDetails className="truncate">
-            {stakeData.data.info.meta.lockup.unixTimestamp}
+            {lockup.unixTimestamp.toString()}
           </DescriptionDetails>
         </>
       ) : null}
@@ -166,25 +157,27 @@ function StakeAccountDescription({
 }
 
 function AuthorizeTransactionBuilder({
-  stakePubkey,
+  stakeAddress,
+  stakeData,
   reset,
 }: {
-  stakePubkey: PublicKey;
+  stakeAddress: Address;
+  stakeData: StakeAccountType;
   reset: () => void;
 }) {
-  const { connection } = useConnection();
-  const { publicKey, sendTransaction } = useWallet();
-  const { setVisible } = useWalletModal();
+  const { client } = useKitClient();
+  const { setOpen } = useConnectorDialog();
   const [authority, setAuthority] = useState("");
   const [withdrawCheckbox, setWithdrawCheckbox] = useState(true);
   const [stakeCheckbox, setStakeCheckbox] = useState(true);
   const [isConfirming, setIsConfirming] = useState(false);
 
-  const { refetch } = useStakeAccount(stakePubkey.toString());
+  const { refetch } = useStakeAccount(stakeAddress);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!publicKey || !sendTransaction) return;
+    if (!client) return;
+    const owner = client.payer;
 
     if (!withdrawCheckbox && !stakeCheckbox) {
       notify({
@@ -193,64 +186,53 @@ function AuthorizeTransactionBuilder({
       });
       return;
     }
-
-    try {
-      const { context, value } = await retryWithBackoff(() =>
-        connection.getLatestBlockhashAndContext("confirmed"),
-      );
-
-      const tx = new Transaction();
-      tx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10e6 }));
-
-      if (withdrawCheckbox) {
-        tx.add(
-          StakeProgram.authorize({
-            authorizedPubkey: publicKey,
-            newAuthorizedPubkey: new PublicKey(authority),
-            stakePubkey,
-            stakeAuthorizationType: StakeAuthorizationLayout.Withdrawer,
-          }),
-        );
-      }
-
-      if (stakeCheckbox) {
-        tx.add(
-          StakeProgram.authorize({
-            authorizedPubkey: publicKey,
-            newAuthorizedPubkey: new PublicKey(authority),
-            stakePubkey,
-            stakeAuthorizationType: StakeAuthorizationLayout.Staker,
-          }),
-        );
-      }
-
-      const signature = await sendTransaction(tx, connection, {
-        minContextSlot: context.slot,
-        maxRetries: 0,
-        preflightCommitment: "confirmed",
-        skipPreflight: true,
+    if (!isAddress(authority)) {
+      notify({
+        type: "error",
+        description: "New authority is not a valid address.",
       });
-      if (!isConfirming) {
-        setIsConfirming(true);
-      }
+      return;
+    }
+    const newAuthority = address(authority);
 
-      console.log(signature);
+    // Changing the withdrawer while a lockup is in force needs the custodian's
+    // signature too; when the wallet is the custodian it signs for both.
+    // Ignored by the program when no lockup is in force.
+    const isCustodian = stakeData.meta.lockup.custodian === owner.address;
 
-      const result = await connection.confirmTransaction(
-        {
-          signature,
-          blockhash: value.blockhash,
-          lastValidBlockHeight: value.lastValidBlockHeight,
-        },
-        "confirmed",
-      );
+    // The connected wallet signs as the current authority for each type.
+    const instructions = [
+      ...(withdrawCheckbox
+        ? [
+            getAuthorizeInstruction({
+              stake: stakeAddress,
+              authority: owner,
+              lockupAuthority: isCustodian ? owner : undefined,
+              arg0: newAuthority,
+              arg1: StakeAuthorize.Withdrawer,
+            }),
+          ]
+        : []),
+      ...(stakeCheckbox
+        ? [
+            getAuthorizeInstruction({
+              stake: stakeAddress,
+              authority: owner,
+              arg0: newAuthority,
+              arg1: StakeAuthorize.Staker,
+            }),
+          ]
+        : []),
+    ];
 
-      if (result.value.err) throw Error(JSON.stringify(result.value.err));
+    setIsConfirming(true);
+    try {
+      const result = await client.sendTransaction(instructions);
 
       notify({
         type: "success",
         title: "Transaction confirmed",
-        txid: signature,
+        txid: result.context.signature,
       });
 
       await refetch();
@@ -258,7 +240,7 @@ function AuthorizeTransactionBuilder({
       notify({
         type: "error",
         title: "Transaction error",
-        description: error instanceof Error ? error.message : String(error),
+        description: transactionErrorMessage(error),
       });
     } finally {
       setIsConfirming(false);
@@ -278,18 +260,7 @@ function AuthorizeTransactionBuilder({
               onChange={setWithdrawCheckbox}
               className="group block size-4 rounded-sm border bg-white data-checked:bg-indigo-500 data-disabled:cursor-not-allowed data-disabled:opacity-50 data-checked:data-disabled:bg-gray-500"
             >
-              <svg
-                className="scale-0 stroke-white opacity-0 transition-all group-data-checked:scale-100 group-data-checked:opacity-100"
-                viewBox="0 0 14 14"
-                fill="none"
-              >
-                <path
-                  d="M3 8L6 11L11 3.5"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <CheckMark />
             </Checkbox>
             <Label>Withdraw authority</Label>
           </Field>
@@ -299,18 +270,7 @@ function AuthorizeTransactionBuilder({
               onChange={setStakeCheckbox}
               className="group block size-4 rounded-sm border bg-white data-checked:bg-indigo-500 data-disabled:cursor-not-allowed data-disabled:opacity-50 data-checked:data-disabled:bg-gray-500"
             >
-              <svg
-                className="scale-0 stroke-white opacity-0 transition-all group-data-checked:scale-100 group-data-checked:opacity-100"
-                viewBox="0 0 14 14"
-                fill="none"
-              >
-                <path
-                  d="M3 8L6 11L11 3.5"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <CheckMark />
             </Checkbox>
             <Label>Staking authority</Label>
           </Field>
@@ -322,7 +282,7 @@ function AuthorizeTransactionBuilder({
             required
             value={authority}
             onChange={({ target }) => setAuthority(target.value)}
-            invalid={authority !== "" && !isPublicKey(authority)}
+            invalid={authority !== "" && !isAddress(authority)}
             className={cn(
               "mt-2 block w-full rounded-lg border border-zinc-300 bg-white/5 px-3 py-1 text-sm/6 text-zinc-900",
               "focus:outline-hidden data-focus:outline-2 data-focus:-outline-offset-2 data-focus:outline-white/25",
@@ -334,13 +294,9 @@ function AuthorizeTransactionBuilder({
           />
         </Field>
 
-        {!publicKey ? (
+        {!client ? (
           <div className="flex justify-end">
-            <Button
-              type="button"
-              color="indigo"
-              onClick={() => void setVisible(true)}
-            >
+            <Button type="button" color="indigo" onClick={() => setOpen(true)}>
               Connect your wallet
             </Button>
           </div>
@@ -354,12 +310,37 @@ function AuthorizeTransactionBuilder({
             >
               Reset
             </Button>
-            <Button type="submit" color="indigo" className="flex-1">
+            <Button
+              type="submit"
+              color="indigo"
+              className="flex-1"
+              disabled={isConfirming}
+            >
+              {isConfirming && (
+                <SpinnerIcon className="mr-1 -ml-1 inline size-[1em] animate-spin" />
+              )}
               Submit
             </Button>
           </div>
         )}
       </form>
     </div>
+  );
+}
+
+function CheckMark() {
+  return (
+    <svg
+      className="scale-0 stroke-white opacity-0 transition-all group-data-checked:scale-100 group-data-checked:opacity-100"
+      viewBox="0 0 14 14"
+      fill="none"
+    >
+      <path
+        d="M3 8L6 11L11 3.5"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

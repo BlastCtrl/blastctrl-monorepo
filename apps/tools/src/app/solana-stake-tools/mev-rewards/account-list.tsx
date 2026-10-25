@@ -1,13 +1,10 @@
 "use client";
 
 import { notify } from "@/components/notification";
-import {
-  compress,
-  isPublicKey,
-  lamportsToSol,
-  lamportsToSolString,
-} from "@/lib/solana/common";
-import { retryWithBackoff } from "@/lib/utils";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { transactionErrorMessage } from "@/connector/transaction-error";
+import { useKitClient } from "@/connector/use-kit-client";
+import { compress, lamportsToSolString } from "@/lib/solana/common";
 import type { StakeAccountType } from "@/state/queries/use-user-stake-accounts";
 import { useUserStakeAccounts } from "@/state/queries/use-user-stake-accounts";
 import { useValidatorData } from "@/state/queries/use-validator-data";
@@ -28,33 +25,34 @@ import {
 } from "@blastctrl/ui/table";
 import { Description, Field, Input, Label } from "@headlessui/react";
 import { DocumentDuplicateIcon } from "@heroicons/react/20/solid";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { getWithdrawInstruction } from "@solana-program/stake";
+import { useConnector } from "@solana/connector/react";
 import {
-  ComputeBudgetProgram,
-  PublicKey,
-  StakeProgram,
-  Transaction,
-} from "@solana/web3.js";
+  address,
+  flattenTransactionPlanResult,
+  isAddress,
+  parallelInstructionPlan,
+  type Address,
+  lamportsToSol,
+} from "@solana/kit";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Box } from "./box";
+import { decimalFixedPointToString } from "@solana/fixed-points";
 
 export function AccountList() {
-  const { publicKey } = useWallet();
-  const { setVisible } = useWalletModal();
-  const { data, isLoading, error } = useUserStakeAccounts(
-    publicKey ?? undefined,
-  );
+  const { account } = useConnector();
+  const { setOpen } = useConnectorDialog();
+  const { data, isLoading, error } = useUserStakeAccounts(account ?? undefined);
 
-  if (!publicKey) {
+  if (!account) {
     return (
       <Box className="mt-4 max-w-2xl">
         <Button
           color="indigo"
           type="button"
           className="w-full"
-          onClick={() => setVisible(true)}
+          onClick={() => setOpen(true)}
         >
           Connect your wallet
         </Button>
@@ -73,13 +71,13 @@ export function AccountList() {
   return <AccountListForm stakeAccounts={data ?? []} />;
 }
 
-function getUnclaimedLamports(account: StakeAccountType) {
-  if (!account.data.info.stake) return 0;
-
+/** Lamports above the delegated stake and the rent reserve, i.e. what can be withdrawn. */
+function getUnclaimedLamports(account: StakeAccountType): bigint {
+  if (!account.stake) return 0n;
   return (
     account.lamports -
-    Number(account.data.info.stake.delegation.stake) -
-    Number(account.data.info.meta.rentExemptReserve)
+    account.stake.delegation.stake -
+    account.meta.rentExemptReserve
   );
 }
 
@@ -89,111 +87,71 @@ function AccountListForm({
   stakeAccounts: StakeAccountType[];
 }) {
   const queryClient = useQueryClient();
-  const { connection } = useConnection();
-  const { publicKey, sendTransaction } = useWallet();
-  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
+  const { client } = useKitClient();
+  const [selectedAccounts, setSelectedAccounts] = useState<Address[]>([]);
   const [modifyRecipient, setModifyRecipient] = useState(false);
   const [recipient, setRecipient] = useState("");
   const [isConfirming, setIsConfirming] = useState(false);
 
   const totalClaimLamports = stakeAccounts
-    .filter((acc) => selectedAccounts.includes(acc.accountId.toString()))
-    .reduce((acc, account) => acc + getUnclaimedLamports(account), 0);
+    .filter((acc) => selectedAccounts.includes(acc.address))
+    .reduce((sum, account) => sum + getUnclaimedLamports(account), 0n);
 
   const isInvalid =
-    modifyRecipient && recipient !== "" && !isPublicKey(recipient);
+    modifyRecipient && recipient !== "" && !isAddress(recipient);
 
   const handleSubmit = async () => {
-    if (!publicKey || !sendTransaction) return;
+    if (!client) return;
+    const owner = client.payer;
+    const recipientAddress =
+      modifyRecipient && recipient ? address(recipient) : owner.address;
 
+    const instructions = stakeAccounts
+      .filter((acc) => selectedAccounts.includes(acc.address))
+      .map((acc) => ({ acc, lamports: getUnclaimedLamports(acc) }))
+      .filter(({ lamports }) => lamports > 0n)
+      .map(({ acc, lamports }) =>
+        getWithdrawInstruction({
+          stake: acc.address,
+          recipient: recipientAddress,
+          withdrawAuthority: owner,
+          // A withdrawal under an active lockup needs the custodian's
+          // signature; the wallet gives it when it is the custodian.
+          lockupAuthority:
+            acc.meta.lockup.custodian === owner.address ? owner : undefined,
+          args: lamports,
+        }),
+      );
+    if (instructions.length === 0) return;
+
+    setIsConfirming(true);
     try {
-      const { context, value } = await retryWithBackoff(() =>
-        connection.getLatestBlockhashAndContext("confirmed"),
+      // Withdrawals are independent, so the planner packs as many as fit into
+      // one transaction and sends any overflow as further transactions.
+      const result = await client.sendTransactions(
+        parallelInstructionPlan(instructions),
       );
+      const signatures = flattenTransactionPlanResult(result)
+        .filter((r) => r.status === "successful")
+        .map((r) => r.context.signature);
 
-      const tx = new Transaction();
-      tx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1e5 }));
-
-      for (const address of selectedAccounts) {
-        const stakePubkey = new PublicKey(address);
-        const account = stakeAccounts.find(
-          (acc) => acc.accountId.toString() === address,
-        );
-
-        if (!account) continue;
-
-        const unclaimedLamports = getUnclaimedLamports(account);
-        if (unclaimedLamports === 0) continue;
-
-        tx.add(
-          StakeProgram.withdraw({
-            authorizedPubkey: publicKey,
-            stakePubkey,
-            lamports: unclaimedLamports,
-            toPubkey: modifyRecipient ? new PublicKey(recipient) : publicKey,
-          }),
-        );
-      }
-
-      tx.recentBlockhash = value.blockhash;
-      tx.feePayer = publicKey;
-
-      const txSize = tx.serialize({ requireAllSignatures: false }).length;
-      if (txSize >= 1232) {
+      for (const signature of signatures) {
         notify({
-          type: "error",
-          title: "Transaction size error",
-          description: `Transaction size too large. Maximum size is 1232 bytes. Current size is ${txSize} bytes. Please reduce the number of stake accounts you want to claim rewards from simultaneously.`,
+          type: "success",
+          title:
+            signatures.length > 1
+              ? `Transaction ${signatures.indexOf(signature) + 1} of ${signatures.length} confirmed`
+              : "Transaction confirmed",
+          txid: signature,
         });
-        return;
       }
-
-      const signature = await sendTransaction(tx, connection, {
-        minContextSlot: context.slot,
-        maxRetries: 0,
-        preflightCommitment: "confirmed",
-        skipPreflight: true,
-      });
-      if (!isConfirming) {
-        setIsConfirming(true);
-      }
-
-      console.log(signature);
-
-      const result = await connection.confirmTransaction(
-        {
-          signature,
-          blockhash: value.blockhash,
-          lastValidBlockHeight: value.lastValidBlockHeight,
-        },
-        "confirmed",
-      );
-
-      if (result.value.err) throw Error(JSON.stringify(result.value.err));
-
-      notify({
-        type: "success",
-        title: "Transaction confirmed",
-        txid: signature,
-      });
-
-      void queryClient.invalidateQueries({
-        exact: true,
-        queryKey: [
-          "user-stake-accounts",
-          publicKey.toString(),
-          publicKey.toString(),
-        ],
-      });
-      void queryClient.invalidateQueries({
-        exact: true,
-        queryKey: ["user-stake-accounts", publicKey.toString()],
-      });
+      setSelectedAccounts([]);
+      void queryClient.invalidateQueries({ queryKey: ["user-stake-accounts"] });
     } catch (error) {
       notify({
         type: "error",
         title: "Transaction error",
-        description: error instanceof Error ? error.message : String(error),
+        description: transactionErrorMessage(error),
       });
     } finally {
       setIsConfirming(false);
@@ -213,48 +171,41 @@ function AccountListForm({
           </TableHead>
           <tbody>
             {stakeAccounts.map((account) => {
-              const address = account.accountId.toString();
-              if (!account.data.info.stake) return null;
-
-              const unclaimedLamports =
-                account.lamports -
-                Number(account.data.info.stake.delegation.stake) -
-                Number(account.data.info.meta.rentExemptReserve);
-
-              if (unclaimedLamports === 0) return null;
+              const unclaimedLamports = getUnclaimedLamports(account);
+              if (!account.stake || unclaimedLamports === 0n) return null;
 
               return (
-                <TableRow key={address}>
+                <TableRow key={account.address}>
                   <TableCell>
                     <div className="flex flex-col gap-1">
                       <div className="font-semibold text-zinc-800">
                         {lamportsToSolString(unclaimedLamports)} SOL
                       </div>
                       <div className="text-sm text-wrap text-zinc-500">
-                        Total in account: {lamportsToSol(account.lamports)} SOL
+                        Total in account:{" "}
+                        {decimalFixedPointToString(
+                          lamportsToSol(account.lamports),
+                        )}{" "}
+                        SOL
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col items-end gap-1.5">
-                      <AccountAddress address={account.accountId} />
+                      <AccountAddress address={account.address} />
                       <ValidatorInfo account={account} />
                     </div>
                   </TableCell>
                   <TableCell>
                     <SwitchField>
                       <Switch
-                        checked={selectedAccounts.includes(address)}
+                        checked={selectedAccounts.includes(account.address)}
                         onChange={() => {
-                          setSelectedAccounts((selectedAccounts) => {
-                            if (selectedAccounts.includes(address)) {
-                              return selectedAccounts.filter(
-                                (a) => a !== address,
-                              );
-                            } else {
-                              return [...selectedAccounts, address];
-                            }
-                          });
+                          setSelectedAccounts((selected) =>
+                            selected.includes(account.address)
+                              ? selected.filter((a) => a !== account.address)
+                              : [...selected, account.address],
+                          );
                         }}
                       />
                     </SwitchField>
@@ -305,10 +256,12 @@ function AccountListForm({
             onClick={handleSubmit}
             color="indigo"
             className="h-9 px-5 sm:px-5"
-            disabled={isInvalid || totalClaimLamports === 0 || isConfirming}
+            disabled={
+              !client || isInvalid || totalClaimLamports === 0n || isConfirming
+            }
           >
             {isConfirming && <SpinnerIcon className="size-3.5 animate-spin" />}
-            {totalClaimLamports === 0
+            {totalClaimLamports === 0n
               ? "Confirm"
               : `Claim ${lamportsToSolString(totalClaimLamports)} SOL`}
           </Button>
@@ -318,13 +271,10 @@ function AccountListForm({
   );
 }
 
-function AccountAddress({ address }: { address: PublicKey }) {
+function AccountAddress({ address }: { address: Address }) {
   return (
-    <CopyButton
-      clipboard={address.toString()}
-      className="flex items-center gap-1"
-    >
-      <span>{compress(address.toString(), 4)}</span>
+    <CopyButton clipboard={address} className="flex items-center gap-1">
+      <span>{compress(address, 4)}</span>
       <DocumentDuplicateIcon className="size-4 text-zinc-400" />
     </CopyButton>
   );
@@ -332,10 +282,10 @@ function AccountAddress({ address }: { address: PublicKey }) {
 
 function ValidatorInfo({ account }: { account: StakeAccountType }) {
   const { data, error, isPending } = useValidatorData(
-    account.data.info.stake?.delegation.voter,
+    account.stake?.delegation.voterPubkey,
   );
 
-  if (account.data.info.stake === null) {
+  if (account.stake === null) {
     return (
       <div className="text-left text-sm">
         This stake account isn&apos;t delegated
@@ -351,7 +301,7 @@ function ValidatorInfo({ account }: { account: StakeAccountType }) {
 
   if (error) {
     return (
-      <div className="w-[140px] text-right hidden text-xs text-red-500 sm:block">
+      <div className="hidden w-[140px] text-right text-xs text-red-500 sm:block">
         Validator data not found
       </div>
     );

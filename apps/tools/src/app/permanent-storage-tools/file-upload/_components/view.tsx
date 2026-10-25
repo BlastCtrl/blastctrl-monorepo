@@ -1,13 +1,12 @@
 import { notify } from "@/components";
-import type { TurboStorage } from "@/lib/turbo";
-import { useNetworkConfigurationStore } from "@/state/use-network-configuration";
-import { formatAmount } from "@/types";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { useLocalStorageState } from "@/lib/hooks/use-local-storage";
+import { formatTurboCredits, type TurboStorage } from "@/lib/turbo";
+import { lamportsToSolString } from "@/lib/solana/common";
 import { Button, SpinnerIcon, cn } from "@blastctrl/ui";
 import { Transition } from "@headlessui/react";
 import { QuestionMarkCircleIcon } from "@heroicons/react/20/solid";
-import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
-import { useLocalStorage, useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useCluster, useConnector } from "@solana/connector/react";
 import { useQuery } from "@tanstack/react-query";
 import { formatRelative } from "date-fns";
 import type { ChangeEvent, DragEvent, MouseEvent } from "react";
@@ -21,19 +20,29 @@ export type UploadedFile = {
   uploadDate: number;
 };
 
+/** Legacy network names, kept so previously stored uploads stay under the same key. */
+const NETWORK_NAMES = {
+  mainnet: "mainnet-beta",
+  devnet: "devnet",
+  testnet: "testnet",
+  localnet: "localnet",
+  custom: "custom",
+} as const;
+
 function pascalify(text: string) {
   text = text.replace(/[-_\s.]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ""));
   return text.substring(0, 1).toUpperCase() + text.substring(1);
 }
 
 export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
-  const { connected, publicKey } = useWallet();
-  const { setVisible } = useWalletModal();
-  const { network } = useNetworkConfigurationStore();
+  const { isConnected: connected, account } = useConnector();
+  const { setOpen } = useConnectorDialog();
+  const { type: clusterType } = useCluster();
+  const network = NETWORK_NAMES[clusterType ?? "custom"];
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploads, setUploads] = useLocalStorage<UploadedFile[]>(
+  const [uploads, setUploads] = useLocalStorageState<UploadedFile[]>(
     `previousUploads${pascalify(network)}`,
     [],
   );
@@ -42,7 +51,7 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
     error: balanceError,
     refetch: refreshBalance,
   } = useQuery({
-    queryKey: ["turbo-balance", publicKey?.toBase58()],
+    queryKey: ["turbo-balance", account],
     queryFn: () => turbo.getBalance(),
     enabled: connected,
     retry: false,
@@ -57,7 +66,7 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
   });
 
   useEffect(() => {
-    if (network !== WalletAdapterNetwork.Mainnet) {
+    if (clusterType !== "mainnet") {
       notify({
         title: `Network is set to ${network}`,
         description: (
@@ -68,7 +77,7 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
         ),
       });
     }
-  }, [network]);
+  }, [network, clusterType]);
 
   const handleDrag = (event: DragEvent<HTMLFormElement | HTMLDivElement>) => {
     event.preventDefault();
@@ -106,7 +115,7 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
 
   const handleUpload = async () => {
     if (!connected) {
-      setVisible(true);
+      setOpen(true);
       return;
     }
 
@@ -298,7 +307,8 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
                       </a>
                     </dt>
                     <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
-                      {filePrice && formatAmount(filePrice)}
+                      {filePrice !== undefined &&
+                        `${lamportsToSolString(filePrice)} SOL`}
                       {priceError && (
                         <span role="alert">Unable to load upload price.</span>
                       )}
@@ -346,7 +356,7 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
         </p>
       )}
 
-      {balance?.basisPoints.gtn(0) && (
+      {balance && balance.raw > 0n && (
         <div className="mx-auto my-3 max-w-sm rounded-md border border-gray-300 px-3 py-2 shadow-xs">
           <div className="text-sm text-gray-900">
             <span className="mb-1 block text-xs tracking-wider text-gray-500 uppercase">
@@ -354,7 +364,7 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
             </span>
             <span className="font-medium text-gray-500">Turbo Credits </span>
             <span className="mx-1 text-base font-semibold text-gray-700">
-              {formatAmount(balance)}
+              {formatTurboCredits(balance)}
             </span>
           </div>
           <p className="pt-2 pb-1 text-xs text-gray-500">

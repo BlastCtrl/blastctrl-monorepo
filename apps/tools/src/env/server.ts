@@ -6,10 +6,6 @@ export const env = createEnv({
     REDIS_URL: z.url(),
     REDIS_TOKEN: z.string().min(1),
     OCTANE_SECRET_KEYPAIR: z.string().min(1),
-    BONK_BURN_FEE_BPS: z
-      .string()
-      .transform((v) => +v)
-      .refine((amount) => !isNaN(amount), "Bonk burn fee must be a number"),
     OCTANE_PLATFORM_FEE_BPS: z
       .string()
       .transform((v) => +v)

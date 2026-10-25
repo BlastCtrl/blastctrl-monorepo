@@ -76,9 +76,8 @@ fs.writeFileSync(
   JSON.stringify({ ...source, ref: ref ?? null, commit }, null, 2) + "\n",
 );
 
-// apps/tools consumes the SDK through dist/, so build before type checking the app.
+// apps/tools imports the SDK source directly, so type check the app against it.
 try {
-  run("pnpm", ["build"]);
   run("pnpm", ["-F", "@blastctrl/tools", "typecheck"], root);
 } catch {
   console.error(

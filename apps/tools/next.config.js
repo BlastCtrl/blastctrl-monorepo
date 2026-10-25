@@ -13,7 +13,14 @@ const nextConfig = {
   //   loader: "cloudinary",
   //   path: "https://res.cloudinary.com/doz0obwb0/image/fetch/",
   // },
-  transpilePackages: ["@blastctrl/ui", "@blastctrl/octane-core"],
+  transpilePackages: [
+    "@blastctrl/ui",
+    "@blastctrl/octane-core",
+    "@blastctrl/solace-sdk",
+    "@blastctrl/mpl-core",
+    "@blastctrl/mpl-token-metadata",
+    "@blastctrl/squads",
+  ],
   images: {
     remotePatterns: [
       {
@@ -25,6 +32,12 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      {
+        // The BONK swap is now the gasless swap with BONK selected.
+        source: "/gasless-bonk-swap",
+        destination: "/gasless-swap?token=bonk",
+        permanent: true,
+      },
       ...["tools\\.blastctrl\\.com", "reclaim\\.blastctrl\\.com"].map(
         (host) => ({
           // Next.js emits this image URL in metadata; serve it directly so

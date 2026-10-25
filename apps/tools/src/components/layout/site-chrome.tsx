@@ -25,10 +25,12 @@ export function SiteChrome({ children }: { children: ReactNode }) {
 
   return (
     <CommandPalette navigation={navigation}>
-      <Topbar />
-      <Breadcrumbs />
-      <main className="mx-auto w-full max-w-7xl grow p-4">{children}</main>
-      <Footer />
+      <div className="flex grow flex-col">
+        <Topbar />
+        <Breadcrumbs />
+        <main className="mx-auto w-full max-w-7xl grow p-4">{children}</main>
+        <Footer />
+      </div>
     </CommandPalette>
   );
 }

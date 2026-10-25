@@ -1,5 +1,4 @@
-import { TokenStandard } from "@metaplex-foundation/mpl-token-metadata";
-import { some } from "@metaplex-foundation/umi";
+import { TokenStandard } from "@/lib/solana/metaplex-token-metadata";
 import { describe, expect, it } from "vitest";
 import { address, creator, metadata } from "./fixtures";
 import type { TransferSettings } from "./plan";
@@ -129,7 +128,7 @@ describe("planTransfer", () => {
       mint,
       metadata({
         updateAuthority: wallet,
-        tokenStandard: some(TokenStandard.Fungible),
+        tokenStandard: TokenStandard.Fungible,
         creators: [creator(wallet, 100, true)],
       }),
       settings(),

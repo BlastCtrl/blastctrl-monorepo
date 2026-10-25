@@ -1,8 +1,9 @@
-import useUmi from "@/lib/hooks/use-umi";
+import { useConnectorDialog } from "@/connector/connector-dialog";
+import { useKitClient } from "@/connector/use-kit-client";
+import { useTokenMetadata } from "@/state/queries/use-token-metadata";
 import { Button, SpinnerIcon } from "@blastctrl/ui";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { PublicKey } from "@solana/web3.js";
+import { useConnector } from "@solana/connector/react";
+import { createNoopSigner, type Address } from "@solana/kit";
 import { useMemo, useState } from "react";
 import { NftTable } from "./nft-table";
 import { planVerify } from "./plan";
@@ -15,9 +16,11 @@ import {
 } from "./signer-choice";
 import { MAX_VERIFICATIONS_PER_SQUADS_TRANSACTION } from "./squads";
 import { SquadsPanel } from "./squads-panel";
-import type { ReadyVerify } from "./transactions";
-import { packBatches, verifyInstruction } from "./transactions";
-import { useNftMetadata } from "./use-nft-metadata";
+import type { Batch, ReadyVerify } from "./transactions";
+import { verifyBatches } from "./transactions";
+import { useResolved } from "./use-resolved";
+
+const NO_BATCHES: Batch[] = [];
 
 const MODES = {
   wallet: {
@@ -32,14 +35,14 @@ const MODES = {
 };
 
 type Props = {
-  mints: string[];
+  mints: Address[];
   onBusyChange: (busy: boolean) => void;
 };
 
 export function VerifyStep({ mints, onBusyChange }: Props) {
-  const umi = useUmi();
-  const { publicKey } = useWallet();
-  const { setVisible } = useWalletModal();
+  const { account } = useConnector();
+  const { client } = useKitClient();
+  const { setOpen } = useConnectorDialog();
 
   const [mode, setMode] = useState<SignerMode>("wallet");
   const [multisigAddress, setMultisigAddress] = useState("");
@@ -47,12 +50,25 @@ export function VerifyStep({ mints, onBusyChange }: Props) {
     multisigAddress,
     mode === "squads",
   );
-  const [checked, setChecked] = useState<string[]>([]);
-  const metadata = useNftMetadata(checked);
+  const [checked, setChecked] = useState<Address[]>([]);
+  const metadata = useTokenMetadata(checked);
 
-  /** The creator whose verification gets built, empty until it's known. */
-  const creator =
-    mode === "wallet" ? (publicKey?.toBase58() ?? "") : (multisig?.vault ?? "");
+  /** The creator whose verification gets built, null until it's known. */
+  const creator = mode === "wallet" ? account : (multisig?.vault ?? null);
+  /**
+   * Who signs the instructions: the kit client's wallet signer, or a noop
+   * signer for the vault, which signs through the Squads proposal.
+   */
+  const vault = multisig?.vault;
+  const creatorSigner = useMemo(
+    () =>
+      mode === "wallet"
+        ? (client?.payer ?? null)
+        : vault
+          ? createNoopSigner(vault)
+          : null,
+    [mode, client, vault],
+  );
 
   const plans = useMemo(() => {
     if (!metadata.data || !creator) return null;
@@ -61,29 +77,25 @@ export function VerifyStep({ mints, onBusyChange }: Props) {
     );
   }, [metadata.data, checked, creator]);
 
-  const batches = useMemo(() => {
-    if (!plans || !creator) return [];
-    return packBatches(
-      plans
-        .filter((p): p is ReadyVerify => p.status === "ready")
-        .map((plan) => ({
-          mint: plan.mint,
-          instruction: verifyInstruction(umi, plan, creator),
-        })),
-      new PublicKey(creator),
+  const pendingBatches = useMemo(() => {
+    if (!plans || !creatorSigner) return null;
+    return verifyBatches(
+      plans.filter((p): p is ReadyVerify => p.status === "ready"),
+      creatorSigner,
       mode === "squads"
         ? { maxPerTransaction: MAX_VERIFICATIONS_PER_SQUADS_TRANSACTION }
         : undefined,
     );
-  }, [plans, creator, umi, mode]);
+  }, [plans, creatorSigner, mode]);
+  const batches = useResolved(pendingBatches) ?? NO_BATCHES;
 
   const listChanged =
     checked.length > 0 &&
     (checked.length !== mints.length || checked.some((m, i) => m !== mints[i]));
 
   const check = () => {
-    if (mode === "wallet" && !publicKey) {
-      setVisible(true);
+    if (mode === "wallet" && !account) {
+      setOpen(true);
       return;
     }
     if (!listChanged && checked.length > 0) {
@@ -94,7 +106,7 @@ export function VerifyStep({ mints, onBusyChange }: Props) {
   };
 
   const checkLabel =
-    mode === "wallet" && !publicKey
+    mode === "wallet" && !account
       ? "Connect your wallet"
       : `Check ${mints.length} ${mints.length === 1 ? "NFT" : "NFTs"}`;
 

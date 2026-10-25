@@ -1,0 +1,8 @@
+{
+  "repository": "https://github.com/metaplex-foundation/mpl-token-metadata",
+  "path": "idls/token_metadata.json",
+  "ref": "main",
+  "commit": "353d01be4af3018e1daf49d0cd35ba9f731d9c9c",
+  "committedAt": "2026-09-15T20:52:03Z",
+  "fetchedAt": "2026-10-21T12:29:25.107Z"
+}
