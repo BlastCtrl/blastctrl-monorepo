@@ -4,7 +4,7 @@ import type { DiscoveredAccount } from "@blastctrl/rent-reclaimer";
 
 afterEach(() => vi.unstubAllGlobals());
 
-it("uses each scenario's web account order for per-batch fee rounding", () => {
+it("uses the web account order for per-batch fee rounding", () => {
   const accounts: DiscoveredAccount[] = Array.from({ length: 11 }, (_, i) => ({
     id: String(i),
     address: String(i),
@@ -18,7 +18,6 @@ it("uses each scenario's web account order for per-batch fee rounding", () => {
     minimum: i === 10 ? 0 : 100,
   }));
   const result = summarize("owner", accounts, 500);
-  expect(result.ifAccountsKeptOpen.estimatedServiceFeeLamports).toBe("3");
   expect(result.estimate.estimatedServiceFeeLamports).toBe("2");
 });
 

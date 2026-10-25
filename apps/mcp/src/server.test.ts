@@ -52,7 +52,7 @@ async function connect(scan: Scan) {
 }
 
 describe("MCP over real local HTTP", () => {
-  it("initializes, lists one read-only tool, and returns both quotes and the web link", async () => {
+  it("initializes, lists one read-only tool, and returns the closing estimate and the web link", async () => {
     const scan = vi.fn<Scan>().mockResolvedValue([account]);
     const { client } = await connect(scan);
     const { tools } = await client.listTools();
@@ -74,10 +74,6 @@ describe("MCP over real local HTTP", () => {
       address,
       network: "mainnet-beta",
       scannedAccountCount: 1,
-      ifAccountsKeptOpen: {
-        grossLamports: "550840",
-        estimatedNetLamports: "518298",
-      },
       estimate: {
         grossLamports: "2039280",
         estimatedNetLamports: "2006738",
