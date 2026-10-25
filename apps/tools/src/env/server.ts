@@ -14,6 +14,7 @@ export const env = createEnv({
         "Octane platform fee must be a number",
       ),
     BLAST_BACKEND_URL: z.url(),
+    RPC_ENDPOINT: z.url(),
   },
   runtimeEnv: process.env,
 });
