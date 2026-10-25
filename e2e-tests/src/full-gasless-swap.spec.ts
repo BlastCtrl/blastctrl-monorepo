@@ -272,18 +272,24 @@ async function phantomOnboarding(extensionPage: Page) {
   await extensionPage.getByTestId("onboarding-form-terms-of-service-checkbox").click(); // Check the checkbox
   await extensionPage.getByTestId("onboarding-form-submit-button").click(); // Submit
 
-  // Older Phantom versions end on a "Get Started" screen; newer ones close
-  // the onboarding tab on their own after the password step.
+  // Phantom used to end onboarding on a "Get Started" screen. Wait for it
+  // with a bound shorter than the test's, so that on another screen the
+  // error says what Phantom shows instead of the test just timing out.
   const getStarted = extensionPage
     .getByTestId("onboarding-form-submit-button")
     .filter({ hasText: /Get Started/i });
   try {
-    await getStarted.waitFor();
+    await getStarted.waitFor({ timeout: 30_000 });
   } catch (error) {
-    // waitFor rejects with "Target page ... has been closed" when Phantom
-    // closes the tab, which means onboarding is done.
+    // Phantom closed the tab itself: onboarding is done.
     if (extensionPage.isClosed()) return;
-    throw error;
+    const texts = async (selector: string) =>
+      (await extensionPage.locator(selector).allInnerTexts()).join(" | ");
+    throw new Error(
+      `Phantom onboarding didn't reach "Get Started". Headings: ${await texts("h1, h2, h3")}. ` +
+        `Buttons: ${await texts("button")}`,
+      { cause: error },
+    );
   }
   await getStarted.click();
   await extensionPage.close();
