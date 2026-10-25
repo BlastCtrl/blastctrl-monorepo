@@ -1,7 +1,6 @@
 import { redisClient } from "./redis";
 import type { Config } from "cache-manager";
 import { caching } from "cache-manager";
-// import * as devalue from "devalue";
 
 const stringify = (value: unknown) => JSON.stringify(value);
 const parse = (val: string) => JSON.parse(val);

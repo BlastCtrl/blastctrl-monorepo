@@ -45,7 +45,6 @@
     "cuelume": "^0.2.8",
     "date-fns": "^3.6.0",
     "decimal.js": "^10.6.0",
-    "devalue": "^5.7.1",
     "jwt-decode": "^4.0.0",
     "motion": "^13.4.4",
     "next": "16.4.3",
