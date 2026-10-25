@@ -43,6 +43,7 @@ jobs:
           OCTANE_PLATFORM_FEE_BPS: "0"
           BLAST_BACKEND_URL: https://backend.example.invalid
           NEXT_PUBLIC_RPC_ENDPOINT: https://rpc.example.invalid
+          RPC_ENDPOINT: https://rpc.example.invalid
 
       - name: Typecheck
         run: pnpm typecheck

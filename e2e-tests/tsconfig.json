@@ -4,7 +4,9 @@
     "allowJs": true,
     "declaration": false,
     "declarationMap": false,
-    "outDir": "dist"
+    "outDir": "dist",
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true
   },
   "include": ["src/**/*.ts", "playwright.config.ts"],
   "exclude": ["BFNAELMOMEIMHLPMGJNJOPHHPKKOLJPA*"]

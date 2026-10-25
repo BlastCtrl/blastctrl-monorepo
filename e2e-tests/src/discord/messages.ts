@@ -1,5 +1,5 @@
 import { formatNumber } from "../solana-lib.js";
-import { SwapStepData, type CleanupStepData } from "./test-reporter.js";
+import type { CleanupStepData, SwapStepData } from "./test-reporter.js";
 
 export function createInitialTestMessage(data: {
   testId: string;
@@ -129,6 +129,7 @@ export function createComprehensiveTestReport(data: {
           name: `${swapStatus.success ? "✅" : "❌"} 2. Gasless Swap Phase`,
           value: `${swapStatus.success ? "Successfully" : "Failed to"} swap **${formatNumber(swapStatus.swapAmount, 6)} USDC for SOL** in ${swapStatus.duration.toFixed(2)}s
           ${swapStatus.transactionId ? `[View Transaction](https://explorer.solana.com/tx/${swapStatus.transactionId})` : ""}
+          ${swapStatus.phantomFlagged ? `\n⚠️ **Phantom flagged the dApp as possibly malicious.** Users see "Request blocked" and have to confirm it's unsafe.` : ""}
           ${swapStatus.errorReason ? `\n❌ **Error:** ${swapStatus.errorReason}` : ""}`,
           inline: false,
         },

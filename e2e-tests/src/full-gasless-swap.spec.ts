@@ -108,6 +108,7 @@ test.afterAll(async () => {
 test("test swap", async ({ page, extensionId }) => {
   let swapStartTime = Date.now();
   let swapDuration: number;
+  let phantomFlagged = false;
 
   try {
     const context = page.context();
@@ -155,12 +156,7 @@ test("test swap", async ({ page, extensionId }) => {
     const confirmPromise = context.waitForEvent("page");
     await page.getByRole("button").filter({ hasText: "Submit" }).click();
     const phantomConfirmWindow = await confirmPromise;
-
-    const confirmButton = phantomConfirmWindow.getByTestId("primary-button");
-    const unsafeConfirmButton = phantomConfirmWindow.locator("p", {
-      hasText: "Confirm anyway",
-    });
-    await confirmButton.or(unsafeConfirmButton).first().click();
+    phantomFlagged = await approveInPhantom(phantomConfirmWindow);
 
     const successToast = page.getByTestId("swap-success-toast");
     await expect(successToast).toBeVisible({
@@ -179,6 +175,7 @@ test("test swap", async ({ page, extensionId }) => {
       swapAmount: swapAmount,
       duration: swapDuration,
       transactionId,
+      phantomFlagged,
     });
   } catch (error) {
     console.error("Swap failed:", error);
@@ -189,11 +186,73 @@ test("test swap", async ({ page, extensionId }) => {
       swapAmount: 4, // Default swap amount
       duration: swapDuration,
       errorReason: error instanceof Error ? error.message : "Unknown error",
+      phantomFlagged,
     });
 
     throw error;
   }
 });
+
+// Phantom can show extra screens before it signs. When it flags the dApp as
+// possibly malicious, it shows "Request blocked" (Proceed anyway), then the
+// transaction (Confirm (unsafe)), then "Are you sure?" with a checkbox and
+// "Yes, confirm (unsafe)". On each screen, log the buttons and use the first
+// control we know, until Phantom signs and closes the window.
+// Only enabled buttons count: Phantom disables a confirm while it simulates
+// the transaction, and until the checkbox is ticked.
+// Returns whether Phantom flagged the request, so the report can say so.
+async function approveInPhantom(phantomWindow: Page): Promise<boolean> {
+  const proceed = phantomWindow.getByRole("button", { name: /Proceed anyway/i, disabled: false });
+  // "Confirm" or "Confirm (unsafe)"
+  const confirm = phantomWindow.getByRole("button", { name: /confirm/i, disabled: false });
+  // Some confirms are text, not buttons: "Yes, confirm (unsafe)" after the
+  // checkbox, and "Confirm anyway" in older versions.
+  const confirmText = phantomWindow.getByText(/^(Yes, confirm|Confirm anyway)/i);
+  // The checkbox is covered by its label, so click the label, as a person
+  // would. Its aria-checked may not update, so tick it only once.
+  const acknowledge = phantomWindow
+    .locator("label")
+    .filter({ has: phantomWindow.getByRole("checkbox") });
+  const buttons = async () => (await phantomWindow.getByRole("button").allInnerTexts()).join(" | ");
+
+  let acknowledged = false;
+  let flagged = false;
+  for (let screen = 1; screen <= 8; screen++) {
+    const controls = [
+      // Tick the checkbox first: the confirm text next to it can't be
+      // disabled, it just doesn't work until the box is ticked.
+      ...(acknowledged ? [] : [{ kind: "acknowledge", locator: acknowledge }]),
+      { kind: "proceed", locator: proceed },
+      { kind: "confirm", locator: confirm },
+      { kind: "confirm", locator: confirmText },
+    ].map((control) => ({ ...control, locator: control.locator.first() }));
+
+    try {
+      const anyControl = controls.map((control) => control.locator).reduce((a, b) => a.or(b));
+      await anyControl.first().waitFor({ timeout: 10_000 });
+    } catch {
+      if (phantomWindow.isClosed()) return flagged;
+      throw new Error(`No known control on Phantom screen ${screen}: ${await buttons()}`);
+    }
+    console.log(`Phantom screen ${screen}: ${await buttons()}`);
+
+    for (const control of controls) {
+      if (await control.locator.isVisible()) {
+        await control.locator.click();
+        if (control.kind !== "confirm") flagged = true;
+        if (control.kind === "acknowledge") {
+          acknowledged = true;
+        } else {
+          // Let the screen change, or the window close.
+          await control.locator.waitFor({ state: "hidden", timeout: 2_000 }).catch(() => {});
+        }
+        break;
+      }
+    }
+    if (phantomWindow.isClosed()) return flagged;
+  }
+  throw new Error("Phantom kept showing screens without signing");
+}
 
 async function phantomOnboarding(extensionPage: Page) {
   await extensionPage.getByRole("button", { name: /I already have a wallet/i }).click();
@@ -207,14 +266,31 @@ async function phantomOnboarding(extensionPage: Page) {
   await extensionPage.getByPlaceholder("Private key").fill(CONFIG.swapperPrivateKey);
   await extensionPage.getByTestId("onboarding-form-submit-button").click();
 
-  const password = "aaaaaaaa";
+  const password = "L!5csLRYFG5jq^3h";
   await extensionPage.getByTestId("onboarding-form-password-input").fill(password); // Password
   await extensionPage.getByTestId("onboarding-form-confirm-password-input").fill(password); // Confirm password
   await extensionPage.getByTestId("onboarding-form-terms-of-service-checkbox").click(); // Check the checkbox
   await extensionPage.getByTestId("onboarding-form-submit-button").click(); // Submit
-  await extensionPage
+
+  // Phantom used to end onboarding on a "Get Started" screen. Wait for it
+  // with a bound shorter than the test's, so that on another screen the
+  // error says what Phantom shows instead of the test just timing out.
+  const getStarted = extensionPage
     .getByTestId("onboarding-form-submit-button")
-    .filter({ hasText: /Get Started/i })
-    .click(); // Get Started
+    .filter({ hasText: /Get Started/i });
+  try {
+    await getStarted.waitFor({ timeout: 30_000 });
+  } catch (error) {
+    // Phantom closed the tab itself: onboarding is done.
+    if (extensionPage.isClosed()) return;
+    const texts = async (selector: string) =>
+      (await extensionPage.locator(selector).allInnerTexts()).join(" | ");
+    throw new Error(
+      `Phantom onboarding didn't reach "Get Started". Headings: ${await texts("h1, h2, h3")}. ` +
+        `Buttons: ${await texts("button")}`,
+      { cause: error },
+    );
+  }
+  await getStarted.click();
   await extensionPage.close();
 }
