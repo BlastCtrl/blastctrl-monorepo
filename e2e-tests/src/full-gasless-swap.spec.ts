@@ -266,7 +266,7 @@ async function phantomOnboarding(extensionPage: Page) {
   await extensionPage.getByPlaceholder("Private key").fill(CONFIG.swapperPrivateKey);
   await extensionPage.getByTestId("onboarding-form-submit-button").click();
 
-  const password = "aaaaaaaa";
+  const password = "L!5csLRYFG5jq^3h";
   await extensionPage.getByTestId("onboarding-form-password-input").fill(password); // Password
   await extensionPage.getByTestId("onboarding-form-confirm-password-input").fill(password); // Confirm password
   await extensionPage.getByTestId("onboarding-form-terms-of-service-checkbox").click(); // Check the checkbox

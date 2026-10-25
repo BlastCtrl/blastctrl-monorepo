@@ -8,7 +8,7 @@ export default defineConfig({
   retries: 0,
   // Phantom may show several screens before it signs, each waiting for a
   // simulation, and the swap gets up to 60s to land.
-  timeout: 120_000,
+  timeout: 90_000,
   workers: process.env.CI ? 1 : undefined,
   reporter: "html",
   use: {
