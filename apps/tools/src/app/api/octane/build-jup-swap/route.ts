@@ -1,4 +1,3 @@
-import { env as clientEnv } from "@/env/client";
 import { env } from "@/env/server";
 import cache from "@/lib/cache-manager";
 import { buildJupiterSwapToSOL } from "@blastctrl/octane-core";
@@ -19,7 +18,7 @@ export const runtime = "nodejs";
 const feePayer = await createKeyPairSignerFromBytes(
   getBase58Encoder().encode(env.OCTANE_SECRET_KEYPAIR),
 );
-const rpc = createSolanaRpc(clientEnv.NEXT_PUBLIC_RPC_ENDPOINT);
+const rpc = createSolanaRpc(env.RPC_ENDPOINT);
 
 const body = z.object({
   user: z.string().refine(isAddress, "Not an address"),
