@@ -19,6 +19,8 @@ export type SwapStepData = {
   duration: number;
   transactionId?: string;
   errorReason?: string;
+  // Phantom flagged the dApp as possibly malicious and we clicked through
+  phantomFlagged?: boolean;
 };
 
 /**
@@ -50,14 +52,7 @@ export class TestReporter {
     errorReason?: string;
   } | null = null;
 
-  swapStatus: {
-    success: boolean;
-    swapAmount: number;
-    receivedAmount?: number;
-    duration: number;
-    transactionId?: string;
-    errorReason?: string;
-  } | null = null;
+  swapStatus: SwapStepData | null = null;
 
   cleanupStatus: CleanupStepData | null = null;
 
@@ -87,10 +82,10 @@ export class TestReporter {
   async init(): Promise<void> {
     try {
       // Get initial balances
-      const funderSol = (await getSolBalance(CONFIG.funder.publicKey)) / 1e9;
-      const funderUsdc = await getTokenBalance(CONFIG.funder.publicKey, CONFIG.usdcMint);
-      const swapperSol = (await getSolBalance(CONFIG.swapper.publicKey)) / 1e9;
-      const swapperUsdc = await getTokenBalance(CONFIG.swapper.publicKey, CONFIG.usdcMint);
+      const funderSol = (await getSolBalance(CONFIG.funder.address)) / 1e9;
+      const funderUsdc = await getTokenBalance(CONFIG.funder.address, CONFIG.usdcMint);
+      const swapperSol = (await getSolBalance(CONFIG.swapper.address)) / 1e9;
+      const swapperUsdc = await getTokenBalance(CONFIG.swapper.address, CONFIG.usdcMint);
 
       // Store initial balances
       this.initialBalances = {
@@ -170,10 +165,10 @@ export class TestReporter {
     try {
       // wait 5 seconds before getting the final balances
       await sleep(5000);
-      const finalFunderSol = (await getSolBalance(CONFIG.funder.publicKey)) / 1e9;
-      const finalFunderUsdc = await getTokenBalance(CONFIG.funder.publicKey, CONFIG.usdcMint);
-      const finalSwapperSol = (await getSolBalance(CONFIG.swapper.publicKey)) / 1e9;
-      const finalSwapperUsdc = await getTokenBalance(CONFIG.swapper.publicKey, CONFIG.usdcMint);
+      const finalFunderSol = (await getSolBalance(CONFIG.funder.address)) / 1e9;
+      const finalFunderUsdc = await getTokenBalance(CONFIG.funder.address, CONFIG.usdcMint);
+      const finalSwapperSol = (await getSolBalance(CONFIG.swapper.address)) / 1e9;
+      const finalSwapperUsdc = await getTokenBalance(CONFIG.swapper.address, CONFIG.usdcMint);
 
       // Store final balances and success status
       this.finalBalances = {
