@@ -16,6 +16,7 @@ const nextConfig = {
   transpilePackages: [
     "@blastctrl/ui",
     "@blastctrl/octane-core",
+    "@blastctrl/rent-reclaimer",
     "@blastctrl/solace-sdk",
     "@blastctrl/mpl-core",
     "@blastctrl/mpl-token-metadata",

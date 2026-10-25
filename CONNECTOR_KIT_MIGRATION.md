@@ -37,7 +37,7 @@ Reference implementations, by area:
 | Transfer-authority: metadata through the shared `useTokenMetadata` query, transfer and verify-creator through the Metaplex builders, batches packed by kit size, Squads proposals through the Squads module and the ordered sender | `src/app/solana-nft-tools/transfer-authority/**`, `src/lib/solana/squads-multisig.ts`, `packages/squads/**`, `src/connector/send-batches.ts` (`sendInOrder`), `src/state/queries/use-token-metadata.ts` |
 | Octane backend (gasless swaps): `packages/octane-core` builds the fee-payer-signed swap on kit; the build route serves it base64-encoded                                                                                           | `packages/octane-core/src/**`, `apps/tools/src/app/api/octane/{build-jup-swap,price}/route.ts`                                                                                                          |
 | Gasless swap, BONK included (the separate BONK page was merged into it): the backend's fee-payer-signed transaction decoded with kit, signed by the wallet through the kit signer, sent and confirmed with kit's factory           | `src/app/gasless-swap/**`, `src/lib/octane.ts`, `src/lib/hooks/use-gasless-swap.ts`, `src/state/queries/use-token-balance.ts`                                                                           |
-| Shared helpers: unsigned simulation, compute headroom, Token-2022 parsing, mint/SOL-balance/token-account queries                                                                                                                  | `src/connector/{simulate,resource-limits}.ts`, `src/lib/solana/token-2022.ts`, `src/state/queries/{use-mint,use-sol-balance,use-token-account-existence}.ts`                                            |
+| Shared helpers: unsigned simulation, compute headroom, Token-2022 parsing, mint/SOL-balance/token-account queries                                                                                                                  | `src/connector/{simulate,resource-limits}.ts`, `packages/kit-extensions/src/token-2022.ts`, `src/state/queries/{use-mint,use-sol-balance,use-token-account-existence}.ts`                                            |
 | Explorer links by connector cluster                                                                                                                                                                                                | `src/state/use-query-context.ts`                                                                                                                                                                        |
 
 ## What is left of web3.js
@@ -68,7 +68,7 @@ The `@solana/wallet-adapter-*` packages, `@solana/spl-token`, `bs58`,
 `bn.js` and `bignumber.js` are gone from `apps/tools/package.json`; the
 adapter provider, its network store, the old wallet menus and the web3
 batch sender are deleted. `@solana-program/token-2022` is deliberately not
-installed (it peers on `@solana/zk-sdk`); `lib/solana/token-2022.ts` holds
+installed (it peers on `@solana/zk-sdk`); `token-2022.ts` in `@blastctrl/kit-extensions` holds
 what the app needs from that program.
 
 To see what a route ships, `pnpm exec next build --analyze` in `apps/tools`
@@ -412,7 +412,7 @@ Instruction builders come from the `@solana-program/*` packages (`stake`,
 pinning versions that peer with Kit 8.5). `@solana-program/token-2022` is
 deliberately not installed (it peers on `@solana/zk-sdk`): the `token` client's
 builders take the Token-2022 program address via `programAddress`, and
-`lib/solana/token-2022.ts` holds that address plus the mint-extension parser.
+`token-2022.ts` in `@blastctrl/kit-extensions` holds that address plus the mint-extension parser.
 Metaplex programs go through the generated kit clients as described above.
 Account inputs accept an `Address` **or** a signer object; pass the signer
 when the account must sign.
@@ -451,7 +451,7 @@ a `KeyPairSigner` (via `createKeyPairSignerFromBytes`). A `KeyPairSigner` also e
   `enabled` only when it exists, so pages render before the wallet connects.
 - `useMintAccount(mint)` (`src/state/queries/use-mint.ts`) gives a mint's
   decimals, owning program and Token-2022 extension ids
-  (`lib/solana/token-2022.ts` parses the TLV list without
+  (`token-2022.ts` in `@blastctrl/kit-extensions` parses the TLV list without
   `@solana-program/token-2022`). Use the program for ATA derivation and
   transfers so Token-2022 mints work; `useTokenAccountExistence` takes it too.
   The distributor sends it to the backend as `tokenProgram` at creation and
@@ -460,7 +460,7 @@ a `KeyPairSigner` (via `createKeyPairSignerFromBytes`). A `KeyPairSigner` also e
 - `@solana-program/token` 0.18 has `getWithdrawExcessLamportsInstruction`
   (Token-2022 and p-token both use index 38), so the hand-built instruction
   is gone. `decodeMint` reads 82 bytes from anything, so tell mints from
-  token accounts first with `isMintAccountData` in `lib/solana/token-2022.ts`
+  token accounts first with `isMintAccountData` from `@blastctrl/kit-extensions`
   (82 bytes, or the mint account type after the token-account padding).
 - `getTokenAccountsByOwner` with `encoding: "jsonParsed"` is typed
   (`TokenAccountInfoWithJsonData`); `lamports` and `space` arrive as

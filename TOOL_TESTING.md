@@ -458,7 +458,7 @@ map custom stake codes to names with `getStakeErrorMessage`.
   accounts in one `getMultipleAccounts` before planning; the realistic
   PYUSD account transfers whole (PYUSD's fee is zero, its hook unset). A
   mint with an active transfer hook (`getTransferHookProgram` in
-  `lib/solana/token-2022.ts`) is refused before the wallet is asked with a
+  `token-2022.ts` in `@blastctrl/kit-extensions`) is refused before the wallet is asked with a
   message naming the hook program and suggesting burn: the hook's extra
   accounts are not resolved. No hooked mint was on hand to exercise that
   path. **Open, UX:** frozen accounts are selectable and sink

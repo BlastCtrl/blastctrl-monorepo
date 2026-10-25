@@ -7,7 +7,7 @@ import {
 } from "@solana/kit";
 
 /**
- * What the app needs from Token-2022 without `@solana-program/token-2022`,
+ * What the apps need from Token-2022 without `@solana-program/token-2022`,
  * which is not installed because it peers on `@solana/zk-sdk`. The token
  * client's instruction builders accept the program address via
  * `programAddress`, and the extension list below is a plain TLV walk.

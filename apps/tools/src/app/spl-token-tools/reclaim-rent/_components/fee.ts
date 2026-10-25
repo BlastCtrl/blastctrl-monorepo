@@ -1,4 +1,8 @@
 import { env } from "@/env/client";
+import {
+  serviceFeeForBatches as batchServiceFee,
+  serviceFeeLamports as serviceFeeAt,
+} from "@blastctrl/rent-reclaimer";
 import { getTransferSolInstruction } from "@solana-program/system";
 import type { Address, TransactionSigner } from "@solana/kit";
 import { FEE_PER_TRANSACTION } from "./rent";
@@ -29,7 +33,18 @@ export function serviceFeeLamports(
   excessLamports: number,
   fee: ServiceFee | null = SERVICE_FEE,
 ) {
-  return fee ? Math.floor((excessLamports * fee.basisPoints) / 10_000) : 0;
+  return fee ? serviceFeeAt(excessLamports, fee.basisPoints) : 0;
+}
+
+/**
+ * The service fee of reclaiming these accounts in this order, one transfer
+ * per transaction, each rounded down on its own, as the transfers are built.
+ */
+export function serviceFeeForBatches(
+  accounts: ReclaimableAccount[],
+  fee: ServiceFee | null = SERVICE_FEE,
+) {
+  return fee ? Number(batchServiceFee(accounts, fee.basisPoints)) : 0;
 }
 
 /** What one transaction's accounts put in the wallet, after its fees. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { keepOpenReason } from "./types";
+import { keepOpenReason } from "./accounts";
 
 describe("keepOpenReason", () => {
   const owner = "Owner1111111111111111111111111111111111111";
