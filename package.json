@@ -5,10 +5,12 @@
     "node": "24.x"
   },
   "scripts": {
-    "dev": "pnpm -r --parallel dev",
+    "dev": "pnpm -F @blastctrl/tools dev",
     "format": "pnpm run --recursive format",
     "lint": "pnpm run --recursive lint",
     "build": "pnpm -F @blastctrl/tools... build",
+    "dev:mcp": "pnpm -F @blastctrl/mcp dev",
+    "test:mcp": "pnpm -F @blastctrl/mcp test",
     "api:update": "node packages/solace-sdk/scripts/update-api.mjs",
     "typecheck": "pnpm -r typecheck"
   },
