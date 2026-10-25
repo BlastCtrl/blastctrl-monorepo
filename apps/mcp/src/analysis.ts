@@ -8,8 +8,7 @@ import {
 } from "@blastctrl/rent-reclaimer";
 import { address, createSolanaRpc } from "@solana/kit";
 
-export const RECLAIM_URL =
-  "https://tools.blastctrl.com/spl-token-tools/reclaim-rent";
+export const RECLAIM_URL = "https://reclaim.blastctrl.com";
 // getGenesisHash returns the full hash, not the shortened CAIP-2 network ID.
 const MAINNET_GENESIS_HASH = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d";
 export const ACCOUNT_LIMIT = 5000;
@@ -95,7 +94,7 @@ export function summarize(
       "Keeping accounts open returns excess rent only. Closing eligible empty accounts also returns the remaining rent deposit.",
       "Network fees use the web tool's base estimate of 5000 lamports per transaction. Wallet priority fees are not included. Fees and balances can change.",
       "The estimate assumes an owner that can sign directly. It does not establish control of this address or support multisig signing.",
-      "To reclaim, open BlastCtrl, select mainnet, connect this address, and run a new scan. The website does not read an address from this link.",
+      "To reclaim, open the BlastCtrl app, connect this address, and run a new scan. The website does not read an address from this link.",
     ],
   };
 }
