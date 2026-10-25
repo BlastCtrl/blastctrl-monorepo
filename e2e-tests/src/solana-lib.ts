@@ -1,127 +1,153 @@
+import { getTransferSolInstruction } from "@solana-program/system";
 import {
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  TOKEN_PROGRAM_ID,
-  createAssociatedTokenAccountIdempotentInstruction,
-  createCloseAccountInstruction,
-  createTransferInstruction,
-  getAccount,
-  getAssociatedTokenAddressSync,
-} from "@solana/spl-token";
+  fetchToken,
+  findAssociatedTokenPda,
+  getCloseAccountInstruction,
+  getCreateAssociatedTokenIdempotentInstruction,
+  getTransferInstruction,
+  TOKEN_PROGRAM_ADDRESS,
+} from "@solana-program/token";
 import {
-  Connection,
-  Keypair,
-  PublicKey,
-  SystemProgram,
-  Transaction,
-  TransactionInstruction,
-  sendAndConfirmTransaction,
-} from "@solana/web3.js";
+  appendTransactionMessageInstructions,
+  assertIsTransactionWithBlockhashLifetime,
+  createSolanaRpc,
+  createSolanaRpcSubscriptions,
+  createTransactionMessage,
+  getSignatureFromTransaction,
+  lamports,
+  pipe,
+  sendAndConfirmTransactionFactory,
+  setTransactionMessageFeePayerSigner,
+  setTransactionMessageLifetimeUsingBlockhash,
+  signTransactionMessageWithSigners,
+  type Address,
+  type Instruction,
+  type KeyPairSigner,
+} from "@solana/kit";
 import CONFIG from "./config.js";
+
+const rpc = createSolanaRpc(CONFIG.rpcUrl);
+const rpcSubscriptions = createSolanaRpcSubscriptions(websocketUrl(CONFIG.rpcUrl));
+const sendAndConfirmTransaction = sendAndConfirmTransactionFactory({ rpc, rpcSubscriptions });
+
+// The websocket endpoint web3.js's Connection used for the same URL: the
+// same host with ws(s), and the next port when one is given.
+function websocketUrl(rpcUrl: string) {
+  const url = new URL(rpcUrl);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  if (url.port) url.port = String(Number(url.port) + 1);
+  return url.toString();
+}
+
+async function sendInstructions(feePayer: KeyPairSigner, instructions: Instruction[]) {
+  const { value: latestBlockhash } = await rpc
+    .getLatestBlockhash({ commitment: "confirmed" })
+    .send();
+  const message = pipe(
+    createTransactionMessage({ version: "legacy" }),
+    (m) => setTransactionMessageFeePayerSigner(feePayer, m),
+    (m) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, m),
+    (m) => appendTransactionMessageInstructions(instructions, m),
+  );
+  // Signs with the fee payer and every signer the instructions carry.
+  const transaction = await signTransactionMessageWithSigners(message);
+  assertIsTransactionWithBlockhashLifetime(transaction);
+  await sendAndConfirmTransaction(transaction, { commitment: "confirmed" });
+  return getSignatureFromTransaction(transaction);
+}
+
+async function associatedTokenAddress(owner: Address, mint: Address) {
+  const [ata] = await findAssociatedTokenPda({
+    owner,
+    mint,
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+  });
+  return ata;
+}
 
 export function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export function loadWallet(key: number[]) {
-  return Keypair.fromSecretKey(Uint8Array.from(key));
-}
+export async function cleanWallet(from: KeyPairSigner, to: KeyPairSigner) {
+  const fromTokenAccount = await associatedTokenAddress(from.address, CONFIG.usdcMint);
+  const toTokenAccount = await associatedTokenAddress(to.address, CONFIG.usdcMint);
 
-export async function cleanWallet(from: Keypair, to: Keypair) {
-  const connection = new Connection(CONFIG.rpcUrl, "confirmed");
-  const fromTokenAccount = getAssociatedTokenAddressSync(CONFIG.usdcMint, from.publicKey);
-  const toTokenAccount = getAssociatedTokenAddressSync(CONFIG.usdcMint, to.publicKey);
-
-  const instructions: TransactionInstruction[] = [];
-  const solBalance = await connection.getBalance(from.publicKey);
-  if (solBalance !== 0) {
+  const instructions: Instruction[] = [];
+  const { value: solBalance } = await rpc
+    .getBalance(from.address, { commitment: "confirmed" })
+    .send();
+  if (solBalance !== 0n) {
     instructions.push(
-      SystemProgram.transfer({
-        fromPubkey: from.publicKey,
-        toPubkey: to.publicKey,
-        lamports: solBalance,
+      getTransferSolInstruction({
+        source: from,
+        destination: to.address,
+        amount: lamports(solBalance),
       }),
     );
   }
 
-  const fromAccountInfo = await getAccount(connection, fromTokenAccount);
-  const tokenBalance = fromAccountInfo.amount;
+  const fromAccountInfo = await fetchToken(rpc, fromTokenAccount, { commitment: "confirmed" });
+  const tokenBalance = fromAccountInfo.data.amount;
   if (tokenBalance !== 0n) {
-    const transferIx = createTransferInstruction(
-      fromTokenAccount,
-      toTokenAccount,
-      from.publicKey,
-      tokenBalance,
-      [],
-      TOKEN_PROGRAM_ID,
-    );
+    const transferIx = getTransferInstruction({
+      source: fromTokenAccount,
+      destination: toTokenAccount,
+      authority: from,
+      amount: tokenBalance,
+    });
 
     // Create close account instruction to close the sender's token account.
-    const closeIx = createCloseAccountInstruction(
-      fromTokenAccount,
-      to.publicKey, // destination for reclaimed rent-exempt balance
-      from.publicKey,
-      [],
-      TOKEN_PROGRAM_ID,
-    );
+    const closeIx = getCloseAccountInstruction({
+      account: fromTokenAccount,
+      destination: to.address, // destination for reclaimed rent-exempt balance
+      owner: from,
+    });
     instructions.push(transferIx, closeIx);
   }
   if (instructions.length === 0) {
     throw Error("No instructions to send");
   }
-  const transaction = new Transaction().add(...instructions);
-  transaction.feePayer = to.publicKey;
-  const { blockhash: newBlockhash } = await connection.getLatestBlockhash("confirmed");
-  transaction.recentBlockhash = newBlockhash;
 
-  const signature = await sendAndConfirmTransaction(connection, transaction, [from, to]);
-  return { signature, lamports: solBalance, tokens: Number(tokenBalance) };
+  const signature = await sendInstructions(to, instructions);
+  return { signature, lamports: Number(solBalance), tokens: Number(tokenBalance) };
 }
 
-export async function sendTokensToWallet(from: Keypair, to: Keypair, amount: number) {
-  const connection = new Connection(CONFIG.rpcUrl, "confirmed");
+export async function sendTokensToWallet(from: KeyPairSigner, to: KeyPairSigner, amount: number) {
   const mint = CONFIG.usdcMint;
 
-  const fromTokenAccount = getAssociatedTokenAddressSync(mint, from.publicKey);
-  const toTokenAccount = getAssociatedTokenAddressSync(mint, to.publicKey);
+  const fromTokenAccount = await associatedTokenAddress(from.address, mint);
+  const toTokenAccount = await associatedTokenAddress(to.address, mint);
 
-  const tokenAccountIx = createAssociatedTokenAccountIdempotentInstruction(
-    from.publicKey,
-    toTokenAccount,
-    to.publicKey,
+  const tokenAccountIx = getCreateAssociatedTokenIdempotentInstruction({
+    payer: from,
+    ata: toTokenAccount,
+    owner: to.address,
     mint,
-    TOKEN_PROGRAM_ID,
-    ASSOCIATED_TOKEN_PROGRAM_ID,
-  );
-  const transferIx = createTransferInstruction(
-    fromTokenAccount,
-    toTokenAccount,
-    from.publicKey,
+  });
+  const transferIx = getTransferInstruction({
+    source: fromTokenAccount,
+    destination: toTokenAccount,
+    authority: from,
     amount,
-    [],
-    TOKEN_PROGRAM_ID,
-  );
+  });
 
-  const transaction = new Transaction().add(tokenAccountIx, transferIx);
-  transaction.feePayer = from.publicKey;
-  const { blockhash } = await connection.getLatestBlockhash("confirmed");
-  transaction.recentBlockhash = blockhash;
-
-  const signature = await sendAndConfirmTransaction(connection, transaction, [from]);
-  return signature;
+  return sendInstructions(from, [tokenAccountIx, transferIx]);
 }
 
-export function getSolBalance(address: PublicKey): Promise<number> {
-  const connection = new Connection(CONFIG.rpcUrl, "confirmed");
-  return connection.getBalance(address);
+export async function getSolBalance(address: Address): Promise<number> {
+  const { value } = await rpc.getBalance(address, { commitment: "confirmed" }).send();
+  return Number(value);
 }
 
-export async function getTokenBalance(address: PublicKey, mint: PublicKey): Promise<number> {
-  const connection = new Connection(CONFIG.rpcUrl, "confirmed");
-  const tokenAccount = getAssociatedTokenAddressSync(mint, address);
+export async function getTokenBalance(address: Address, mint: Address): Promise<number> {
+  const tokenAccount = await associatedTokenAddress(address, mint);
 
   try {
-    const balance = await connection.getTokenAccountBalance(tokenAccount);
-    return balance.value.uiAmount ?? 0;
+    const { value } = await rpc
+      .getTokenAccountBalance(tokenAccount, { commitment: "confirmed" })
+      .send();
+    return value.uiAmount ?? 0;
   } catch {
     // Account does not exist
     return 0;

@@ -1,8 +1,13 @@
-import { NATIVE_MINT } from "@solana/spl-token";
+import {
+  getBase64EncodedWireTransaction,
+  getBase64Encoder,
+  getTransactionDecoder,
+  partiallySignTransaction,
+} from "@solana/kit";
 import config from "./config.js";
-import { VersionedTransaction } from "@solana/web3.js";
 
 const BASE_URL = "https://lite-api.jup.ag/ultra/v1";
+const WSOL_MINT = "So11111111111111111111111111111111111111112";
 
 interface SuccessfulSwapResponse {
   status: "Success";
@@ -26,10 +31,10 @@ type SwapResponse = SuccessfulSwapResponse | FailedSwapResponse;
 
 export async function runJupiterUltraSwap(amount: number) {
   const orderUrl = new URL(`${BASE_URL}/order`);
-  orderUrl.searchParams.append("inputMint", NATIVE_MINT.toString());
-  orderUrl.searchParams.append("outputMint", config.usdcMint.toString());
+  orderUrl.searchParams.append("inputMint", WSOL_MINT);
+  orderUrl.searchParams.append("outputMint", config.usdcMint);
   orderUrl.searchParams.append("amount", amount.toString());
-  orderUrl.searchParams.append("taker", config.funder.publicKey.toString());
+  orderUrl.searchParams.append("taker", config.funder.address);
 
   const orderResponse = await fetch(orderUrl, {
     method: "GET",
@@ -42,10 +47,12 @@ export async function runJupiterUltraSwap(amount: number) {
 
   const orderData = await orderResponse.json();
   const transactionBase64 = orderData.transaction;
-  const transaction = VersionedTransaction.deserialize(Buffer.from(transactionBase64, "base64"));
+  const transaction = getTransactionDecoder().decode(getBase64Encoder().encode(transactionBase64));
 
-  transaction.sign([config.funder]);
-  const signedTransaction = Buffer.from(transaction.serialize()).toString("base64");
+  // Partially: like web3's VersionedTransaction.sign, this fills in the
+  // taker's signature and leaves any other slot to Jupiter.
+  const signed = await partiallySignTransaction([config.funder.keyPair], transaction);
+  const signedTransaction = getBase64EncodedWireTransaction(signed);
 
   const executeResponse = (await (
     await fetch(`${BASE_URL}/execute`, {
