@@ -85,7 +85,7 @@ export const CommandPalette = ({
               <Combobox
                 as="div"
                 className="divide-y divide-gray-100"
-                onChange={(navItem: (typeof navigation)[number]) => {
+                onChange={(navItem: (typeof navigation)[number] | null) => {
                   setIsOpen(false);
                   if (navItem?.href) {
                     /* Navigate the user to the selected page */
