@@ -100,10 +100,10 @@ plugin, enable it in a new chat, and ask:
 > Check this Solana address for reclaimable rent: ADDRESS
 
 Test a valid address, an empty address, an invalid address, and an RPC failure.
-Check that ChatGPT reports the two scenarios separately. Check that the link
-opens the existing BlastCtrl page. The link does not prefill an address or
-change the website's network. The user must select mainnet and connect the
-address that was analyzed.
+Check that ChatGPT leads with the estimate that closes empty accounts and
+mentions keeping them open only as the alternative. Check that the link opens
+reclaim.blastctrl.com. The link does not prefill an address; the user must
+connect the address that was analyzed.
 
 No portable plugin package is needed for this custom-server test. Public
 distribution is a later step. It requires a stable HTTPS URL, plugin metadata,
@@ -116,8 +116,9 @@ reclaim link are eligible before submitting a public plugin.
 - Mainnet only. The tool accepts an address, not an RPC URL.
 - The scan covers SPL Token and Token-2022 accounts. It checks mint authority
   only for mints referenced by those accounts. It does not find every mint.
-- One quote keeps accounts open. The other closes eligible empty accounts.
-  The result separates excess rent from the additional closure deposit.
+- `estimate` closes eligible empty token accounts, like reclaim.blastctrl.com
+  does by default. `ifAccountsKeptOpen` is the alternative that only withdraws
+  excess rent. Each separates excess rent from the closure deposit.
 - Service fees use the existing excess-only rule, rounded down per batch.
   Network fees use the website's estimate of 5,000 lamports per transaction
   and ten accounts per batch. Wallet priority fees are not included.

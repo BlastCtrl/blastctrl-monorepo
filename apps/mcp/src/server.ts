@@ -44,7 +44,7 @@ export function createMcpServer({
     {
       title: "Analyze reclaimable Solana rent",
       description:
-        "Check a supplied Solana address on mainnet for excess rent in SPL Token and Token-2022 accounts and referenced controlled mints. Returns separate estimates with and without empty-account closures, fee estimates, account counts, and a BlastCtrl link. Read-only; does not connect a wallet, build, sign, or submit transactions. Does not discover all controlled mints or support multisig execution.",
+        "Check a supplied Solana address on mainnet for excess rent in SPL Token and Token-2022 accounts and referenced controlled mints. The estimate assumes eligible empty token accounts are closed, as the BlastCtrl reclaim page does by default; a second estimate keeps them open. Returns fee estimates, account counts, and a BlastCtrl link. Read-only; does not connect a wallet, build, sign, or submit transactions. Does not discover all controlled mints or support multisig execution.",
       inputSchema: { address: addressSchema },
       outputSchema: {
         address: z.string(),
@@ -53,8 +53,8 @@ export function createMcpServer({
         serviceFeeBasisPoints: z.number().int(),
         scannedAccountCount: z.number().int(),
         excludedAccountCount: z.number().int(),
-        keepAccountsOpen: quoteSchema,
-        closeEmptyAccounts: quoteSchema,
+        estimate: quoteSchema,
+        ifAccountsKeptOpen: quoteSchema,
         accountSummary: z.array(
           z.object({
             address: z.string(),
@@ -94,7 +94,7 @@ export function createMcpServer({
           content: [
             {
               type: "text",
-              text: `Address: ${address} (mainnet-beta). Excess rent with accounts kept open: ${result.keepAccountsOpen.grossSol} SOL before fees; estimated net ${result.keepAccountsOpen.estimatedNetSol} SOL. Including eligible empty-account closures: ${result.closeEmptyAccounts.grossSol} SOL before fees; estimated net ${result.closeEmptyAccounts.estimatedNetSol} SOL. Scanned ${result.scannedAccountCount} accounts. ${result.notes.join(" ")} Open BlastCtrl: ${result.reclaimUrl}`,
+              text: `Address: ${address} (mainnet-beta). Reclaimable, closing ${result.estimate.closedAccountCount} empty accounts: ${result.estimate.grossSol} SOL before fees; estimated net ${result.estimate.estimatedNetSol} SOL. If empty accounts are kept open instead: ${result.ifAccountsKeptOpen.grossSol} SOL before fees; estimated net ${result.ifAccountsKeptOpen.estimatedNetSol} SOL. Scanned ${result.scannedAccountCount} accounts. ${result.notes.join(" ")} Open BlastCtrl: ${result.reclaimUrl}`,
             },
           ],
         };

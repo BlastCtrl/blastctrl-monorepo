@@ -46,12 +46,14 @@ export function summarize(
           : 0),
     );
   const ordered = orderFor(true);
-  const keepAccountsOpen = quoteReclaim(
+  // Closing empty accounts is the default, as on reclaim.blastctrl.com; the
+  // keep-open quote is there for a caller who asks about the alternative.
+  const estimate = quoteReclaim(ordered, true, serviceFeeBasisPoints);
+  const ifAccountsKeptOpen = quoteReclaim(
     orderFor(false),
     false,
     serviceFeeBasisPoints,
   );
-  const closeEmptyAccounts = quoteReclaim(ordered, true, serviceFeeBasisPoints);
   const relevant = ordered.filter(
     (a) => a.blockedReason || reclaimLamports(a, true) > 0,
   );
@@ -62,8 +64,8 @@ export function summarize(
     serviceFeeBasisPoints,
     scannedAccountCount: accounts.length,
     excludedAccountCount: accounts.filter((a) => a.blockedReason).length,
-    keepAccountsOpen,
-    closeEmptyAccounts,
+    estimate,
+    ifAccountsKeptOpen,
     accountSummary: relevant.slice(0, DETAIL_LIMIT).map((a) => ({
       address: a.address,
       mint: a.mint,
@@ -80,7 +82,7 @@ export function summarize(
     notes: [
       "This is an estimate from public mainnet data. No wallet was connected and no transaction was created or sent.",
       "The scan covers SPL Token and Token-2022 accounts and controlled mints referenced by those accounts. Other controlled mints, stake accounts, and arbitrary program accounts are not included.",
-      "Keeping accounts open returns excess rent only. Closing eligible empty accounts also returns the remaining rent deposit.",
+      "The estimate assumes eligible empty token accounts are closed, which returns their whole rent deposit. Keeping them open instead returns excess rent only (see ifAccountsKeptOpen).",
       "Network fees use the web tool's base estimate of 5000 lamports per transaction. Wallet priority fees are not included. Fees and balances can change.",
       "The estimate assumes an owner that can sign directly. It does not establish control of this address or support multisig signing.",
       "To reclaim, open the BlastCtrl app, connect this address, and run a new scan. The website does not read an address from this link.",

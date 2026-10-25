@@ -18,8 +18,8 @@ it("uses each scenario's web account order for per-batch fee rounding", () => {
     minimum: i === 10 ? 0 : 100,
   }));
   const result = summarize("owner", accounts, 500);
-  expect(result.keepAccountsOpen.estimatedServiceFeeLamports).toBe("3");
-  expect(result.closeEmptyAccounts.estimatedServiceFeeLamports).toBe("2");
+  expect(result.ifAccountsKeptOpen.estimatedServiceFeeLamports).toBe("3");
+  expect(result.estimate.estimatedServiceFeeLamports).toBe("2");
 });
 
 it("scans both token programs and ties every RPC request to the deadline signal", async () => {

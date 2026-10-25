@@ -74,11 +74,11 @@ describe("MCP over real local HTTP", () => {
       address,
       network: "mainnet-beta",
       scannedAccountCount: 1,
-      keepAccountsOpen: {
+      ifAccountsKeptOpen: {
         grossLamports: "550840",
         estimatedNetLamports: "518298",
       },
-      closeEmptyAccounts: {
+      estimate: {
         grossLamports: "2039280",
         estimatedNetLamports: "2006738",
       },
@@ -110,7 +110,7 @@ describe("MCP over real local HTTP", () => {
     });
     expect(empty.structuredContent).toMatchObject({
       scannedAccountCount: 0,
-      keepAccountsOpen: { estimatedNetLamports: "0" },
+      estimate: { estimatedNetLamports: "0" },
     });
     const failure = await client.callTool({
       name: "analyze_rent_reclaim",
@@ -215,8 +215,8 @@ describe("limits and configuration", () => {
     );
     expect(result.accountSummary).toHaveLength(20);
     expect(result.accountSummaryTruncated).toBe(true);
-    expect(result.keepAccountsOpen.accountCount).toBe(25);
-    expect(result.keepAccountsOpen.grossLamports).toBe("13771000");
+    expect(result.estimate.accountCount).toBe(25);
+    expect(result.estimate.grossLamports).toBe("50982000");
   });
 
   it("bounds concurrency and releases capacity after failures", async () => {
