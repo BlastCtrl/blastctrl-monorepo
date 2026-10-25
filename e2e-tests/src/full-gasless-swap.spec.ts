@@ -271,9 +271,20 @@ async function phantomOnboarding(extensionPage: Page) {
   await extensionPage.getByTestId("onboarding-form-confirm-password-input").fill(password); // Confirm password
   await extensionPage.getByTestId("onboarding-form-terms-of-service-checkbox").click(); // Check the checkbox
   await extensionPage.getByTestId("onboarding-form-submit-button").click(); // Submit
-  await extensionPage
+
+  // Older Phantom versions end on a "Get Started" screen; newer ones close
+  // the onboarding tab on their own after the password step.
+  const getStarted = extensionPage
     .getByTestId("onboarding-form-submit-button")
-    .filter({ hasText: /Get Started/i })
-    .click(); // Get Started
+    .filter({ hasText: /Get Started/i });
+  try {
+    await getStarted.waitFor();
+  } catch (error) {
+    // waitFor rejects with "Target page ... has been closed" when Phantom
+    // closes the tab, which means onboarding is done.
+    if (extensionPage.isClosed()) return;
+    throw error;
+  }
+  await getStarted.click();
   await extensionPage.close();
 }
