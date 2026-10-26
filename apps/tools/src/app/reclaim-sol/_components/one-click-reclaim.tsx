@@ -4,7 +4,7 @@ import {
   SERVICE_FEE,
   afterFees,
   formatFeeRate,
-  serviceFeeLamports,
+  serviceFeeForBatches,
 } from "@/app/spl-token-tools/reclaim-rent/_components/fee";
 import {
   ACCOUNTS_PER_TRANSACTION,
@@ -20,7 +20,6 @@ import type {
 import type { ReclaimableAccount } from "@/app/spl-token-tools/reclaim-rent/_components/types";
 import {
   closes,
-  feeBase,
   reclaimLamports,
 } from "@/app/spl-token-tools/reclaim-rent/_components/types";
 import { useReclaimExcess } from "@/app/spl-token-tools/reclaim-rent/_components/use-reclaim-excess";
@@ -145,7 +144,7 @@ export function OneClickReclaim() {
   const transactions = Math.ceil(open.length / ACCOUNTS_PER_TRANSACTION);
   const net =
     open.reduce((sum, a) => sum + reclaimLamports(a, CLOSE_EMPTY), 0) -
-    serviceFeeLamports(feeBase(open)) -
+    serviceFeeForBatches(open) -
     transactions * FEE_PER_TRANSACTION;
 
   const status: RewardStatus =

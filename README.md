@@ -1,15 +1,18 @@
 # Blastctrl Monorepo
 
-This monorepo currently hosts the Blast Tools Nextjs application, but it could be used for other purposes in the future. The project is originally based on the [Solana dApp Scaffold repo](https://github.com/solana-labs/dapp-scaffold).
+This monorepo hosts the Blast Tools Nextjs application and the rent reclaimer MCP server. The project is originally based on the [Solana dApp Scaffold repo](https://github.com/solana-labs/dapp-scaffold).
 
 ### Structure
 
 ```
 ├── apps : applications
 │   ├── tools : Blastctrl Tools (a nextjs web app)
+│   ├── mcp : read-only MCP server that estimates reclaimable rent for an address (see its README)
 ├── packages : shared libraries and configuration
 │   ├── eslint-config : ESLint 10 flat configs (base, React, Next.js)
 │   ├── prettier-config : shared Prettier configuration
+│   ├── kit-extensions : internal @solana/kit helpers, including the Token-2022 mint parsing
+│   ├── rent-reclaimer : token-account scan, reclaim rules and quotes shared by the tools app and the MCP server
 │   ├── tailwind-config : Tailwind v4 theme and PostCSS configuration
 │   ├── typescript-config : TypeScript 6 base, Next.js, React and bundler presets
 │   ├── mpl-core : Codama-generated @solana/kit client for Metaplex Core (see its README)
@@ -35,11 +38,20 @@ You will need to setup the following environment variables in the `apps/tools/.e
 
 ```
 NEXT_PUBLIC_RPC_ENDPOINT=
+RPC_ENDPOINT=
 JUP_SWAP_API=
 REDIS_URL=
 REDIS_TOKEN=
 OCTANE_SECRET_KEYPAIR=
 OCTANE_PLATFORM_FEE_BPS=
+```
+
+The rent reclaimer MCP server in `apps/mcp` needs its own `apps/mcp/.env`
+(see `apps/mcp/.env.example` and [its README](apps/mcp/README.md)):
+
+```bash
+pnpm dev:mcp
+pnpm test:mcp
 ```
 
 ### Workspace checks

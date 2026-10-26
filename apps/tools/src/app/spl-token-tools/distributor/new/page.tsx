@@ -1,7 +1,7 @@
 "use client";
 
 import { notify } from "@/components/notification";
-import { MINT_EXTENSION } from "@/lib/solana/token-2022";
+import { MINT_EXTENSION } from "@blastctrl/kit-extensions";
 import { useMintAccount } from "@/state/queries/use-mint";
 import { useSolBalance } from "@/state/queries/use-sol-balance";
 import type { Address } from "@solana/kit";

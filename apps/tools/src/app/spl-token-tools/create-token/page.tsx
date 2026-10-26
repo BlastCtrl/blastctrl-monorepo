@@ -24,7 +24,7 @@ import {
   type TokenMetadata,
   type TokenMetadataFields,
 } from "@/lib/solana/metaplex-token-metadata";
-import { isMintAccountData } from "@/lib/solana/token-2022";
+import { isMintAccountData } from "@blastctrl/kit-extensions";
 import { Button, cn } from "@blastctrl/ui";
 import {
   Dialog,

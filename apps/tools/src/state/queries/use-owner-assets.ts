@@ -1,5 +1,5 @@
 import { useAppRpc } from "@/connector/app-rpc";
-import { TOKEN_2022_PROGRAM_ADDRESS } from "@/lib/solana/token-2022";
+import { TOKEN_2022_PROGRAM_ADDRESS } from "@blastctrl/kit-extensions";
 import {
   AccountState,
   getTokenDecoder,

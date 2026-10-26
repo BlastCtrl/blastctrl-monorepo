@@ -32,12 +32,12 @@ Reference implementations, by area:
 | Shared reads on Kit RPC                                                                                                                                                                                                            | `src/state/queries/use-stake-account.ts`, `use-user-stake-accounts.ts`, `use-epoch.ts`, `use-rent.ts`                                                                                                   |
 | Metaplex through the generated kit clients (create-token is the reference)                                                                                                                                                         | `src/lib/solana/metaplex-token-metadata.ts`, `packages/mpl-token-metadata/**`, `packages/mpl-core/**`                                                                                                   |
 | NFT tools: mint (Token Metadata `createV1` + `mintV1`), mint-core (Core `createV1`), update (`updateV1` after reading the metadata account); Arweave uploads of media and JSON                                                     | `src/app/solana-nft-tools/{mint,mint-core,update}/**`, `src/lib/solana/metaplex-{token-metadata,json-metadata}.ts`, `src/lib/hooks/use-arweave-uploader.tsx`                                            |
-| Reclaim-rent and reclaim-sol: token-account and mint scan on the kit RPC, close / withdraw-excess / fee instructions from the program clients, batches signed in one wallet prompt                                                 | `src/app/spl-token-tools/reclaim-rent/**`, `src/app/reclaim-sol/**`, `src/connector/send-batches.ts`, `src/state/queries/use-reclaimable-accounts.ts`                                                   |
+| Reclaim-rent and reclaim-sol: token-account and mint scan on the kit RPC (shared with the MCP server), close / withdraw-excess / fee instructions from the program clients, batches signed in one wallet prompt                    | `packages/rent-reclaimer/src/**`, `src/app/spl-token-tools/reclaim-rent/**`, `src/app/reclaim-sol/**`, `src/connector/send-batches.ts`, `src/state/queries/use-reclaimable-accounts.ts`                 |
 | NFT collections: add (`updateV1` Set + `verifyCollectionV1`) and remove (`unverifyCollectionV1`) built in the browser, metadata read first so only what can work is sent, batches in one prompt                                    | `src/app/solana-nft-tools/collections/**`, `src/lib/solana/metaplex-token-metadata.ts` (`fetchTokenMetadatas`, the collection builders)                                                                 |
 | Transfer-authority: metadata through the shared `useTokenMetadata` query, transfer and verify-creator through the Metaplex builders, batches packed by kit size, Squads proposals through the Squads module and the ordered sender | `src/app/solana-nft-tools/transfer-authority/**`, `src/lib/solana/squads-multisig.ts`, `packages/squads/**`, `src/connector/send-batches.ts` (`sendInOrder`), `src/state/queries/use-token-metadata.ts` |
 | Octane backend (gasless swaps): `packages/octane-core` builds the fee-payer-signed swap on kit; the build route serves it base64-encoded                                                                                           | `packages/octane-core/src/**`, `apps/tools/src/app/api/octane/{build-jup-swap,price}/route.ts`                                                                                                          |
 | Gasless swap, BONK included (the separate BONK page was merged into it): the backend's fee-payer-signed transaction decoded with kit, signed by the wallet through the kit signer, sent and confirmed with kit's factory           | `src/app/gasless-swap/**`, `src/lib/octane.ts`, `src/lib/hooks/use-gasless-swap.ts`, `src/state/queries/use-token-balance.ts`                                                                           |
-| Shared helpers: unsigned simulation, compute headroom, Token-2022 parsing, mint/SOL-balance/token-account queries                                                                                                                  | `src/connector/{simulate,resource-limits}.ts`, `src/lib/solana/token-2022.ts`, `src/state/queries/{use-mint,use-sol-balance,use-token-account-existence}.ts`                                            |
+| Shared helpers: unsigned simulation, compute headroom, Token-2022 parsing, mint/SOL-balance/token-account queries                                                                                                                  | `src/connector/{simulate,resource-limits}.ts`, `packages/kit-extensions/src/token-2022.ts`, `src/state/queries/{use-mint,use-sol-balance,use-token-account-existence}.ts`                               |
 | Explorer links by connector cluster                                                                                                                                                                                                | `src/state/use-query-context.ts`                                                                                                                                                                        |
 
 ## What is left of web3.js
@@ -68,7 +68,7 @@ The `@solana/wallet-adapter-*` packages, `@solana/spl-token`, `bs58`,
 `bn.js` and `bignumber.js` are gone from `apps/tools/package.json`; the
 adapter provider, its network store, the old wallet menus and the web3
 batch sender are deleted. `@solana-program/token-2022` is deliberately not
-installed (it peers on `@solana/zk-sdk`); `lib/solana/token-2022.ts` holds
+installed (it peers on `@solana/zk-sdk`); `token-2022.ts` in `@blastctrl/kit-extensions` holds
 what the app needs from that program.
 
 To see what a route ships, `pnpm exec next build --analyze` in `apps/tools`
@@ -332,6 +332,22 @@ switched from base58 to base64. Jupiter's instructions arrive as JSON and map
 to kit's `{ programAddress, accounts, data }` the same way Umi's and web3's do.
 The package's tests fake `fetch` and the RPC, so they need no validator.
 
+### Server side: the rent reclaimer MCP server
+
+`apps/mcp` answers one read-only MCP tool, `analyze_rent_reclaim`, with the
+same scan the reclaim tools run: `packages/rent-reclaimer` holds the scan
+(`discoverReclaimableAccounts`, `lookupReclaimableMint`), the account rules
+and `quoteReclaim`, and takes any kit `Rpc` with the methods it reads, so
+the app passes `useAppRpc().rpc` and the server `createSolanaRpc(url)`. The
+app wraps the scan with DAS names; the server quotes a
+reclaim that closes empty accounts. Every request of a scan takes the caller's
+`abortSignal` through `.send({ abortSignal })` (and `fetchEncodedAccounts`'
+config); kit's request coalescer puts a signal of its own in front of
+`fetch`, so a test checks that aborting reaches the request rather than
+that the signal is the same object. Kit's transport doesn't retry on 429,
+which is what the server wants under its deadline. The server runs from
+source through `tsx`, since the workspace packages ship TypeScript.
+
 ### A transaction built elsewhere
 
 The gasless swap gets a transaction the backend built and partially signed.
@@ -412,7 +428,7 @@ Instruction builders come from the `@solana-program/*` packages (`stake`,
 pinning versions that peer with Kit 8.5). `@solana-program/token-2022` is
 deliberately not installed (it peers on `@solana/zk-sdk`): the `token` client's
 builders take the Token-2022 program address via `programAddress`, and
-`lib/solana/token-2022.ts` holds that address plus the mint-extension parser.
+`token-2022.ts` in `@blastctrl/kit-extensions` holds that address plus the mint-extension parser.
 Metaplex programs go through the generated kit clients as described above.
 Account inputs accept an `Address` **or** a signer object; pass the signer
 when the account must sign.
@@ -451,7 +467,7 @@ a `KeyPairSigner` (via `createKeyPairSignerFromBytes`). A `KeyPairSigner` also e
   `enabled` only when it exists, so pages render before the wallet connects.
 - `useMintAccount(mint)` (`src/state/queries/use-mint.ts`) gives a mint's
   decimals, owning program and Token-2022 extension ids
-  (`lib/solana/token-2022.ts` parses the TLV list without
+  (`token-2022.ts` in `@blastctrl/kit-extensions` parses the TLV list without
   `@solana-program/token-2022`). Use the program for ATA derivation and
   transfers so Token-2022 mints work; `useTokenAccountExistence` takes it too.
   The distributor sends it to the backend as `tokenProgram` at creation and
@@ -460,7 +476,7 @@ a `KeyPairSigner` (via `createKeyPairSignerFromBytes`). A `KeyPairSigner` also e
 - `@solana-program/token` 0.18 has `getWithdrawExcessLamportsInstruction`
   (Token-2022 and p-token both use index 38), so the hand-built instruction
   is gone. `decodeMint` reads 82 bytes from anything, so tell mints from
-  token accounts first with `isMintAccountData` in `lib/solana/token-2022.ts`
+  token accounts first with `isMintAccountData` from `@blastctrl/kit-extensions`
   (82 bytes, or the mint account type after the token-account padding).
 - `getTokenAccountsByOwner` with `encoding: "jsonParsed"` is typed
   (`TokenAccountInfoWithJsonData`); `lamports` and `space` arrive as

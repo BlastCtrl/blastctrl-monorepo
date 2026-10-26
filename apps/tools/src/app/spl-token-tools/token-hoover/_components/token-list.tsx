@@ -2,7 +2,7 @@ import { notify } from "@/components";
 import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient, type KitClient } from "@/connector/use-kit-client";
 import { compress, normalizeTokenAmount } from "@/lib/solana";
-import { getTransferHookProgram } from "@/lib/solana/token-2022";
+import { getTransferHookProgram } from "@blastctrl/kit-extensions";
 import { useAssetData } from "@/state/queries/use-asset-data";
 import {
   ownerAssetsKey,

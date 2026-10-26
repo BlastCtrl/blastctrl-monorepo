@@ -1,0 +1,36 @@
+{
+  "name": "@blastctrl/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules",
+    "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+    "start": "tsx --env-file-if-exists=.env src/index.ts",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "lint": "eslint .",
+    "lint:fix": "eslint --fix .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@blastctrl/rent-reclaimer": "workspace:^",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@solana/kit": "^8.5.0",
+    "tsx": "^4.20.6",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@blastctrl/eslint-config": "workspace:*",
+    "@blastctrl/typescript-config": "workspace:^",
+    "@types/node": "^22.18.8",
+    "eslint": "10.11.0",
+    "prettier": "^3.9.8",
+    "typescript": "6.0.3",
+    "vitest": "^3.2.7"
+  },
+  "prettier": "@blastctrl/prettier-config"
+}

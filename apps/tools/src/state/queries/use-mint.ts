@@ -1,5 +1,5 @@
 import { useAppRpc } from "@/connector/app-rpc";
-import { getMintExtensionTypes } from "@/lib/solana/token-2022";
+import { getMintExtensionTypes } from "@blastctrl/kit-extensions";
 import { decodeMint, type Mint } from "@solana-program/token";
 import {
   address,

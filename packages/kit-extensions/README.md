@@ -1,6 +1,9 @@
 # Kit Extensions
 
-Internal extensions for `@solana/kit`.
+Internal extensions for `@solana/kit`: a send-and-confirm that reports the
+slot, and the Token-2022 helpers the apps need without
+`@solana-program/token-2022` (program address, mint detection, extension
+parsing).
 
 ```ts
 import { sendAndConfirmWithSlotFactory } from "@blastctrl/kit-extensions";

@@ -16,7 +16,7 @@ import {
   SERVICE_FEE,
   afterFees,
   formatFeeRate,
-  serviceFeeLamports,
+  serviceFeeForBatches,
 } from "./fee";
 import { MintPanel } from "./mint-panel";
 import { ReclaimDialog } from "./reclaim-dialog";
@@ -40,7 +40,7 @@ import type {
   Sending,
 } from "./results/types";
 import type { ReclaimableAccount } from "./types";
-import { closes, excessLamports, feeBase, reclaimLamports } from "./types";
+import { closes, excessLamports, reclaimLamports } from "./types";
 import { useReclaimExcess } from "./use-reclaim-excess";
 import { useRentRate } from "@/state/queries/use-rent";
 
@@ -78,16 +78,13 @@ const tickedAfterScan = (a: ReclaimableAccount) =>
  * What the results block shows for a selection: what it returns before
  * fees, the transactions it takes, the service fee and what's left.
  */
-function reclaimTotals(
-  selected: ReclaimableAccount[],
-  closeEmpty: boolean,
-) {
+function reclaimTotals(selected: ReclaimableAccount[], closeEmpty: boolean) {
   const lamports = selected.reduce(
     (sum, a) => sum + reclaimLamports(a, closeEmpty),
     0,
   );
   const transactions = Math.ceil(selected.length / ACCOUNTS_PER_TRANSACTION);
-  const serviceFee = serviceFeeLamports(feeBase(selected));
+  const serviceFee = serviceFeeForBatches(selected);
   const networkFee = transactions * FEE_PER_TRANSACTION;
   return {
     lamports,

@@ -23,6 +23,7 @@
     "@blastctrl/mpl-core": "workspace:^",
     "@blastctrl/mpl-token-metadata": "workspace:^",
     "@blastctrl/octane-core": "workspace:^",
+    "@blastctrl/rent-reclaimer": "workspace:^",
     "@blastctrl/solace-sdk": "workspace:^",
     "@blastctrl/squads": "workspace:^",
     "@blastctrl/ui": "workspace:^",
