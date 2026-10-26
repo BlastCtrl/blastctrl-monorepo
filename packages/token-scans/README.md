@@ -10,11 +10,14 @@ environment-variable dependency.
   tool's list).
 - `fetchTokenAccountsByOwner`, `filterAssociatedTokenAccounts`,
   `isAssociatedTokenAccount` and `findNestedAta({ rpc, walletAccounts,
-concurrency, delayMs, abortSignal })`: the recover-nested tool's automatic
-  search, token accounts owned by the wallet's own associated token accounts
-  and whether the ATA program can recover each. The page checks one ATA at a
-  time with an 800 ms pause (the defaults); the server checks several at once
-  with no pause.
+concurrency, intervalMs, maxRetries, retryBaseMs, abortSignal })`: the
+  recover-nested tool's automatic search, token accounts owned by the
+  wallet's own associated token accounts and whether the ATA program can
+  recover each. The defaults (`PUBLIC_RPC_NESTED_SCAN`: four ATAs at once, a
+  new one at most every 100 ms, so at most 20 requests per second) suit the
+  page's public, rate-limited RPC; the server checks ten at once with no
+  interval. Rate-limited requests (HTTP 429) are retried with a doubling
+  backoff that pauses the whole scan.
 
 Instructions (revoke, recover) stay in the tools app. This workspace package
 exports TypeScript source directly, like `@blastctrl/rent-reclaimer`.

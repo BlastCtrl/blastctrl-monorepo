@@ -6,7 +6,9 @@ import {
   type Token,
 } from "@solana-program/token";
 import {
+  isSolanaError,
   parseBase64RpcAccount,
+  SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR,
   type Account,
   type Address,
   type GetTokenAccountsByOwnerApi,
@@ -95,41 +97,95 @@ function sleep(ms: number, signal?: AbortSignal) {
 }
 
 /**
+ * How long the RPC asked us to wait, if it rate limited the request (HTTP
+ * 429). Uses `Retry-After` when the response exposes it, otherwise
+ * `fallbackMs`. Null for any other error.
+ */
+function rateLimitWait(error: unknown, fallbackMs: number): number | null {
+  if (
+    !isSolanaError(error, SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR) ||
+    error.context.statusCode !== 429
+  ) {
+    return null;
+  }
+  const seconds = Number(error.context.headers?.get("retry-after"));
+  return Number.isFinite(seconds) && seconds > 0
+    ? Math.max(seconds * 1000, fallbackMs)
+    : fallbackMs;
+}
+
+/**
+ * Settings for a public RPC that rate limits per IP (around 1,200 requests
+ * per 10 s). At most 4 ATAs in flight and a new one started at most every
+ * 100 ms caps the scan at 10 ATAs, or 20 requests, per second: a sixth of
+ * that limit, leaving room for the page's other requests.
+ */
+export const PUBLIC_RPC_NESTED_SCAN = {
+  concurrency: 4,
+  intervalMs: 100,
+} as const;
+
+/**
  * Looks for token accounts owned by each of the wallet's ATAs. One RPC call
- * per ATA and token program. By default one ATA at a time with a pause after
- * each, to stay under a public RPC's rate limit; a server with its own RPC
- * can check several at once without the pause.
+ * per ATA and token program. Up to `concurrency` ATAs are checked at once,
+ * starting a new one at most every `intervalMs`. The defaults suit a public,
+ * rate-limited RPC; a server with its own RPC can raise the concurrency and
+ * drop the interval.
+ *
+ * A request the RPC rate limits (HTTP 429) is retried after a backoff that
+ * doubles each time, up to `maxRetries`. The backoff also holds back the
+ * other ATAs' next starts, so the whole scan slows down instead of piling
+ * more requests onto a limit it already hit.
  */
 export async function findNestedAta({
   rpc,
   walletAccounts,
   onProgress,
-  concurrency = 1,
-  delayMs = 800,
+  concurrency = PUBLIC_RPC_NESTED_SCAN.concurrency,
+  intervalMs = PUBLIC_RPC_NESTED_SCAN.intervalMs,
+  maxRetries = 4,
+  retryBaseMs = 1000,
   abortSignal,
 }: {
   rpc: NestedScanRpc;
   walletAccounts: TokenAccount[];
-  /** Called with each ATA's index once it has been checked, in order. */
+  /** Called with each ATA's index once it and every ATA before it have been checked. */
   onProgress?: (index: number) => void;
   /** How many ATAs to check at once. */
   concurrency?: number;
-  /** Pause after each group of `concurrency` ATAs. */
-  delayMs?: number;
+  /** Minimum time between starting two ATA checks. */
+  intervalMs?: number;
+  /** How many times to retry an ATA the RPC rate limited. */
+  maxRetries?: number;
+  /** First backoff after a rate limit; doubles on each retry of that ATA. */
+  retryBaseMs?: number;
   abortSignal?: AbortSignal;
 }): Promise<NestedPair[]> {
-  const result: NestedPair[] = [];
+  const found: (NestedPair[] | undefined)[] = walletAccounts.map(
+    () => undefined,
+  );
+  let next = 0;
+  let reported = 0;
+  // Earliest time the next ATA check may start, shared by all workers.
+  let nextStart = 0;
 
-  for (let start = 0; start < walletAccounts.length; start += concurrency) {
-    const group = walletAccounts.slice(start, start + concurrency);
-    const found = await Promise.all(
-      group.map(async (parent) => {
+  async function waitTurn() {
+    const now = Date.now();
+    const start = Math.max(now, nextStart);
+    nextStart = start + intervalMs;
+    if (start > now) await sleep(start - now, abortSignal);
+  }
+
+  async function check(parent: TokenAccount): Promise<NestedPair[]> {
+    for (let attempt = 0; ; attempt++) {
+      await waitTurn();
+      try {
         const nestedAccounts = await fetchTokenAccountsByOwner(
           rpc,
           parent.address,
           { abortSignal },
         );
-        return Promise.all(
+        return await Promise.all(
           nestedAccounts.map(async (nested) => ({
             parent,
             nested,
@@ -138,13 +194,30 @@ export async function findNestedAta({
               (await isAssociatedTokenAccount(nested, parent.address)),
           })),
         );
-      }),
-    );
-    for (const [offset, pairs] of found.entries()) {
-      result.push(...pairs);
-      onProgress?.(start + offset);
+      } catch (error) {
+        const wait = rateLimitWait(error, retryBaseMs * 2 ** attempt);
+        if (wait === null || attempt >= maxRetries) throw error;
+        nextStart = Math.max(nextStart, Date.now() + wait);
+      }
     }
-    if (delayMs > 0) await sleep(delayMs, abortSignal);
   }
-  return result;
+
+  async function worker() {
+    while (next < walletAccounts.length) {
+      const index = next++;
+      found[index] = await check(walletAccounts[index]!);
+      while (reported < found.length && found[reported]) {
+        onProgress?.(reported);
+        reported++;
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from(
+      { length: Math.max(1, Math.min(concurrency, walletAccounts.length)) },
+      worker,
+    ),
+  );
+  return found.flatMap((pairs) => pairs ?? []);
 }

@@ -8,6 +8,7 @@ export {
   filterAssociatedTokenAccounts,
   findNestedAta,
   isAssociatedTokenAccount,
+  PUBLIC_RPC_NESTED_SCAN,
   type NestedPair,
   type NestedScanRpc,
   type TokenAccount,

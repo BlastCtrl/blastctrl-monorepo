@@ -5,7 +5,13 @@ import {
   getTokenEncoder,
   TOKEN_PROGRAM_ADDRESS,
 } from "@solana-program/token";
-import { getAddressDecoder, getBase64Decoder, type Address } from "@solana/kit";
+import {
+  getAddressDecoder,
+  getBase64Decoder,
+  SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR,
+  SolanaError,
+  type Address,
+} from "@solana/kit";
 import { describe, expect, it, vi } from "vitest";
 import { fetchDelegatedTokenAccounts } from "./delegations";
 import {
@@ -210,7 +216,7 @@ describe("nested accounts", () => {
     const pairs = await findNestedAta({
       rpc,
       walletAccounts: parents,
-      delayMs: 0,
+      intervalMs: 0,
     });
     expect(
       pairs.map((p) => [p.parent.address, p.nested.address, p.recoverable]),
@@ -222,68 +228,154 @@ describe("nested accounts", () => {
     expect(pairs[0]!.nested.data.amount).toBe(10n);
   });
 
-  it("checks ATAs in groups, keeps their order, and pauses between groups", async () => {
+  /** `count` wallet ATAs, and an RPC whose nested lookups `respond` controls. */
+  async function scanSetup(
+    count: number,
+    respond: (
+      index: number,
+      attempt: number,
+    ) => Promise<void> | void = () => {},
+  ) {
     const parents = await fetchTokenAccountsByOwner(
       fakeRpc({
-        [wallet]: [1, 2, 3].map((i) =>
-          rpcToken(key(60 + i), { mint: key(i), owner: wallet }),
+        [wallet]: Array.from({ length: count }, (_, i) =>
+          rpcToken(key(60 + i), { mint: key(i + 1), owner: wallet }),
         ),
       }).rpc,
       wallet,
     );
     const { rpc, calls } = fakeRpc({});
+    const attempts = parents.map(() => 0);
     const log: string[] = [];
     calls.getTokenAccountsByOwner.mockImplementation(
       (owner: Address, filter: { programId: Address }) => {
         const i = parents.findIndex((p) => p.address === owner);
-        if (filter.programId === TOKEN_PROGRAM_ADDRESS) log.push(`fetch ${i}`);
         return {
-          send: async () => ({
-            context: { slot: 1n },
-            value:
-              filter.programId === TOKEN_PROGRAM_ADDRESS
-                ? [rpcToken(key(70 + i), { mint: key(9), owner })]
-                : [],
-          }),
+          send: async () => {
+            if (filter.programId === TOKEN_PROGRAM_ADDRESS) {
+              log.push(`fetch ${i}`);
+              await respond(i, attempts[i]!++);
+            }
+            return {
+              context: { slot: 1n },
+              value:
+                filter.programId === TOKEN_PROGRAM_ADDRESS
+                  ? [rpcToken(key(70 + i), { mint: key(9), owner })]
+                  : [],
+            };
+          },
         };
       },
+    );
+    return { parents, rpc, log };
+  }
+
+  const rateLimited = () =>
+    new SolanaError(SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, {
+      headers: new Headers(),
+      message: "Too Many Requests",
+      statusCode: 429,
+    });
+
+  it("checks several ATAs at once, spaces their starts, and keeps their order", async () => {
+    // ATA 0 answers last, so later ATAs finish first.
+    const { parents, rpc, log } = await scanSetup(4, (i) =>
+      i === 0 ? new Promise((r) => setTimeout(r, 80)) : undefined,
     );
     const started = Date.now();
     const pairs = await findNestedAta({
       rpc,
       walletAccounts: parents,
       concurrency: 2,
-      delayMs: 30,
+      intervalMs: 20,
       onProgress: (i) => log.push(`progress ${i}`),
     });
-    expect(Date.now() - started).toBeGreaterThanOrEqual(55);
+    // Starts at 0, 20, 40 and 60 ms: ATA 0 holds one slot while the other
+    // slot works through ATAs 1-3.
+    expect(Date.now() - started).toBeGreaterThanOrEqual(75);
     expect(log).toEqual([
       "fetch 0",
       "fetch 1",
+      "fetch 2",
+      "fetch 3",
+      // Progress waits for ATA 0, then reports in order.
       "progress 0",
       "progress 1",
-      "fetch 2",
       "progress 2",
+      "progress 3",
     ]);
     expect(pairs.map((p) => p.nested.address)).toEqual([
       key(70),
       key(71),
       key(72),
+      key(73),
     ]);
   });
 
-  it("stops at the pause when aborted", async () => {
-    const parents = await fetchTokenAccountsByOwner(
-      fakeRpc({
-        [wallet]: [rpcToken(key(61), { mint: key(1), owner: wallet })],
-      }).rpc,
-      wallet,
-    );
+  it("never has more than `concurrency` ATAs in flight", async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const { parents, rpc } = await scanSetup(10, async () => {
+      peak = Math.max(peak, ++inFlight);
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight--;
+    });
+    await findNestedAta({
+      rpc,
+      walletAccounts: parents,
+      concurrency: 3,
+      intervalMs: 0,
+    });
+    expect(peak).toBe(3);
+  });
+
+  it("retries a rate-limited ATA after a backoff", async () => {
+    const { parents, rpc, log } = await scanSetup(2, (i, attempt) => {
+      if (i === 0 && attempt < 2) throw rateLimited();
+    });
+    const started = Date.now();
+    const pairs = await findNestedAta({
+      rpc,
+      walletAccounts: parents,
+      intervalMs: 0,
+      retryBaseMs: 20,
+    });
+    // Backoffs of 20 then 40 ms.
+    expect(Date.now() - started).toBeGreaterThanOrEqual(55);
+    expect(log.filter((l) => l === "fetch 0")).toHaveLength(3);
+    expect(pairs.map((p) => p.nested.address)).toEqual([key(70), key(71)]);
+  });
+
+  it("gives up after `maxRetries` rate limits and does not retry other errors", async () => {
+    const limited = await scanSetup(1, () => {
+      throw rateLimited();
+    });
+    await expect(
+      findNestedAta({
+        rpc: limited.rpc,
+        walletAccounts: limited.parents,
+        maxRetries: 2,
+        retryBaseMs: 1,
+      }),
+    ).rejects.toThrow(SolanaError);
+    expect(limited.log).toHaveLength(3);
+
+    const failing = await scanSetup(1, () => {
+      throw new Error("boom");
+    });
+    await expect(
+      findNestedAta({ rpc: failing.rpc, walletAccounts: failing.parents }),
+    ).rejects.toThrow("boom");
+    expect(failing.log).toHaveLength(1);
+  });
+
+  it("stops while waiting for its turn when aborted", async () => {
+    const { parents, rpc } = await scanSetup(2);
     const controller = new AbortController();
     const done = findNestedAta({
-      rpc: fakeRpc({}).rpc,
+      rpc,
       walletAccounts: parents,
-      delayMs: 60_000,
+      intervalMs: 60_000,
       abortSignal: controller.signal,
     });
     setTimeout(() => controller.abort(new Error("deadline")), 5);
