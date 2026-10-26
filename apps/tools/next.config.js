@@ -17,6 +17,7 @@ const nextConfig = {
     "@blastctrl/ui",
     "@blastctrl/octane-core",
     "@blastctrl/rent-reclaimer",
+    "@blastctrl/token-scans",
     "@blastctrl/solace-sdk",
     "@blastctrl/mpl-core",
     "@blastctrl/mpl-token-metadata",

@@ -26,7 +26,7 @@ Reference implementations, by area:
 | Kit client hook                                                                                                                                                                                                                    | `apps/tools/src/connector/use-kit-client.ts`                                                                                                                                                            |
 | Shared error helper                                                                                                                                                                                                                | `apps/tools/src/connector/transaction-error.ts`                                                                                                                                                         |
 | Stake tools (create UI + CSV, set-lockup, authorize, merge, split, MEV rewards)                                                                                                                                                    | `apps/tools/src/app/solana-stake-tools/**`                                                                                                                                                              |
-| SPL token tools: close-empty, revoke-delegations, recover-nested, token-hoover, distributor (Solace airdrops, incl. `packages/solace-sdk`), create-token                                                                           | `apps/tools/src/app/spl-token-tools/{close-empty,revoke-delegations,recover-nested,token-hoover,distributor,create-token}/**`                                                                           |
+| SPL token tools: close-empty, revoke-delegations, recover-nested (their scans shared with the MCP server), token-hoover, distributor (Solace airdrops, incl. `packages/solace-sdk`), create-token                                  | `apps/tools/src/app/spl-token-tools/{close-empty,revoke-delegations,recover-nested,token-hoover,distributor,create-token}/**`, `packages/token-scans/src/**`                                            |
 | Permanent storage file upload (Turbo SDK via `@solana/connector/compat`)                                                                                                                                                           | `apps/tools/src/app/permanent-storage-tools/file-upload/**`, `lib/turbo.ts`                                                                                                                             |
 | DAS-extended RPC + token-account scans                                                                                                                                                                                             | `src/connector/app-rpc.ts`, `src/state/queries/{use-asset-data,use-owner-assets,use-delegated-assets,use-reclaimable-accounts,use-owner-nfts,use-jup-tokens}.ts`                                        |
 | Shared reads on Kit RPC                                                                                                                                                                                                            | `src/state/queries/use-stake-account.ts`, `use-user-stake-accounts.ts`, `use-epoch.ts`, `use-rent.ts`                                                                                                   |
@@ -332,10 +332,15 @@ switched from base58 to base64. Jupiter's instructions arrive as JSON and map
 to kit's `{ programAddress, accounts, data }` the same way Umi's and web3's do.
 The package's tests fake `fetch` and the RPC, so they need no validator.
 
-### Server side: the rent reclaimer MCP server
+### Server side: the MCP server
 
-`apps/mcp` answers one read-only MCP tool, `analyze_rent_reclaim`, with the
-same scan the reclaim tools run: `packages/rent-reclaimer` holds the scan
+`apps/mcp` answers three read-only MCP tools with the scans the web tools
+run, and links to the web tool for anything that signs.
+`check_token_delegations` and `check_nested_token_accounts` use
+`packages/token-scans` (the revoke-delegations list and recover-nested's
+automatic search; the server checks ten ATAs at a time with no pause where
+the page goes one at a time, and gives up past 500 ATAs).
+`analyze_rent_reclaim` uses the same scan the reclaim tools run: `packages/rent-reclaimer` holds the scan
 (`discoverReclaimableAccounts`, `lookupReclaimableMint`), the account rules
 and `quoteReclaim`, and takes any kit `Rpc` with the methods it reads, so
 the app passes `useAppRpc().rpc` and the server `createSolanaRpc(url)`. The

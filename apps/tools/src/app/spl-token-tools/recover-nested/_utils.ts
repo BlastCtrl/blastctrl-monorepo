@@ -1,114 +1,20 @@
-import type { AppRpc } from "@/connector/app-rpc";
-import { TOKEN_2022_PROGRAM_ADDRESS } from "@blastctrl/kit-extensions";
-import { sleep } from "@/lib/utils";
+import type { TokenAccount } from "@blastctrl/token-scans";
 import {
-  decodeToken,
   findAssociatedTokenPda,
   getCreateAssociatedTokenIdempotentInstruction,
   getRecoverNestedAssociatedTokenInstruction,
-  TOKEN_PROGRAM_ADDRESS,
-  type Token,
 } from "@solana-program/token";
-import {
-  parseBase64RpcAccount,
-  type Account,
-  type Address,
-  type TransactionSigner,
-} from "@solana/kit";
+import type { TransactionSigner } from "@solana/kit";
 
-export type TokenAccount = Account<Token>;
-
-export type NestedPair = {
-  /** The wallet's ATA that owns `nested`. */
-  parent: TokenAccount;
-  /** A token account owned by `parent` instead of by a wallet. */
-  nested: TokenAccount;
-  /**
-   * The ATA program can only recover a nested *associated* token account of
-   * the same token program as its parent (the instruction names one program
-   * and derives both ATAs with it).
-   */
-  recoverable: boolean;
-};
-
-/**
- * Decoded Token and Token-2022 accounts owned by `owner`. Token-2022
- * accounts are decoded with the fixed-size layout; their extensions follow
- * it and are not read.
- */
-export async function fetchTokenAccountsByOwner(
-  rpc: AppRpc,
-  owner: Address,
-): Promise<TokenAccount[]> {
-  const results = await Promise.all(
-    [TOKEN_PROGRAM_ADDRESS, TOKEN_2022_PROGRAM_ADDRESS].map((programId) =>
-      rpc
-        .getTokenAccountsByOwner(owner, { programId }, { encoding: "base64" })
-        .send(),
-    ),
-  );
-  return results.flatMap(({ value }) =>
-    value.map(({ pubkey, account }) =>
-      decodeToken(parseBase64RpcAccount(pubkey, account)),
-    ),
-  );
-}
-
-/** Whether `account` is the associated token account of `owner` for its mint. */
-export async function isAssociatedTokenAccount(
-  account: TokenAccount,
-  owner: Address,
-): Promise<boolean> {
-  const [ata] = await findAssociatedTokenPda({
-    owner,
-    mint: account.data.mint,
-    tokenProgram: account.programAddress,
-  });
-  return ata === account.address;
-}
-
-/** Keeps the accounts that are `owner`'s own associated token accounts. */
-export async function filterAssociatedTokenAccounts(
-  accounts: TokenAccount[],
-  owner: Address,
-): Promise<TokenAccount[]> {
-  const flags = await Promise.all(
-    accounts.map((account) => isAssociatedTokenAccount(account, owner)),
-  );
-  return accounts.filter((_, i) => flags[i]);
-}
-
-/**
- * Looks for token accounts owned by each of the wallet's ATAs. One RPC call
- * per ATA, paced to stay under the rate limit.
- */
-export async function findNestedAta({
-  rpc,
-  walletAccounts,
-  onProgress,
-}: {
-  rpc: AppRpc;
-  walletAccounts: TokenAccount[];
-  onProgress?: (index: number) => void;
-}): Promise<NestedPair[]> {
-  const result: NestedPair[] = [];
-
-  for (const [i, parent] of walletAccounts.entries()) {
-    const nestedAccounts = await fetchTokenAccountsByOwner(rpc, parent.address);
-    for (const nested of nestedAccounts) {
-      result.push({
-        parent,
-        nested,
-        recoverable:
-          nested.programAddress === parent.programAddress &&
-          (await isAssociatedTokenAccount(nested, parent.address)),
-      });
-    }
-    onProgress?.(i);
-    await sleep(800);
-  }
-  return result;
-}
+// The scan lives in `@blastctrl/token-scans`, shared with the MCP server.
+export {
+  fetchTokenAccountsByOwner,
+  filterAssociatedTokenAccounts,
+  findNestedAta,
+  isAssociatedTokenAccount,
+  type NestedPair,
+  type TokenAccount,
+} from "@blastctrl/token-scans";
 
 /**
  * Instructions that recover `nested` into the wallet's ATA for its mint: create

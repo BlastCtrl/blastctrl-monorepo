@@ -1,42 +1,58 @@
 import { createServer } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createMcpServer } from "./server";
-import type { Scan } from "./analysis";
+import { createMcpServer, type Scans } from "./server";
 
-/** A small per-process budget for the first deployment, shared across clients. */
-export function limitScans(scan: Scan, now = Date.now): Scan {
+type AnyScan = (address: string, signal: AbortSignal) => Promise<unknown>;
+type Limited<S extends Record<string, AnyScan>> = {
+  [K in keyof S]: (address: string, signal: AbortSignal) => ReturnType<S[K]>;
+};
+
+/**
+ * A small per-process budget for the first deployment, shared across clients
+ * and across every scan in `scans`.
+ */
+export function limitScans<S extends Record<string, AnyScan>>(
+  scans: S,
+  now = Date.now,
+): Limited<S> {
   let windowStart = now();
   let requests = 0;
   let active = 0;
-  return async (address, signal) => {
-    if (now() - windowStart >= 60_000) {
-      windowStart = now();
-      requests = 0;
-    }
-    if (requests >= 30 || active >= 4) throw new Error("Scan capacity reached");
-    requests++;
-    active++;
-    try {
-      return await scan(address, signal);
-    } finally {
-      active--;
-    }
-  };
+  const limit =
+    <T>(scan: (address: string, signal: AbortSignal) => Promise<T>) =>
+    async (address: string, signal: AbortSignal): Promise<T> => {
+      if (now() - windowStart >= 60_000) {
+        windowStart = now();
+        requests = 0;
+      }
+      if (requests >= 30 || active >= 4)
+        throw new Error("Scan capacity reached");
+      requests++;
+      active++;
+      try {
+        return await scan(address, signal);
+      } finally {
+        active--;
+      }
+    };
+  return Object.fromEntries(
+    Object.entries(scans).map(([name, scan]) => [name, limit(scan)]),
+  ) as Limited<S>;
 }
 
 export function createHttpServer({
-  scan,
+  scans,
   serviceFeeBasisPoints,
   publicOrigin,
   publicHosts = [],
 }: {
-  scan: Scan;
+  scans: Scans;
   serviceFeeBasisPoints: number;
   publicOrigin?: string;
   /** Further Host headers to accept, e.g. the Vercel deployment's domains. */
   publicHosts?: string[];
 }) {
-  const limitedScan = limitScans(scan);
+  const limited = limitScans(scans);
   const allowedOrigins = new Set([
     "http://localhost:6274",
     "http://127.0.0.1:6274",
@@ -90,9 +106,17 @@ export function createHttpServer({
         return;
       }
       const controller = new AbortController();
+      // Every scan also stops when the client goes away.
+      const withClose =
+        <T>(scan: (address: string, signal: AbortSignal) => Promise<T>) =>
+        (address: string, signal: AbortSignal) =>
+          scan(address, AbortSignal.any([signal, controller.signal]));
       const server = createMcpServer({
-        scan: (address, signal) =>
-          limitedScan(address, AbortSignal.any([signal, controller.signal])),
+        scans: {
+          rent: withClose(limited.rent),
+          delegations: withClose(limited.delegations),
+          nested: withClose(limited.nested),
+        },
         serviceFeeBasisPoints,
       });
       const transport = new StreamableHTTPServerTransport({
