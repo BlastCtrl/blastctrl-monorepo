@@ -52,7 +52,11 @@ export function createHttpServer({
   /** Further Host headers to accept, e.g. the Vercel deployment's domains. */
   publicHosts?: string[];
 }) {
-  const limited = limitScans(scans);
+  const limited = limitScans({
+    rent: scans.rent,
+    delegations: scans.delegations,
+    nested: scans.nested,
+  });
   const allowedOrigins = new Set([
     "http://localhost:6274",
     "http://127.0.0.1:6274",
@@ -116,6 +120,9 @@ export function createHttpServer({
           rent: withClose(limited.rent),
           delegations: withClose(limited.delegations),
           nested: withClose(limited.nested),
+          // Not in the scan budget: everyone shares one cached RPC read.
+          rentStatus: (signal) =>
+            scans.rentStatus(AbortSignal.any([signal, controller.signal])),
         },
         serviceFeeBasisPoints,
       });
