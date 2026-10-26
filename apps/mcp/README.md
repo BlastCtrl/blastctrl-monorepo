@@ -169,8 +169,8 @@ For the delegation and nested account checks:
 - The nested check only searches under the wallet's associated token
   accounts, like the web tool's automatic search, and marks an account
   recoverable when the ATA program can recover it (the parent's ATA for the
-  same token program). It checks ten ATAs at a time, where the web page goes
-  one at a time with a pause for the public RPC, and fails with no result
+  same token program). It checks ten ATAs at a time, where the web page paces
+  itself for the public RPC, and fails with no result
   past 500 ATAs.
 - All three tools share the 25-second deadline and the per-process scan
   budget above.

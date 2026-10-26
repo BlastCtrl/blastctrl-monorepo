@@ -47,7 +47,7 @@ function ordered(pairs: NestedPair[]) {
 /**
  * The recover-nested tool's automatic search: token accounts owned by any of
  * the wallet's associated token accounts. The server's own RPC checks several
- * ATAs at once instead of the page's one-at-a-time pacing.
+ * ATAs at once, without the pacing the page uses for the public RPC.
  */
 export function createRpcNestedScan(rpcUrl: string): NestedScan {
   const rpc = createSolanaRpc(rpcUrl);
@@ -62,7 +62,7 @@ export function createRpcNestedScan(rpcUrl: string): NestedScan {
       rpc,
       walletAccounts: parents,
       concurrency: NESTED_CONCURRENCY,
-      delayMs: 0,
+      intervalMs: 0,
       abortSignal,
     });
     const mintDecimals = await fetchMintDecimals(
