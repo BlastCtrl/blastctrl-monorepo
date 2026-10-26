@@ -139,10 +139,34 @@ reclaim link are eligible before submitting a public plugin.
 - Kit's RPC client does not retry on rate limits, so a 429 from the provider
   fails the scan instead of stretching it past its deadline.
 
-For deployment, set `HOST=0.0.0.0`, set `PUBLIC_ORIGIN`, and place the Node
-server behind HTTPS. Keep the RPC credential in the host's secret storage.
 The HTTP endpoint is intentionally unauthenticated. The limits above are a
 small test deployment budget, not per-user quotas.
+
+## Deploy on Vercel
+
+The server deploys to Vercel as is, with the **Node** application preset.
+Vercel finds `src/index.ts`, compiles it and the workspace packages it
+imports, and runs the whole server as one Vercel Function with Fluid compute.
+Its runtime takes the server from the `listen()` call and routes every request
+to it, so `HOST` and `PORT` don't apply there.
+
+Project settings:
+
+- Root Directory: `apps/mcp`, with files outside it included (the default),
+  so the workspace packages and the lockfile are there.
+- Application Preset: Node. Leave the build, output and install commands at
+  their defaults; there is no build script.
+- Environment variables: `RPC_ENDPOINT` and `RECLAIM_RENT_FEE_BPS`, as above.
+
+The host check accepts the deployment's own domains from Vercel's system
+variables (`VERCEL_URL`, `VERCEL_BRANCH_URL`, `VERCEL_PROJECT_PRODUCTION_URL`),
+which Vercel exposes by default. Set `PUBLIC_ORIGIN` only for a further custom
+domain that isn't the production one. The MCP URL is `https://<domain>/mcp`.
+
+The scan limits are per instance there, and Fluid compute can run several,
+so put a shared limit (for example a Vercel Firewall rate limit on `/mcp`) in
+front of it for real traffic. Deployment Protection on preview deployments
+also blocks MCP clients that can't send its bypass token.
 
 ## Sources
 

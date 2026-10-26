@@ -28,10 +28,13 @@ export function createHttpServer({
   scan,
   serviceFeeBasisPoints,
   publicOrigin,
+  publicHosts = [],
 }: {
   scan: Scan;
   serviceFeeBasisPoints: number;
   publicOrigin?: string;
+  /** Further Host headers to accept, e.g. the Vercel deployment's domains. */
+  publicHosts?: string[];
 }) {
   const limitedScan = limitScans(scan);
   const allowedOrigins = new Set([
@@ -39,6 +42,8 @@ export function createHttpServer({
     "http://127.0.0.1:6274",
   ]);
   if (publicOrigin) allowedOrigins.add(publicOrigin);
+  const allowedHosts = new Set(publicHosts);
+  if (publicOrigin) allowedHosts.add(new URL(publicOrigin).host);
   return createServer(
     { requestTimeout: 30_000, headersTimeout: 10_000 },
     async (req, res) => {
@@ -57,7 +62,7 @@ export function createHttpServer({
         host &&
         (/^localhost:\d+$/.test(host) ||
           /^127\.0\.0\.1:\d+$/.test(host) ||
-          (publicOrigin && host === new URL(publicOrigin).host));
+          allowedHosts.has(host));
       if (!allowedHost) {
         res.writeHead(403).end("Host not allowed");
         return;

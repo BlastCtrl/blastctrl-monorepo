@@ -10,7 +10,7 @@ import { ScanLimitError } from "@blastctrl/rent-reclaimer";
 import { createHttpServer, limitScans } from "./http";
 import { summarize } from "./analysis";
 import type { Scan } from "./analysis";
-import { readConfig } from "./config";
+import { publicHosts, readConfig } from "./config";
 import { createMcpServer } from "./server";
 
 const address = "11111111111111111111111111111111";
@@ -31,8 +31,12 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 });
 
-async function connect(scan: Scan) {
-  const server = createHttpServer({ scan, serviceFeeBasisPoints: 500 });
+async function connect(scan: Scan, hosts: string[] = []) {
+  const server = createHttpServer({
+    scan,
+    serviceFeeBasisPoints: 500,
+    publicHosts: hosts,
+  });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   const url = new URL(
@@ -262,5 +266,30 @@ describe("limits and configuration", () => {
         RECLAIM_RENT_FEE_BPS: "500",
       }),
     ).toMatchObject({ RECLAIM_RENT_FEE_BPS: 500, HOST: "127.0.0.1" });
+  });
+
+  it("answers to the Vercel deployment's domains", async () => {
+    const config = readConfig({
+      RPC_ENDPOINT: "https://rpc.example",
+      RECLAIM_RENT_FEE_BPS: "0",
+      VERCEL_URL: "blastctrl-mcp-abc123.vercel.app",
+      VERCEL_PROJECT_PRODUCTION_URL: "mcp.blastctrl.com",
+    });
+    const hosts = publicHosts(config);
+    expect(hosts).toEqual([
+      "blastctrl-mcp-abc123.vercel.app",
+      "mcp.blastctrl.com",
+    ]);
+    const { url } = await connect(async () => [], hosts);
+    const statusFor = (host: string) =>
+      new Promise<number | undefined>((resolve, reject) => {
+        get(new URL("/health", url), { headers: { Host: host } }, (res) => {
+          res.resume();
+          resolve(res.statusCode);
+        }).on("error", reject);
+      });
+    expect(await statusFor("mcp.blastctrl.com")).toBe(200);
+    expect(await statusFor("blastctrl-mcp-abc123.vercel.app")).toBe(200);
+    expect(await statusFor("other.vercel.app")).toBe(403);
   });
 });

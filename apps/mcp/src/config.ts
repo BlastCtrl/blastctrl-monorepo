@@ -22,6 +22,11 @@ const schema = z.object({
       return url.protocol === "https:" && url.origin === value;
     }, "Use the HTTPS origin without a path or trailing slash")
     .optional(),
+  // Vercel's system variables: the deployment's own domain, its branch
+  // domain and the production domain, as bare hosts.
+  VERCEL_URL: z.string().optional(),
+  VERCEL_BRANCH_URL: z.string().optional(),
+  VERCEL_PROJECT_PRODUCTION_URL: z.string().optional(),
 });
 
 export function readConfig(env: NodeJS.ProcessEnv) {
@@ -33,4 +38,13 @@ export function readConfig(env: NodeJS.ProcessEnv) {
     );
   }
   return result.data;
+}
+
+/** The public Host headers the server answers to, besides localhost. */
+export function publicHosts(config: ReturnType<typeof readConfig>) {
+  return [
+    config.VERCEL_URL,
+    config.VERCEL_BRANCH_URL,
+    config.VERCEL_PROJECT_PRODUCTION_URL,
+  ].filter((host): host is string => !!host);
 }
