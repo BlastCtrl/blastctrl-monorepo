@@ -219,7 +219,9 @@ describe("check_rent_reduction_status", () => {
     });
     const text = (result.content as { text: string }[])[0]!.text;
     expect(text).toContain("step 1 (9% lower");
-    expect(text).toContain("0.001488440 SOL");
+    expect(text).toContain(
+      "Rent is now 27% below the original rate, and 63% below once step 3 is live (90% after step 5).",
+    );
     expect(text).toContain("https://reclaim.blastctrl.com");
   });
 

@@ -341,12 +341,14 @@ export function describeRentStatus(
         `step ${s.step} (${s.reductionPercent}% lower${s.activatedAt ? `, activated ${s.activatedAt.slice(0, 10)}` : `, slot ${s.activationSlot}`})`,
     );
   const scheduled = result.steps.filter((s) => s.status === "scheduled");
+  const next = result.steps.find((s) => s.status !== "active");
+  const final = result.steps.at(-1)!;
   return [
     `Solana rent reduction (SIMD-0437) on mainnet-beta: ${live.length ? `live: ${live.join(", ")}.` : "no steps are live yet."}`,
     scheduled.length
       ? `Scheduled for the next epoch boundary (about ${scheduled[0]!.expectedActivationAt}): step ${scheduled.map((s) => s.step).join(", ")}.`
       : "",
-    `A 165-byte token account now needs ${result.current.tokenAccountRentSol} SOL of rent (${result.current.reductionPercent}% below the original 0.00203928 SOL); one opened before the cuts holds ${result.legacyTokenAccount.excessNowSol} SOL of excess, rising to ${result.legacyTokenAccount.excessAfterAllStepsSol} SOL after step 5.`,
+    `Rent is now ${result.current.reductionPercent}% below the original rate${next ? `, and ${next.reductionPercent}% below once step ${next.step} is live${next.step === final.step ? "" : ` (${final.reductionPercent}% after step ${final.step})`}` : ""}. An account opened before the cuts can reclaim that share of its rent deposit as excess.`,
     result.suggestion,
   ]
     .filter(Boolean)
