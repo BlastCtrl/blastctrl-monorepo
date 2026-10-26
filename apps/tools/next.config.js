@@ -52,9 +52,10 @@ const nextConfig = {
       ),
       {
         // Keep other pages on the toolbox domain. Leave framework requests,
-        // APIs, and files (including the sitemap) on their original host.
+        // Vercel Analytics beacons, APIs, and files (including the sitemap)
+        // on their original host.
         source:
-          "/:path((?!_next(?:/|$)|api(?:/|$)|blast-api(?:/|$)|.*\\.[^/]+$).+)",
+          "/:path((?!_next(?:/|$)|_vercel(?:/|$)|api(?:/|$)|blast-api(?:/|$)|.*\\.[^/]+$).+)",
         has: [{ type: "host", value: "reclaim\\.blastctrl\\.com" }],
         destination: "https://tools.blastctrl.com/:path",
         permanent: true,

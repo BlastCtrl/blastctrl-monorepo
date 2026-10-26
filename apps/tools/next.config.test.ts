@@ -79,6 +79,7 @@ describe("reclaim domain routing", () => {
   it.each([
     "/_next/static/chunks/app.js",
     "/_next/image?url=%2Fsol_coin.png&w=64&q=75",
+    "/_vercel/insights/view",
     "/api/octane/price",
     "/blastctrl_icon.svg",
     "/favicon.ico",

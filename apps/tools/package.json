@@ -42,6 +42,7 @@
     "@tanstack/react-query-devtools": "^5.103.1",
     "@tanstack/react-virtual": "^3.13.12",
     "@upstash/redis": "^1.35.6",
+    "@vercel/analytics": "^2.0.1",
     "cache-manager": "^5.5.2",
     "clsx": "^2.1.1",
     "cuelume": "^0.2.8",
