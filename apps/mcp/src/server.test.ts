@@ -11,7 +11,7 @@ import { createHttpServer, limitScans } from "./http";
 import { summarize } from "./analysis";
 import type { Scan } from "./analysis";
 import { publicHosts, readConfig } from "./config";
-import { createMcpServer } from "./server";
+import { createMcpServer, type Scans } from "./server";
 
 const address = "11111111111111111111111111111111";
 const account: DiscoveredAccount = {
@@ -31,9 +31,18 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 });
 
-async function connect(scan: Scan, hosts: string[] = []) {
+const emptyScans: Scans = {
+  rent: async () => [],
+  delegations: async () => ({ accounts: [], mintDecimals: {} }),
+  nested: async () => ({ parentCount: 0, pairs: [], mintDecimals: {} }),
+};
+
+async function connect(scans: Scan | Partial<Scans>, hosts: string[] = []) {
   const server = createHttpServer({
-    scan,
+    scans: {
+      ...emptyScans,
+      ...(typeof scans === "function" ? { rent: scans } : scans),
+    },
     serviceFeeBasisPoints: 500,
     publicHosts: hosts,
   });
@@ -56,19 +65,24 @@ async function connect(scan: Scan, hosts: string[] = []) {
 }
 
 describe("MCP over real local HTTP", () => {
-  it("initializes, lists one read-only tool, and returns the closing estimate and the web link", async () => {
+  it("initializes, lists the read-only tools, and returns the closing estimate and the web link", async () => {
     const scan = vi.fn<Scan>().mockResolvedValue([account]);
     const { client } = await connect(scan);
     const { tools } = await client.listTools();
-    expect(tools).toHaveLength(1);
-    expect(tools[0]).toMatchObject({
-      name: "analyze_rent_reclaim",
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        openWorldHint: true,
-      },
-    });
+    expect(tools.map((t) => t.name)).toEqual([
+      "analyze_rent_reclaim",
+      "check_token_delegations",
+      "check_nested_token_accounts",
+    ]);
+    for (const tool of tools) {
+      expect(tool).toMatchObject({
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          openWorldHint: true,
+        },
+      });
+    }
     const result = await client.callTool({
       name: "analyze_rent_reclaim",
       arguments: { address },
@@ -178,15 +192,18 @@ describe("limits and configuration", () => {
     const server = createMcpServer({
       serviceFeeBasisPoints: 0,
       timeoutMs: 10,
-      scan: async (_, scanSignal) => {
-        signal = scanSignal;
-        return new Promise((_, reject) => {
-          scanSignal.addEventListener(
-            "abort",
-            () => reject(scanSignal.reason),
-            { once: true },
-          );
-        });
+      scans: {
+        ...emptyScans,
+        rent: async (_, scanSignal) => {
+          signal = scanSignal;
+          return new Promise((_, reject) => {
+            scanSignal.addEventListener(
+              "abort",
+              () => reject(scanSignal.reason),
+              { once: true },
+            );
+          });
+        },
       },
     });
     const client = new Client({ name: "timeout-test", version: "1.0.0" });
@@ -228,29 +245,33 @@ describe("limits and configuration", () => {
       await pending;
       throw new Error("RPC failure");
     });
-    const limited = limitScans(scan);
+    const limited = limitScans({ rent: scan, other: scan });
     const signal = new AbortController().signal;
     const results = Promise.allSettled(
-      Array.from({ length: 4 }, () => limited(address, signal)),
+      Array.from({ length: 4 }, () => limited.rent(address, signal)),
     );
-    await expect(limited(address, signal)).rejects.toThrow("capacity");
+    // The capacity is shared by every tool's scan.
+    await expect(limited.other(address, signal)).rejects.toThrow("capacity");
     release();
     await results;
     scan.mockResolvedValue([]);
-    expect(await limited(address, signal)).toEqual([]);
+    expect(await limited.rent(address, signal)).toEqual([]);
   });
 
   it("shares the request budget and resets it after a minute", async () => {
     let time = 0;
     const limited = limitScans(
-      async () => [],
+      { rent: async () => [], nested: async () => [] },
       () => time,
     );
     const signal = new AbortController().signal;
-    for (let i = 0; i < 30; i++) await limited(address, signal);
-    await expect(limited(address, signal)).rejects.toThrow("capacity");
+    for (let i = 0; i < 15; i++) {
+      await limited.rent(address, signal);
+      await limited.nested(address, signal);
+    }
+    await expect(limited.rent(address, signal)).rejects.toThrow("capacity");
     time = 60_000;
-    expect(await limited(address, signal)).toEqual([]);
+    expect(await limited.rent(address, signal)).toEqual([]);
   });
 
   it("requires an explicit fee rate and never prints the RPC secret in config errors", () => {

@@ -26,6 +26,7 @@
     "@blastctrl/rent-reclaimer": "workspace:^",
     "@blastctrl/solace-sdk": "workspace:^",
     "@blastctrl/squads": "workspace:^",
+    "@blastctrl/token-scans": "workspace:^",
     "@blastctrl/ui": "workspace:^",
     "@headlessui/react": "2.2.10",
     "@heroicons/react": "^2.2.0",

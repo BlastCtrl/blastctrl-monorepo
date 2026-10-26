@@ -1,9 +1,22 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { isAddress } from "@solana/kit";
 import { z } from "zod";
 import { ScanLimitError } from "@blastctrl/rent-reclaimer";
 import { SCAN_TIMEOUT_MS, summarize } from "./analysis";
 import type { Scan } from "./analysis";
+import { summarizeDelegations, type DelegationScan } from "./delegations";
+import {
+  NestedScanLimitError,
+  summarizeNested,
+  type NestedScan,
+} from "./nested";
+
+export type Scans = {
+  rent: Scan;
+  delegations: DelegationScan;
+  nested: NestedScan;
+};
 
 const lamports = z.string().regex(/^-?\d+$/);
 const quoteSchema = z.object({
@@ -24,17 +37,62 @@ const quoteSchema = z.object({
   feesExceedReclaim: z.boolean(),
 });
 
+const tokenAmount = z.object({
+  raw: z.string(),
+  amount: z.string().optional(),
+});
+
 const addressSchema = z
   .string()
   .trim()
   .refine(isAddress, "Supply a valid Solana address");
 
+const readOnly = {
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    openWorldHint: true,
+    idempotentHint: true,
+  },
+  _meta: { securitySchemes: [{ type: "noauth" }] },
+};
+
+/**
+ * Runs one scan under the request's signal and the deadline. Errors become a
+ * fixed message: RPC errors can contain provider URLs and API keys.
+ */
+async function runScan<T>(
+  requestSignal: AbortSignal,
+  timeoutMs: number,
+  scan: (signal: AbortSignal) => Promise<T>,
+  respond: (value: T) => CallToolResult,
+  nothingReturned: string,
+): Promise<CallToolResult> {
+  const signal = AbortSignal.any([
+    requestSignal,
+    AbortSignal.timeout(timeoutMs),
+  ]);
+  try {
+    const value = await scan(signal);
+    signal.throwIfAborted();
+    return respond(value);
+  } catch (error) {
+    const message =
+      error instanceof ScanLimitError || error instanceof NestedScanLimitError
+        ? error.message
+        : signal.aborted
+          ? `The scan timed out or was cancelled. ${nothingReturned} Try again.`
+          : `The scan could not be completed. ${nothingReturned} Try again later.`;
+    return { isError: true, content: [{ type: "text", text: message }] };
+  }
+}
+
 export function createMcpServer({
-  scan,
+  scans,
   serviceFeeBasisPoints,
   timeoutMs = SCAN_TIMEOUT_MS,
 }: {
-  scan: Scan;
+  scans: Scans;
   serviceFeeBasisPoints: number;
   timeoutMs?: number;
 }) {
@@ -71,43 +129,142 @@ export function createMcpServer({
         reclaimUrl: z.string(),
         notes: z.array(z.string()),
       },
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        openWorldHint: true,
-        idempotentHint: true,
-      },
-      _meta: { securitySchemes: [{ type: "noauth" }] },
+      ...readOnly,
     },
-    async ({ address }, extra) => {
-      const signal = AbortSignal.any([
+    async ({ address }, extra) =>
+      runScan(
         extra.signal,
-        AbortSignal.timeout(timeoutMs),
-      ]);
-      try {
-        const accounts = await scan(address, signal);
-        signal.throwIfAborted();
-        const result = summarize(address, accounts, serviceFeeBasisPoints);
-        return {
-          structuredContent: result,
-          content: [
-            {
-              type: "text",
-              text: `Address: ${address} (mainnet-beta). Reclaimable, closing ${result.estimate.closedAccountCount} empty accounts: ${result.estimate.grossSol} SOL before fees; estimated net ${result.estimate.estimatedNetSol} SOL. Scanned ${result.scannedAccountCount} accounts. ${result.notes.join(" ")} Open BlastCtrl: ${result.reclaimUrl}`,
-            },
-          ],
-        };
-      } catch (error) {
-        // RPC errors can contain provider URLs and API keys. Never return them.
-        const message =
-          error instanceof ScanLimitError
-            ? error.message
-            : signal.aborted
-              ? "The scan timed out or was cancelled. No estimate was returned. Try again."
-              : "The scan could not be completed. No estimate was returned. Try again later.";
-        return { isError: true, content: [{ type: "text", text: message }] };
-      }
+        timeoutMs,
+        (signal) => scans.rent(address, signal),
+        (accounts) => {
+          const result = summarize(address, accounts, serviceFeeBasisPoints);
+          return {
+            structuredContent: result,
+            content: [
+              {
+                type: "text",
+                text: `Address: ${address} (mainnet-beta). Reclaimable, closing ${result.estimate.closedAccountCount} empty accounts: ${result.estimate.grossSol} SOL before fees; estimated net ${result.estimate.estimatedNetSol} SOL. Scanned ${result.scannedAccountCount} accounts. ${result.notes.join(" ")} Open BlastCtrl: ${result.reclaimUrl}`,
+              },
+            ],
+          };
+        },
+        "No estimate was returned.",
+      ),
+  );
+
+  server.registerTool(
+    "check_token_delegations",
+    {
+      title: "Check Solana token delegations",
+      description:
+        "Check a supplied Solana address on mainnet for SPL Token and Token-2022 accounts with an active delegate, an address allowed to transfer tokens out of the account without the owner. Returns each delegate, the delegated amount and the account balance, and a link to the BlastCtrl tool that revokes delegations. Read-only; does not connect a wallet, build, sign, or submit transactions, and does not revoke anything.",
+      inputSchema: { address: addressSchema },
+      outputSchema: {
+        address: z.string(),
+        network: z.literal("mainnet-beta"),
+        scannedAt: z.string(),
+        delegatedAccountCount: z.number().int(),
+        accounts: z.array(
+          z.object({
+            tokenAccount: z.string(),
+            mint: z.string(),
+            program: z.enum(["token", "token-2022"]),
+            delegate: z.string(),
+            delegatedAmount: tokenAmount,
+            balance: tokenAmount,
+            unlimited: z.boolean(),
+            coversWholeBalance: z.boolean(),
+            frozen: z.boolean(),
+          }),
+        ),
+        accountsTruncated: z.boolean(),
+        revokeUrl: z.string(),
+        notes: z.array(z.string()),
+      },
+      ...readOnly,
     },
+    async ({ address }, extra) =>
+      runScan(
+        extra.signal,
+        timeoutMs,
+        (signal) => scans.delegations(address, signal),
+        (scan) => {
+          const result = summarizeDelegations(address, scan);
+          const found =
+            result.delegatedAccountCount === 0
+              ? "No token accounts with an active delegate were found."
+              : `Found ${result.delegatedAccountCount} token accounts with an active delegate.`;
+          return {
+            structuredContent: result,
+            content: [
+              {
+                type: "text",
+                text: `Address: ${address} (mainnet-beta). ${found} ${result.notes.join(" ")} Revoke in BlastCtrl: ${result.revokeUrl}`,
+              },
+            ],
+          };
+        },
+        "No result was returned.",
+      ),
+  );
+
+  server.registerTool(
+    "check_nested_token_accounts",
+    {
+      title: "Check nested Solana token accounts",
+      description:
+        "Check a supplied Solana address on mainnet for nested token accounts: SPL Token or Token-2022 accounts owned by one of the wallet's associated token accounts instead of by the wallet, whose tokens are stuck until recovered. Returns each nested account, whether it can be recovered, the rent it holds, and a link to the BlastCtrl tool that recovers them. Read-only; does not connect a wallet, build, sign, or submit transactions, and does not recover anything.",
+      inputSchema: { address: addressSchema },
+      outputSchema: {
+        address: z.string(),
+        network: z.literal("mainnet-beta"),
+        scannedAt: z.string(),
+        checkedAssociatedTokenAccountCount: z.number().int(),
+        nestedAccountCount: z.number().int(),
+        recoverableAccountCount: z.number().int(),
+        recoverableRentLamports: lamports,
+        recoverableRentSol: z.string(),
+        accounts: z.array(
+          z.object({
+            nestedAccount: z.string(),
+            nestedMint: z.string(),
+            parentAccount: z.string(),
+            parentMint: z.string(),
+            program: z.enum(["token", "token-2022"]),
+            tokenBalance: tokenAmount,
+            rentLamports: lamports,
+            recoverable: z.boolean(),
+          }),
+        ),
+        accountsTruncated: z.boolean(),
+        recoverUrl: z.string(),
+        notes: z.array(z.string()),
+      },
+      ...readOnly,
+    },
+    async ({ address }, extra) =>
+      runScan(
+        extra.signal,
+        timeoutMs,
+        (signal) => scans.nested(address, signal),
+        (scan) => {
+          const result = summarizeNested(address, scan);
+          const found =
+            result.nestedAccountCount === 0
+              ? `No nested token accounts were found under its ${result.checkedAssociatedTokenAccountCount} associated token accounts.`
+              : `Found ${result.nestedAccountCount} nested token accounts, ${result.recoverableAccountCount} recoverable, holding ${result.recoverableRentSol} SOL of recoverable rent.`;
+          return {
+            structuredContent: result,
+            content: [
+              {
+                type: "text",
+                text: `Address: ${address} (mainnet-beta). ${found} ${result.notes.join(" ")} Recover in BlastCtrl: ${result.recoverUrl}`,
+              },
+            ],
+          };
+        },
+        "No result was returned.",
+      ),
   );
   return server;
 }

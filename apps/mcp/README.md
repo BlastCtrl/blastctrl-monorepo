@@ -1,8 +1,23 @@
-# BlastCtrl MCP: Rent Reclaimer
+# BlastCtrl MCP
 
-This server lets ChatGPT check a Solana address for reclaimable rent.
-It uses the same account scan as the BlastCtrl website, from
-`packages/rent-reclaimer`, and reads the chain with `@solana/kit`.
+This server lets ChatGPT check a Solana address with three read-only tools:
+
+- `analyze_rent_reclaim`: reclaimable rent, with the same account scan as
+  the BlastCtrl reclaim page, from `packages/rent-reclaimer`.
+- `check_token_delegations`: token accounts with an active delegate, with
+  the scan of the BlastCtrl revoke delegations tool, from
+  `packages/token-scans`. Links to
+  https://tools.blastctrl.com/spl-token-tools/revoke-delegations.
+- `check_nested_token_accounts`: token accounts owned by the wallet's
+  associated token accounts, with the automatic search of the BlastCtrl
+  recover nested tool, from `packages/token-scans`. Links to
+  https://tools.blastctrl.com/spl-token-tools/recover-nested.
+
+It reads the chain with `@solana/kit`. None of the tools revokes, recovers or
+reclaims anything; each reports what it found and links to the web tool,
+where the user connects the wallet and acts.
+
+The rent flow, as an example:
 
 The flow is:
 
@@ -58,11 +73,12 @@ Run the tests from the repository root:
 ```sh
 pnpm test:mcp
 pnpm -F @blastctrl/rent-reclaimer test
+pnpm -F @blastctrl/token-scans test
 ```
 
 The tests use RPC fixtures and an actual MCP client over local HTTP.
-They do not send transactions or use an external RPC provider. The scan
-itself is tested in `packages/rent-reclaimer`.
+They do not send transactions or use an external RPC provider. The scans
+themselves are tested in `packages/rent-reclaimer` and `packages/token-scans`.
 
 For a manual test, start MCP Inspector:
 
@@ -76,6 +92,9 @@ Call `analyze_rent_reclaim` with:
 ```json
 { "address": "YOUR_SOLANA_ADDRESS" }
 ```
+
+`check_token_delegations` and `check_nested_token_accounts` take the same
+input.
 
 Inspector's browser origins on port 6274 are allowed. Requests from other
 browser origins are rejected unless the origin matches `PUBLIC_ORIGIN`.
@@ -138,6 +157,23 @@ reclaim link are eligible before submitting a public plugin.
 - This first version does not use DAS metadata, a database, or persistent scans.
 - Kit's RPC client does not retry on rate limits, so a 429 from the provider
   fails the scan instead of stretching it past its deadline.
+
+For the delegation and nested account checks:
+
+- Both cover SPL Token and Token-2022 accounts on mainnet and list at most 20
+  accounts; the counts include all of them and the result says when the list
+  is shorter.
+- Amounts come as raw base units and, where the mint could be read, as whole
+  tokens. A delegation is flagged `unlimited` at the u64 maximum and
+  `coversWholeBalance` when it is at least the balance.
+- The nested check only searches under the wallet's associated token
+  accounts, like the web tool's automatic search, and marks an account
+  recoverable when the ATA program can recover it (the parent's ATA for the
+  same token program). It checks ten ATAs at a time, where the web page goes
+  one at a time with a pause for the public RPC, and fails with no result
+  past 500 ATAs.
+- All three tools share the 25-second deadline and the per-process scan
+  budget above.
 
 The HTTP endpoint is intentionally unauthenticated. The limits above are a
 small test deployment budget, not per-user quotas.
