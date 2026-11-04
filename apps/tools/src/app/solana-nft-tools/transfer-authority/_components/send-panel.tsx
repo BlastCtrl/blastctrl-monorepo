@@ -1,3 +1,4 @@
+import { trackToolAttempt } from "@/lib/analytics";
 import { notify } from "@/components";
 import {
   WalletRefusedError,
@@ -56,6 +57,7 @@ export function SendPanel({
 
   const send = async () => {
     if (!client || batches.length === 0) return;
+    trackToolAttempt();
 
     setProgress(
       batches.map((b) => ({ nfts: b.mints.length, status: "queued" })),

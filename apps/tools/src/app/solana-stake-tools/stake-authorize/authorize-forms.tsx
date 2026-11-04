@@ -1,5 +1,6 @@
 "use client";
 
+import { trackToolAttempt } from "@/lib/analytics";
 import {
   DescriptionDetails,
   DescriptionList,
@@ -177,6 +178,7 @@ function AuthorizeTransactionBuilder({
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!client) return;
+    trackToolAttempt();
     const owner = client.payer;
 
     if (!withdrawCheckbox && !stakeCheckbox) {

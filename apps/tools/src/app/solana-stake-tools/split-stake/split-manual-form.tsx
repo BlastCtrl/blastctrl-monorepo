@@ -1,3 +1,4 @@
+import { trackToolAttempt } from "@/lib/analytics";
 import { notify } from "@/components/notification";
 import { useConnectorDialog } from "@/connector/connector-dialog";
 import { transactionErrorMessage } from "@/connector/transaction-error";
@@ -60,6 +61,7 @@ export function SplitManualForm() {
     e.preventDefault();
     if (!client || data === undefined || rentExemption === undefined) return;
     if (!isAddress(accountToSplit)) return;
+    trackToolAttempt();
 
     setFormErrors({});
 

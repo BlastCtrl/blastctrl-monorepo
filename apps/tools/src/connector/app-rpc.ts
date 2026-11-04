@@ -15,10 +15,14 @@ import {
   createRpc,
   createSolanaRpcApi,
   DEFAULT_RPC_CONFIG,
+  isJsonRpcPayload,
   type Rpc,
   type RpcApi,
+  type RpcResponse,
+  type RpcTransport,
   type SolanaRpcApi,
 } from "@solana/kit";
+import { trackTxSent } from "@/lib/analytics";
 import { useMemo } from "react";
 
 /**
@@ -76,6 +80,29 @@ export function createAppRpcApi(): RpcApi<AppRpcApi> {
   }) as RpcApi<AppRpcApi>;
 }
 
+/**
+ * Reports each transaction the RPC accepts. Every broadcast in the app goes
+ * through this RPC (kit executor, batch senders, gasless swap), so this is the
+ * one place that sees them all.
+ */
+export function withTxSentTracking(transport: RpcTransport): RpcTransport {
+  return async <TResponse>(
+    config: Parameters<RpcTransport>[0],
+  ): Promise<RpcResponse<TResponse>> => {
+    const response = await transport<TResponse>(config);
+    if (
+      isJsonRpcPayload(config.payload) &&
+      config.payload.method === "sendTransaction" &&
+      typeof response === "object" &&
+      response !== null &&
+      "result" in response
+    ) {
+      trackTxSent();
+    }
+    return response;
+  };
+}
+
 const rpcCache = new Map<string, AppRpc>();
 
 /** One RPC per endpoint URL, shared across hooks and the kit client. */
@@ -84,7 +111,7 @@ export function getAppRpc(url: string): AppRpc {
   if (!rpc) {
     rpc = createRpc({
       api: createAppRpcApi(),
-      transport: createDefaultRpcTransport({ url }),
+      transport: withTxSentTracking(createDefaultRpcTransport({ url })),
     });
     rpcCache.set(url, rpc);
   }

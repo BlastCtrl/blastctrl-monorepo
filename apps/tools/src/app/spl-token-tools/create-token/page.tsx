@@ -1,5 +1,6 @@
 "use client";
 
+import { trackToolAttempt } from "@/lib/analytics";
 import {
   InputGroup,
   InputMultiline,
@@ -105,6 +106,7 @@ export default function CreateToken() {
       setOpen(true);
       return;
     }
+    trackToolAttempt();
 
     setIsConfirming(true);
     try {

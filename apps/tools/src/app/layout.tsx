@@ -1,5 +1,4 @@
 import { SiteChrome } from "@/components/layout/site-chrome";
-import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "../styles/globals.css";
@@ -65,7 +64,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <Providers>
           <SiteChrome>{children}</SiteChrome>
         </Providers>
-        <Analytics />
       </body>
     </html>
   );

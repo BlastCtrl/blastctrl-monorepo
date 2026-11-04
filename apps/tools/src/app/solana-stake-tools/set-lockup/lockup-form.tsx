@@ -1,5 +1,6 @@
 "use client";
 
+import { trackToolAttempt } from "@/lib/analytics";
 import { Badge } from "@/components/badge";
 import {
   DescriptionDetails,
@@ -231,6 +232,7 @@ function SetLockupTransactionBuilder({
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!client) return;
+    trackToolAttempt();
     const owner = client.payer;
 
     if (custodian === "" && timestamp === "" && epoch === "") {

@@ -1,4 +1,5 @@
 import { notify } from "@/components";
+import { trackToolAttempt } from "@/lib/analytics";
 import {
   kitBatchSender,
   sendBatches,
@@ -35,8 +36,16 @@ export function useCollectionBatches(
 ) {
   const [batches, setBatches] = useState<CollectionBatch[] | null>(null);
 
-  const send = (client: KitClient, items: CollectionItem[]) =>
-    sendCollectionBatches(client, items, build, perTransaction, setBatches);
+  const send = (client: KitClient, items: CollectionItem[]) => {
+    trackToolAttempt();
+    return sendCollectionBatches(
+      client,
+      items,
+      build,
+      perTransaction,
+      setBatches,
+    );
+  };
 
   return { batches, send, reset: () => setBatches(null) };
 }

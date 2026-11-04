@@ -1,5 +1,6 @@
 "use client";
 
+import { trackToolAttempt } from "@/lib/analytics";
 import { InputGroup, InputMultiline, notify } from "@/components";
 import { useConnectorDialog } from "@/connector/connector-dialog";
 import { transactionErrorMessage } from "@/connector/transaction-error";
@@ -127,6 +128,7 @@ function MintForm() {
       return;
     }
 
+    trackToolAttempt();
     setIsConfirming(true);
     try {
       // The uploader's toasts report a failed upload; stop quietly after one.

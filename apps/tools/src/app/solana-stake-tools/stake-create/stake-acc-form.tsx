@@ -1,5 +1,6 @@
 "use client";
 
+import { trackToolAttempt } from "@/lib/analytics";
 import {
   DescriptionDetails,
   DescriptionList,
@@ -154,6 +155,7 @@ export function StakeAccountForm() {
 
   const submitTransaction = async (data: FormSchemaOutput) => {
     if (!client) return;
+    trackToolAttempt();
     setIsConfirming(true);
 
     try {

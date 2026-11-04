@@ -21,6 +21,7 @@ import {
   ConnectorDialog,
   ConnectorDialogContext,
 } from "@/connector/connector-dialog";
+import { AppAnalytics } from "@/connector/app-analytics";
 
 const getOrigin = () => {
   if (typeof window !== "undefined") {
@@ -103,6 +104,7 @@ export function Providers({ children }: { children: ReactNode }) {
           <Toaster position="bottom-left" />
           <ReactQueryDevtools initialIsOpen={false} />
           <ConnectorDialog />
+          <AppAnalytics />
           {children}
         </ConnectorDialogContext>
       </ConnectorProvider>
