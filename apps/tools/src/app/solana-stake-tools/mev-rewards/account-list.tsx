@@ -1,5 +1,6 @@
 "use client";
 
+import { trackToolAttempt } from "@/lib/analytics";
 import { notify } from "@/components/notification";
 import { useConnectorDialog } from "@/connector/connector-dialog";
 import { transactionErrorMessage } from "@/connector/transaction-error";
@@ -102,6 +103,7 @@ function AccountListForm({
 
   const handleSubmit = async () => {
     if (!client) return;
+    trackToolAttempt();
     const owner = client.payer;
     const recipientAddress =
       modifyRecipient && recipient ? address(recipient) : owner.address;

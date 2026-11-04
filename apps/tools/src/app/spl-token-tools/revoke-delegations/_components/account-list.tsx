@@ -1,3 +1,4 @@
+import { trackToolAttempt } from "@/lib/analytics";
 import { notify } from "@/components";
 import { RotateCwIcon } from "@/components/icons/rotate-cw";
 import { transactionErrorMessage } from "@/connector/transaction-error";
@@ -322,6 +323,7 @@ function RevokeDelegationsButton({
 
   const handleRevokeDelegations = async () => {
     if (!client || selectedAccounts.length === 0) return;
+    trackToolAttempt();
 
     const instructions = revokeInstructions(selectedAccounts, client.payer);
 

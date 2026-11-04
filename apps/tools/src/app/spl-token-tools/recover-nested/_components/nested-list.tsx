@@ -1,3 +1,4 @@
+import { trackToolAttempt } from "@/lib/analytics";
 import { notify } from "@/components";
 import { useConnectorDialog } from "@/connector/connector-dialog";
 import { transactionErrorMessage } from "@/connector/transaction-error";
@@ -75,6 +76,7 @@ export const NestedInfo = ({
       setOpen(true);
       return;
     }
+    trackToolAttempt();
 
     setConfirming(true);
     try {

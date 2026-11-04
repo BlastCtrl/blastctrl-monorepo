@@ -1,3 +1,4 @@
+import { trackToolAttempt } from "@/lib/analytics";
 import {
   kitBatchSender,
   sendBatches,
@@ -33,6 +34,7 @@ export function useReclaimExcess({
   return useMutation({
     mutationFn: async (variables: Variables) => {
       if (!client) throw Error("Wallet is not connected");
+      trackToolAttempt();
       await sendReclaimBatches(client, variables, { onBatchResult, onStage });
     },
     onSettled,

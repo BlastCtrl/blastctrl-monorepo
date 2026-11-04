@@ -1,3 +1,4 @@
+import { trackToolAttempt } from "@/lib/analytics";
 import { notify } from "@/components/notification";
 import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient } from "@/connector/use-kit-client";
@@ -22,6 +23,7 @@ export const SignStep = () => {
 
   const handleSendTransaction = useCallback(async () => {
     if (!client) return;
+    trackToolAttempt();
     const closedAccounts: ParsedTokenAccount[] = [];
 
     setIsConfirming(true);

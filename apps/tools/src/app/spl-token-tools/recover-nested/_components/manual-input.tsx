@@ -1,3 +1,4 @@
+import { trackToolAttempt } from "@/lib/analytics";
 import { notify } from "@/components";
 import { useAppRpc, type AppRpc } from "@/connector/app-rpc";
 import { useConnectorDialog } from "@/connector/connector-dialog";
@@ -196,6 +197,7 @@ export const ManualInput = () => {
       return;
     }
     if (!preview) return;
+    trackToolAttempt();
 
     setConfirming(true);
     try {

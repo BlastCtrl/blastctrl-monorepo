@@ -1,5 +1,6 @@
 "use client";
 
+import { trackToolAttempt } from "@/lib/analytics";
 import { notify } from "@/components";
 import { useAppRpc } from "@/connector/app-rpc";
 import { useConnectorDialog } from "@/connector/connector-dialog";
@@ -103,6 +104,7 @@ function GaslessSwapForm() {
 
   const submitSwap = async (data: FormData) => {
     if (!selectToken || !account) return;
+    trackToolAttempt();
     const amountAsDecimals = Math.floor(
       data.swapAmount * 10 ** selectToken.decimals,
     );

@@ -1,5 +1,6 @@
 "use client";
 
+import { trackToolAttempt } from "@/lib/analytics";
 import { InputGroup, notify } from "@/components";
 import { useConnectorDialog } from "@/connector/connector-dialog";
 import { transactionErrorMessage } from "@/connector/transaction-error";
@@ -173,6 +174,7 @@ export default function Update() {
         notify({ type: "error", title: "Not allowed", description: refusal });
         return;
       }
+      trackToolAttempt();
 
       const result = await client.sendTransaction(
         await updateNftInstructions(client.payer, mint, plan),

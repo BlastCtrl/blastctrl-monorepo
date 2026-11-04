@@ -1,5 +1,6 @@
 "use client";
 
+import { trackToolAttempt } from "@/lib/analytics";
 import { InputGroup, InputMultiline, notify } from "@/components";
 import { useConnectorDialog } from "@/connector/connector-dialog";
 import { transactionErrorMessage } from "@/connector/transaction-error";
@@ -49,6 +50,7 @@ export default function Mint() {
       setOpen(true);
       return;
     }
+    trackToolAttempt();
 
     setIsConfirming(true);
     try {

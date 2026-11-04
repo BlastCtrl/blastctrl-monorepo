@@ -1,5 +1,6 @@
 "use client";
 
+import { trackToolAttempt } from "@/lib/analytics";
 import { notify } from "@/components/notification";
 import { useConnectorDialog } from "@/connector/connector-dialog";
 import { transactionErrorMessage } from "@/connector/transaction-error";
@@ -112,6 +113,7 @@ export function StakeCSVForm() {
     }));
     txActions.initializeTransactions(transactionData);
     setHasStartedProcessing(true);
+    trackToolAttempt();
 
     try {
       const rentReserve = await client.getMinimumBalance(STAKE_ACCOUNT_SIZE);
@@ -163,6 +165,7 @@ export function StakeCSVForm() {
     }
 
     applyUpdate(transactionId, transaction.index, { status: "processing" });
+    trackToolAttempt();
     try {
       const rentReserve = await client.getMinimumBalance(STAKE_ACCOUNT_SIZE);
       const signature = await sendStakeRow(client, row, rentReserve);

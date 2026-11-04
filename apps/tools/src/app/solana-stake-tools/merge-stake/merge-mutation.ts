@@ -1,3 +1,4 @@
+import { trackToolAttempt } from "@/lib/analytics";
 import { notify } from "@/components/notification";
 import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient } from "@/connector/use-kit-client";
@@ -33,6 +34,7 @@ export function useMergeStakesMutation() {
     },
     mutationFn: async (args: MergeStakeArgs) => {
       if (!client) throw Error("Connect your wallet");
+      trackToolAttempt();
 
       if (
         !window.confirm(

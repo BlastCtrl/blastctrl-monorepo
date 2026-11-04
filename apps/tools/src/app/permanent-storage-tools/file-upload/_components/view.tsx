@@ -1,3 +1,4 @@
+import { trackToolAttempt } from "@/lib/analytics";
 import { notify } from "@/components";
 import { useConnectorDialog } from "@/connector/connector-dialog";
 import { useLocalStorageState } from "@/lib/hooks/use-local-storage";
@@ -123,6 +124,7 @@ export const UploaderView = ({ turbo }: { turbo: TurboStorage }) => {
       notify({ type: "error", description: "No file selected" });
       return;
     }
+    trackToolAttempt();
 
     try {
       setIsUploading(true);

@@ -1,5 +1,6 @@
 "use client";
 
+import { trackToolAttempt } from "@/lib/analytics";
 import { notify } from "@/components/notification";
 import { useConnectorDialog } from "@/connector/connector-dialog";
 import { transactionErrorMessage } from "@/connector/transaction-error";
@@ -16,7 +17,11 @@ import {
   ClipboardDocumentIcon,
 } from "@heroicons/react/24/solid";
 import * as Slider from "@radix-ui/react-slider";
-import { generateKeyPairSigner, type Address, type Lamports } from "@solana/kit";
+import {
+  generateKeyPairSigner,
+  type Address,
+  type Lamports,
+} from "@solana/kit";
 import type { SyntheticEvent } from "react";
 import { useState } from "react";
 import { Box } from "./box";
@@ -133,7 +138,11 @@ function SplitFormInner({
     fromLamports(total / 2n),
   );
 
-  const inputError = splitAmountError(selectedAccount, inputs.newLamports, rent);
+  const inputError = splitAmountError(
+    selectedAccount,
+    inputs.newLamports,
+    rent,
+  );
   // Share kept by the original account, for the slider.
   const percent =
     total > 0n
@@ -165,6 +174,7 @@ function SplitFormInner({
   const handleSubmit = async (e: SyntheticEvent) => {
     e.preventDefault();
     if (!client || inputError) return;
+    trackToolAttempt();
 
     if (
       selectedAccount.meta.authorized.staker !== owner &&

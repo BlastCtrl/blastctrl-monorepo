@@ -1,3 +1,4 @@
+import { trackToolAttempt } from "@/lib/analytics";
 import { notify } from "@/components";
 import { transactionErrorMessage } from "@/connector/transaction-error";
 import { useKitClient, type KitClient } from "@/connector/use-kit-client";
@@ -228,6 +229,7 @@ export const TokenList = ({
 
   const handleSubmit = async () => {
     if (!client || isProcessing) return;
+    trackToolAttempt();
 
     const selected = tokenAccounts.flatMap((account) => {
       const action = tokenActions.get(account.token_account);
