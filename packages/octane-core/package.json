@@ -24,7 +24,7 @@
     "@blastctrl/typescript-config": "workspace:^",
     "@types/node": "^20.12.7",
     "eslint": "10.11.0",
-    "glob": "^10.3.14",
+    "glob": "^14.0.2",
     "tsx": "^4.9.4",
     "typescript": "6.0.3"
   },
