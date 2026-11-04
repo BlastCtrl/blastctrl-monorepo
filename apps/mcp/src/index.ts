@@ -3,6 +3,7 @@ import { publicHosts, readConfig } from "./config";
 import { createRpcDelegationScan } from "./delegations";
 import { createHttpServer } from "./http";
 import { createRpcNestedScan } from "./nested";
+import { createRpcRentStatusScan } from "./rent-status";
 
 const config = readConfig(process.env);
 const server = createHttpServer({
@@ -10,6 +11,7 @@ const server = createHttpServer({
     rent: createRpcScan(config.RPC_ENDPOINT),
     delegations: createRpcDelegationScan(config.RPC_ENDPOINT),
     nested: createRpcNestedScan(config.RPC_ENDPOINT),
+    rentStatus: createRpcRentStatusScan(config.RPC_ENDPOINT),
   },
   serviceFeeBasisPoints: config.RECLAIM_RENT_FEE_BPS,
   publicOrigin: config.PUBLIC_ORIGIN,
