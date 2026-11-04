@@ -2,6 +2,9 @@ packages:
   - packages/*
   - apps/*
   - e2e-tests
+catalog:
+  # One zod for every workspace package: reference it as "zod": "catalog:".
+  zod: ^4.6.7
 blockExoticSubdeps: true
 minimumReleaseAge: 2880
 minimumReleaseAgeExclude:
@@ -33,6 +36,10 @@ overrides:
   "ws@<7.5.10": "^7.5.10"
   "secp256k1@5.0.0": "^5.0.1"
   "shell-quote@<1.8.4": "^1.8.4"
+  # porto (under octane-core) asks for zod ^4.1.5; give it the catalog's zod
+  # instead of an older 4.x of its own. The zod 3 copies (WalletConnect,
+  # x402, Coinbase) are left alone: zod 4 breaks their API.
+  "porto>zod": "catalog:"
 packageExtensions:
   # The connector's compat bridge (file uploads through the Turbo SDK) turns
   # signed bytes back into a web3.js 1 transaction with whatever web3.js it
