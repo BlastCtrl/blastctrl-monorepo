@@ -68,7 +68,23 @@ export function redactEvent(event: BeforeSendEvent): BeforeSendEvent {
   }
 }
 
+// The rendered page's route, set by `AppAnalytics`. Not the browser's
+// pathname: a rewrite can serve a tool under another path
+// (reclaim.blastctrl.com/ serves /reclaim-sol).
+let tool: string | null = null;
+
+/** The tool path for the root layout's active route segments. */
+export function toolFromSegments(segments: string[]): string {
+  const route = segments.filter((segment) => !segment.startsWith("("));
+  return redactPath(`/${route.join("/")}`);
+}
+
+export function setAnalyticsTool(next: string) {
+  tool = next;
+}
+
 function currentTool(): string {
+  if (tool !== null) return tool;
   if (typeof window === "undefined") return "unknown";
   return redactPath(window.location.pathname);
 }

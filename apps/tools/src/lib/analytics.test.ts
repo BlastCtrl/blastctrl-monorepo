@@ -8,6 +8,8 @@ import {
   redactEvent,
   redactPath,
   setAnalyticsContext,
+  setAnalyticsTool,
+  toolFromSegments,
   trackToolAttempt,
   walletLabel,
 } from "./analytics";
@@ -60,6 +62,33 @@ describe("redactPath", () => {
     expect(event.url).toBe(
       "https://tools.blastctrl.com/spl-token-tools/distributor/[airdropId]?x=1",
     );
+  });
+});
+
+describe("toolFromSegments", () => {
+  it("names the rendered route, not the browser path", () => {
+    // reclaim.blastctrl.com/ is a rewrite to /reclaim-sol.
+    expect(toolFromSegments(["reclaim-sol"])).toBe("/reclaim-sol");
+    expect(toolFromSegments(["spl-token-tools", "close-empty"])).toBe(
+      "/spl-token-tools/close-empty",
+    );
+    expect(toolFromSegments([])).toBe("/");
+  });
+
+  it("drops route groups and redacts IDs", () => {
+    expect(toolFromSegments(["(tools)", "gasless-swap"])).toBe("/gasless-swap");
+    expect(toolFromSegments(["spl-token-tools", "distributor", "abc"])).toBe(
+      "/spl-token-tools/distributor/[airdropId]",
+    );
+  });
+
+  it("is what events report", () => {
+    setAnalyticsTool("/reclaim-sol");
+    trackToolAttempt();
+    expect(track).toHaveBeenCalledWith("tool_attempt", {
+      tool: "/reclaim-sol",
+      wallet: "phantom",
+    });
   });
 });
 
