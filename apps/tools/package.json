@@ -50,7 +50,7 @@
     "decimal.js": "^10.6.0",
     "jwt-decode": "^4.0.0",
     "motion": "^13.4.4",
-    "next": "16.4.5",
+    "next": "16.4.6",
     "papaparse": "^5.7.0",
     "qrcode.react": "^4.2.0",
     "react": "19.3.1",
