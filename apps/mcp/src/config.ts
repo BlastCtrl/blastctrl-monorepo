@@ -24,6 +24,8 @@ const schema = z.object({
     .optional(),
   // Vercel's system variables: the deployment's own domain, its branch
   // domain and the production domain, as bare hosts.
+  // "production", "preview" or "development"; unset off Vercel.
+  VERCEL_ENV: z.string().optional(),
   VERCEL_URL: z.string().optional(),
   VERCEL_BRANCH_URL: z.string().optional(),
   VERCEL_PROJECT_PRODUCTION_URL: z.string().optional(),

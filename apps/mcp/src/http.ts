@@ -1,6 +1,12 @@
-import { createServer } from "node:http";
+import { createServer, type IncomingHttpHeaders } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createMcpServer, type Scans } from "./server";
+import {
+  createMcpServer,
+  ScanCapacityError,
+  type Scans,
+  type ToolName,
+  type ToolOutcome,
+} from "./server";
 
 type AnyScan = (address: string, signal: AbortSignal) => Promise<unknown>;
 type Limited<S extends Record<string, AnyScan>> = {
@@ -25,8 +31,7 @@ export function limitScans<S extends Record<string, AnyScan>>(
         windowStart = now();
         requests = 0;
       }
-      if (requests >= 30 || active >= 4)
-        throw new Error("Scan capacity reached");
+      if (requests >= 30 || active >= 4) throw new ScanCapacityError();
       requests++;
       active++;
       try {
@@ -45,12 +50,19 @@ export function createHttpServer({
   serviceFeeBasisPoints,
   publicOrigin,
   publicHosts = [],
+  onToolCall,
 }: {
   scans: Scans;
   serviceFeeBasisPoints: number;
   publicOrigin?: string;
   /** Further Host headers to accept, e.g. the Vercel deployment's domains. */
   publicHosts?: string[];
+  /** Reports each tool call, with the headers of the request that made it. */
+  onToolCall?: (
+    tool: ToolName,
+    outcome: ToolOutcome,
+    headers: IncomingHttpHeaders,
+  ) => void;
 }) {
   const limited = limitScans(scans);
   const allowedOrigins = new Set([
@@ -118,6 +130,9 @@ export function createHttpServer({
           nested: withClose(limited.nested),
         },
         serviceFeeBasisPoints,
+        onToolCall:
+          onToolCall &&
+          ((tool, outcome) => onToolCall(tool, outcome, req.headers)),
       });
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,

@@ -204,6 +204,19 @@ so put a shared limit (for example a Vercel Firewall rate limit on `/mcp`) in
 front of it for real traffic. Deployment Protection on preview deployments
 also blocks MCP clients that can't send its bypass token.
 
+### Analytics
+
+Each tool call that reaches its scan sends one Vercel Web Analytics custom
+event, `mcp_tool_call`, with two properties (the plan's limit): `tool` and
+`outcome` (`ok`, `limit`, `capacity`, `timeout` or `error`). The address is
+never sent. Calls rejected for a malformed address aren't counted.
+
+Events are sent from the production deployment only, and need Web Analytics
+enabled on the Vercel project. The event goes to the deployment's own
+`VERCEL_URL`; if that URL is behind Deployment Protection, set
+`VERCEL_WEB_ANALYTICS_ENDPOINT` to the production domain. Visitor counts mean
+little here: the requests come from the AI client's servers, not from users.
+
 ## Sources
 
 - [OpenAI MCP quickstart](https://developers.openai.com/plugins/build/app-quickstart)

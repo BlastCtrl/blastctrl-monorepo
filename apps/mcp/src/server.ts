@@ -18,6 +18,25 @@ export type Scans = {
   nested: NestedScan;
 };
 
+/** The per-process scan budget in `limitScans` is used up. */
+export class ScanCapacityError extends Error {
+  constructor() {
+    super("Scan capacity reached");
+  }
+}
+
+export type ToolName =
+  | "analyze_rent_reclaim"
+  | "check_token_delegations"
+  | "check_nested_token_accounts";
+/**
+ * How a tool call ended: `limit` is a wallet too large to scan, `capacity`
+ * the server's own budget, `timeout` the deadline or a client that left.
+ */
+export type ToolOutcome = "ok" | "limit" | "capacity" | "timeout" | "error";
+/** Called once per tool call that reached its scan. Never gets the address. */
+export type OnToolCall = (tool: ToolName, outcome: ToolOutcome) => void;
+
 const lamports = z.string().regex(/^-?\d+$/);
 const quoteSchema = z.object({
   closeEmptyAccounts: z.boolean(),
@@ -67,6 +86,7 @@ async function runScan<T>(
   scan: (signal: AbortSignal) => Promise<T>,
   respond: (value: T) => CallToolResult,
   nothingReturned: string,
+  onOutcome: (outcome: ToolOutcome) => void,
 ): Promise<CallToolResult> {
   const signal = AbortSignal.any([
     requestSignal,
@@ -75,14 +95,26 @@ async function runScan<T>(
   try {
     const value = await scan(signal);
     signal.throwIfAborted();
-    return respond(value);
+    const result = respond(value);
+    onOutcome("ok");
+    return result;
   } catch (error) {
-    const message =
-      error instanceof ScanLimitError || error instanceof NestedScanLimitError
-        ? error.message
-        : signal.aborted
-          ? `The scan timed out or was cancelled. ${nothingReturned} Try again.`
-          : `The scan could not be completed. ${nothingReturned} Try again later.`;
+    const limited =
+      error instanceof ScanLimitError || error instanceof NestedScanLimitError;
+    onOutcome(
+      limited
+        ? "limit"
+        : error instanceof ScanCapacityError
+          ? "capacity"
+          : signal.aborted
+            ? "timeout"
+            : "error",
+    );
+    const message = limited
+      ? error.message
+      : signal.aborted
+        ? `The scan timed out or was cancelled. ${nothingReturned} Try again.`
+        : `The scan could not be completed. ${nothingReturned} Try again later.`;
     return { isError: true, content: [{ type: "text", text: message }] };
   }
 }
@@ -91,11 +123,20 @@ export function createMcpServer({
   scans,
   serviceFeeBasisPoints,
   timeoutMs = SCAN_TIMEOUT_MS,
+  onToolCall,
 }: {
   scans: Scans;
   serviceFeeBasisPoints: number;
   timeoutMs?: number;
+  onToolCall?: OnToolCall;
 }) {
+  const report = (tool: ToolName) => (outcome: ToolOutcome) => {
+    try {
+      onToolCall?.(tool, outcome);
+    } catch {
+      // Reporting never changes a tool's result.
+    }
+  };
   const server = new McpServer({ name: "blastctrl", version: "0.1.0" });
   server.registerTool(
     "analyze_rent_reclaim",
@@ -149,6 +190,7 @@ export function createMcpServer({
           };
         },
         "No estimate was returned.",
+        report("analyze_rent_reclaim"),
       ),
   );
 
@@ -205,6 +247,7 @@ export function createMcpServer({
           };
         },
         "No result was returned.",
+        report("check_token_delegations"),
       ),
   );
 
@@ -264,6 +307,7 @@ export function createMcpServer({
           };
         },
         "No result was returned.",
+        report("check_nested_token_accounts"),
       ),
   );
   return server;

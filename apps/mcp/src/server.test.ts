@@ -37,8 +37,13 @@ const emptyScans: Scans = {
   nested: async () => ({ parentCount: 0, pairs: [], mintDecimals: {} }),
 };
 
-async function connect(scans: Scan | Partial<Scans>, hosts: string[] = []) {
+async function connect(
+  scans: Scan | Partial<Scans>,
+  hosts: string[] = [],
+  onToolCall?: Parameters<typeof createHttpServer>[0]["onToolCall"],
+) {
   const server = createHttpServer({
+    onToolCall,
     scans: {
       ...emptyScans,
       ...(typeof scans === "function" ? { rent: scans } : scans),
@@ -146,6 +151,40 @@ describe("MCP over real local HTTP", () => {
     });
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result)).toContain("too many token accounts");
+  });
+
+  it("reports each tool call's name and outcome, and never the address", async () => {
+    const onToolCall = vi.fn();
+    const { client } = await connect(
+      {
+        rent: async () => [account],
+        delegations: async () => {
+          throw new ScanLimitError();
+        },
+        nested: async () => {
+          throw new Error("https://rpc.example/?api-key=secret");
+        },
+      },
+      [],
+      onToolCall,
+    );
+    for (const name of [
+      "analyze_rent_reclaim",
+      "check_token_delegations",
+      "check_nested_token_accounts",
+    ])
+      await client.callTool({ name, arguments: { address } });
+    await client.callTool({
+      name: "analyze_rent_reclaim",
+      arguments: { address: "not-an-address" },
+    });
+    expect(onToolCall.mock.calls.map((call) => call.slice(0, 2))).toEqual([
+      ["analyze_rent_reclaim", "ok"],
+      ["check_token_delegations", "limit"],
+      ["check_nested_token_accounts", "error"],
+    ]);
+    expect(onToolCall.mock.calls[0]?.[2]).toHaveProperty("user-agent");
+    expect(JSON.stringify(onToolCall.mock.calls)).not.toContain(address);
   });
 
   it("checks host and origin, provides health, and limits request body size", async () => {

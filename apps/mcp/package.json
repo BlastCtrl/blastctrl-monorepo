@@ -19,9 +19,10 @@
   "dependencies": {
     "@blastctrl/rent-reclaimer": "workspace:^",
     "@blastctrl/token-scans": "workspace:^",
-    "@solana-program/token": "^0.18.0",
     "@modelcontextprotocol/sdk": "^1.32.1",
+    "@solana-program/token": "^0.18.0",
     "@solana/kit": "^8.5.0",
+    "@vercel/analytics": "^2.0.1",
     "tsx": "^4.20.6",
     "zod": "catalog:"
   },
