@@ -6,7 +6,8 @@ import type { AnimationSequence, MotionValue } from "motion/react";
 import { motion, stagger, useAnimate } from "motion/react";
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { formatSol } from "../rent";
+import { useRentStatus } from "@/state/queries/use-rent";
+import { checkBackNote, formatSol } from "../rent";
 import {
   CheckAgainLink,
   CheckAgainPill,
@@ -626,7 +627,7 @@ function pillLabel(p: RewardProps) {
 }
 
 function Detail(p: RewardProps & { busy: boolean }) {
-  const shared = sharedDetail(p);
+  const shared = sharedDetail(p, checkBackNote(useRentStatus()));
   let text: ReactNode = shared;
   let tone = "text-zinc-600";
   if (shared) {

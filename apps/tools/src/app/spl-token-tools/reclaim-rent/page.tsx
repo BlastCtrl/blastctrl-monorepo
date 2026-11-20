@@ -1,25 +1,13 @@
-"use client";
+import { ReclaimRentTool } from "./_components/reclaim-rent-tool";
+import { RentStatusBoundary } from "./_components/rent-status-boundary";
 
-import { useCluster } from "@solana/connector/react";
-import { Suspense, use } from "react";
-import { browser } from "react-dom";
-import { ReclaimRent } from "./_components/reclaim-rent";
-import { showsTestAccountsPanel } from "./_components/test-accounts";
-import { TestAccountsPanel } from "./_components/test-accounts-panel";
+// How often the server reads the rent status again; see RentStatusBoundary.
+export const revalidate = 300;
 
 export default function ReclaimRentPage() {
   return (
-    <>
-      <ReclaimRent />
-      <Suspense fallback={null}>
-        <TestAccounts />
-      </Suspense>
-    </>
+    <RentStatusBoundary>
+      <ReclaimRentTool />
+    </RentStatusBoundary>
   );
-}
-
-function TestAccounts() {
-  use(browser("The active cluster is client-side state"));
-  const { type } = useCluster();
-  return showsTestAccountsPanel(type) && <TestAccountsPanel />;
 }

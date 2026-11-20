@@ -16,12 +16,14 @@ import {
   ACCOUNTS_PER_TRANSACTION,
   FEE_PER_TRANSACTION,
   formatSol,
+  nextDrop,
   remainingSteps,
+  type RentStatus,
 } from "./rent";
 import type { ReclaimableAccount } from "./types";
 import { closes, excessLamports, feeBase, reclaimLamports } from "./types";
 import { useReclaimExcess } from "./use-reclaim-excess";
-import { useRentRate } from "@/state/queries/use-rent";
+import { useRentStatus } from "@/state/queries/use-rent";
 
 type Batch = {
   accounts: ReclaimableAccount[];
@@ -85,7 +87,7 @@ export function ReclaimDialog({
   onClose,
 }: Props) {
   const { account } = useConnector();
-  const stepsLeft = remainingSteps(useRentRate().lamportsPerByte);
+  const rentStatus = useRentStatus();
   const [phase, setPhase] = useState<Phase>("review");
   const [batches, setBatches] = useState(() => toBatches(accounts, closeEmpty));
   const [signingCount, setSigningCount] = useState(0);
@@ -227,8 +229,7 @@ export function ReclaimDialog({
             {phase === "done" && failed.length === 0 && (
               <p className="mt-4 text-sm text-zinc-600">
                 The SOL is in your wallet.
-                {stepsLeft > 0 &&
-                  ` Rent drops ${stepsLeft === 1 ? "once more" : `${stepsLeft} more times`}, expected in November. After each drop, ${closing > 0 ? "the accounts still open" : "the same accounts"} will have more to reclaim.`}
+                {rentStatus && moreToCome(rentStatus, closing > 0)}
               </p>
             )}
             {phase === "done" && failed.length > 0 && (
@@ -369,6 +370,25 @@ function Review({
 }
 
 /** What the reclaim does to the accounts, before the numbers. */
+/**
+ * After a reclaim: how many more times rent drops, whether the next drop
+ * is scheduled if the chain says, and that there'll be more to reclaim
+ * then. Empty once the last step is live.
+ */
+function moreToCome(status: RentStatus, closedSome: boolean) {
+  const stepsLeft = remainingSteps(status.lamportsPerByte);
+  if (stepsLeft === 0) return "";
+  const next = nextDrop(status);
+  const once = stepsLeft === 1;
+  const when =
+    next === "scheduled"
+      ? `, ${once ? "" : "starting "}at the next epoch`
+      : next === "unscheduled"
+        ? `, though ${once ? "that" : "the next drop"} isn't scheduled yet`
+        : "";
+  return ` Rent drops ${once ? "once more" : `${stepsLeft} more times`}${when}. After each drop, ${closedSome ? "the accounts still open" : "the same accounts"} will have more to reclaim.`;
+}
+
 function whatHappens(closing: number, staying: number) {
   const closed =
     closing === 1

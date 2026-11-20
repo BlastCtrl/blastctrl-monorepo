@@ -34,13 +34,16 @@ export const HEADLINES: Partial<Record<RewardStatus, string>> = {
   nothing: "Nothing to reclaim right now.",
 };
 
-/** The sentence under the headline for the states other than ready. */
-export function sharedDetail(p: RewardProps): ReactNode {
+/**
+ * The sentence under the headline for the states other than ready.
+ * `checkBack` says when rent drops next, and is empty when it won't.
+ */
+export function sharedDetail(p: RewardProps, checkBack: string): ReactNode {
   switch (p.status) {
     case "fees-exceed":
-      return "The fees are more than these accounts hold extra. Rent drops again in November, so check back then.";
+      return `The fees are more than these accounts hold extra. ${checkBack}`.trim();
     case "nothing":
-      return "Every account in this wallet is already at the minimum. Rent drops again in November, so check back then.";
+      return `Every account in this wallet is already at the minimum. ${checkBack}`.trim();
     case "reclaimed":
       return `Sent to your wallet from ${fromWhere(p.reclaimedFrom.tokenAccounts, p.reclaimedFrom.mints)}.`;
     default:

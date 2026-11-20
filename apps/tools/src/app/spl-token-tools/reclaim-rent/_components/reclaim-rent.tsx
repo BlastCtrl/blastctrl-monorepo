@@ -23,11 +23,10 @@ import { ReclaimDialog } from "./reclaim-dialog";
 import {
   ACCOUNTS_PER_TRANSACTION,
   FEE_PER_TRANSACTION,
-  ORIGINAL_LAMPORTS_PER_BYTE,
-  TOKEN_ACCOUNT_SIZE,
+  checkBackNote,
   formatSol,
-  minimumBalance,
   remainingSteps,
+  tokenAccountExcess,
 } from "./rent";
 import { RentScheduleChart } from "./rent-schedule-chart";
 import { SoundToggle } from "./results/sound-toggle";
@@ -42,7 +41,7 @@ import type {
 import type { ReclaimableAccount } from "./types";
 import { closes, excessLamports, reclaimLamports } from "./types";
 import { useReclaimExcess } from "./use-reclaim-excess";
-import { useRentRate } from "@/state/queries/use-rent";
+import { useRentStatus } from "@/state/queries/use-rent";
 
 /**
  * A scan always takes at least this long, so the stage has unrolled and
@@ -110,8 +109,12 @@ export function ReclaimRent({
   const { setOpen } = useConnectorDialog();
   const { network } = useAppRpc();
   const queryClient = useQueryClient();
-  const { lamportsPerByte } = useRentRate();
-  const stepsLeft = remainingSteps(lamportsPerByte);
+  const rentStatus = useRentStatus();
+  // Until the status has loaded, the intro says neither.
+  const stepsLeft = rentStatus && remainingSteps(rentStatus.lamportsPerByte);
+  const excessToday = rentStatus
+    ? tokenAccountExcess(rentStatus.lamportsPerByte)
+    : 0;
   const owner = account ?? "";
   const { data, error, refetch } = useReclaimableAccounts(owner);
   const reduced = !!useReducedMotion() || forceReducedMotion;
@@ -460,28 +463,23 @@ export function ReclaimRent({
             <div className="mt-4 max-w-prose space-y-2 text-pretty text-gray-500">
               <p>
                 Every account on Solana holds a SOL deposit (rent), and the
-                required rent is{" "}
+                required rent {stepsLeft === 0 ? "has been" : "is being"}{" "}
                 <a
                   href="https://solana.com/upgrades/reduced-rent"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-indigo-600 hover:text-indigo-800"
                 >
-                  being lowered in five steps
+                  lowered in five steps
                 </a>
                 . Token accounts and mints you created earlier still hold the
                 old, larger amount.
               </p>
               <p>
-                This tool sends the difference back to your wallet: about{" "}
-                {formatSol(
-                  minimumBalance(
-                    TOKEN_ACCOUNT_SIZE,
-                    ORIGINAL_LAMPORTS_PER_BYTE,
-                  ) - minimumBalance(TOKEN_ACCOUNT_SIZE, lamportsPerByte),
-                  5,
-                )}{" "}
-                SOL per token account today, and more with each step.
+                This tool sends the difference back to your wallet
+                {excessToday > 0 &&
+                  `: about ${formatSol(excessToday, 5)} SOL per token account${stepsLeft ? " today, and more with each step" : ""}`}
+                .
               </p>
               <p>
                 Your tokens stay where they are. Below the reclaim button, you
@@ -511,7 +509,7 @@ export function ReclaimRent({
             <div className="mb-2 hidden justify-end md:flex">
               <SoundToggle />
             </div>
-            <RentScheduleChart lamportsPerByte={lamportsPerByte} />
+            <RentScheduleChart status={rentStatus} />
           </div>
         </div>
       </div>
@@ -557,7 +555,7 @@ export function ReclaimRent({
                     tokenAccounts={tokenAccounts}
                     scannedCount={scanned.length}
                     atMinimum={atMinimum}
-                    stepsLeft={stepsLeft}
+                    checkBack={checkBackNote(rentStatus)}
                     mints={mints}
                     owner={owner}
                     selectedIds={selectedIds}
@@ -616,7 +614,8 @@ function Details(p: {
   tokenAccounts: ReclaimableAccount[];
   scannedCount: number;
   atMinimum: number;
-  stepsLeft: number;
+  /** When rent drops next, as a sentence; empty when it won't. */
+  checkBack: string;
   mints: ReclaimableAccount[];
   owner: string;
   selectedIds: Set<string>;
@@ -677,9 +676,7 @@ function Details(p: {
             {p.scannedCount === 0
               ? "This wallet has no token accounts."
               : "Every token account in this wallet is already at the minimum."}
-            {p.scannedCount > 0 &&
-              p.stepsLeft > 0 &&
-              " Rent drops again in November, so check back then."}
+            {p.scannedCount > 0 && p.checkBack && ` ${p.checkBack}`}
           </p>
         ) : (
           <>

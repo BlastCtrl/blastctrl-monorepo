@@ -35,7 +35,9 @@ export function Providers({ children }: { children: ReactNode }) {
     () =>
       new QueryClient({
         queryCache: new QueryCache({
-          onError: (error) => {
+          onError: (error, query) => {
+            // For reads a page does fine without.
+            if (query.meta?.silent) return;
             notify({
               type: "error",
               title: "Query Error",
