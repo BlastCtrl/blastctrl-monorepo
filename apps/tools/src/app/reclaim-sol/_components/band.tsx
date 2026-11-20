@@ -1,17 +1,16 @@
 "use client";
 
 import {
-  ORIGINAL_LAMPORTS_PER_BYTE,
-  TOKEN_ACCOUNT_SIZE,
+  TOKEN_ACCOUNT_DEPOSIT,
   formatSol,
-  minimumBalance,
+  tokenAccountExcess,
 } from "@/app/spl-token-tools/reclaim-rent/_components/rent";
 import {
   Chips,
   ReclaimPill,
 } from "@/app/spl-token-tools/reclaim-rent/_components/results/bits";
 import { Stage } from "@/app/spl-token-tools/reclaim-rent/_components/results/stage";
-import { useRentRate } from "@/state/queries/use-rent";
+import { useRentStatus } from "@/state/queries/use-rent";
 import { isAddress } from "@solana/kit";
 import { cn } from "@blastctrl/ui";
 import { AnimatePresence, motion } from "motion/react";
@@ -104,9 +103,11 @@ export function Invitation({
   onEntry: (entry: Entry) => void;
   onCheckAddress: (address: string) => void;
 }) {
-  const { lamportsPerByte } = useRentRate();
-  const paid = minimumBalance(TOKEN_ACCOUNT_SIZE, ORIGINAL_LAMPORTS_PER_BYTE);
-  const excess = paid - minimumBalance(TOKEN_ACCOUNT_SIZE, lamportsPerByte);
+  const rentStatus = useRentStatus();
+  // Zero until the cluster's rent is known, and the headline names no amount.
+  const excess = rentStatus
+    ? tokenAccountExcess(rentStatus.lamportsPerByte)
+    : 0;
   const byAddress = !connected && entry === "address";
 
   return (
@@ -121,11 +122,13 @@ export function Invitation({
     >
       <div className="min-w-0 md:max-w-xl">
         <h2 className="font-display text-xl font-bold text-balance text-slate-800 sm:text-2xl">
-          About {formatSol(excess, 5)} SOL back from every token account.
+          {excess > 0
+            ? `About ${formatSol(excess, 5)} SOL back from every token account.`
+            : "SOL back from every token account."}
         </h2>
         <p className="mt-3 max-w-md text-sm text-pretty text-zinc-600">
-          Empty ones return their whole {formatSol(paid, 5)} SOL deposit. Active
-          wallets often have dozens.
+          Empty ones return their whole {formatSol(TOKEN_ACCOUNT_DEPOSIT, 5)}{" "}
+          SOL deposit. Active wallets often have dozens.
         </p>
         <Chips closesEmpty />
       </div>

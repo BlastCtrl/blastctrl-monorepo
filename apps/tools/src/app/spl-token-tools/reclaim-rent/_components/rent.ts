@@ -1,28 +1,36 @@
-export const ACCOUNT_STORAGE_OVERHEAD = 128;
+import {
+  ACCOUNT_STORAGE_OVERHEAD,
+  ORIGINAL_LAMPORTS_PER_BYTE,
+  RENT_REDUCTION_STEPS,
+  type RentReductionStatus,
+} from "@blastctrl/rent-reclaimer";
+
+export { ACCOUNT_STORAGE_OVERHEAD, ORIGINAL_LAMPORTS_PER_BYTE };
 export const TOKEN_ACCOUNT_SIZE = 165;
 
-export const ORIGINAL_LAMPORTS_PER_BYTE = 6960;
-
 /**
- * Used until the live rate has loaded. Everything that matters (the excess
- * per account) uses minimums fetched from the RPC, never this.
+ * How far a cluster is through the SIMD-0437 rent reduction: the live rate,
+ * and what each step's feature gate says about what comes next. Read from
+ * the chain, on the server for the first paint and in the browser after.
  */
-export const FALLBACK_LAMPORTS_PER_BYTE = 5080;
+export type RentStatus = RentReductionStatus;
+
+/** Keyed by cluster: they move through the reduction at different times. */
+export const rentStatusKey = (network: string) =>
+  ["rent-status", network] as const;
 
 export type RentStep = {
   label: string;
   lamportsPerByte: number;
 };
 
-// SIMD-0437: five feature-gated reductions of lamports_per_byte. Steps 1 and
-// 2 went live in September 2026; the rest are expected in November.
+/** The original rate, then SIMD-0437's five feature-gated reductions. */
 export const RENT_STEPS: RentStep[] = [
-  { label: "Original", lamportsPerByte: 6960 },
-  { label: "Step 1", lamportsPerByte: 6333 },
-  { label: "Step 2", lamportsPerByte: 5080 },
-  { label: "Step 3", lamportsPerByte: 2575 },
-  { label: "Step 4", lamportsPerByte: 1322 },
-  { label: "Step 5", lamportsPerByte: 696 },
+  { label: "Original", lamportsPerByte: ORIGINAL_LAMPORTS_PER_BYTE },
+  ...RENT_REDUCTION_STEPS.map((s) => ({
+    label: `Step ${s.step}`,
+    lamportsPerByte: s.lamportsPerByte,
+  })),
 ];
 
 export type RentStepStatus = "past" | "current" | "upcoming";
@@ -52,6 +60,68 @@ export function remainingSteps(lamportsPerByte: number) {
   return RENT_STEPS.length - 1 - currentStepIndex(lamportsPerByte);
 }
 
+/**
+ * Whether the gate of the step at `index` in {@link RENT_STEPS} is set to go
+ * live at the next epoch boundary. The gates start at step 1, so the gate of
+ * `RENT_STEPS[i]` is `gates[i - 1]`.
+ */
+export function isScheduled(status: RentStatus, index: number) {
+  return status.gates?.[index - 1] === "scheduled";
+}
+
+/**
+ * When rent drops next. "scheduled" has the estimated time the next epoch
+ * starts. "unscheduled" means the gates were read and none of the remaining
+ * steps is set to go live. "unknown" means the gates couldn't be read.
+ */
+export type NextDrop =
+  | { kind: "none" }
+  | { kind: "scheduled"; at: number }
+  | { kind: "unscheduled" }
+  | { kind: "unknown" };
+
+export function nextDrop(status: RentStatus): NextDrop {
+  const current = currentStepIndex(status.lamportsPerByte);
+  if (current === RENT_STEPS.length - 1) return { kind: "none" };
+  if (!status.gates || status.nextEpochAt === null) return { kind: "unknown" };
+  const scheduled = RENT_STEPS.some(
+    (_, i) => i > current && isScheduled(status, i),
+  );
+  return scheduled
+    ? { kind: "scheduled", at: status.nextEpochAt }
+    : { kind: "unscheduled" };
+}
+
+// In UTC, so the server and every browser write the same day.
+const DAY = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+
+/** A day like "Nov 22". */
+export function formatDay(time: number) {
+  return DAY.format(time);
+}
+
+/**
+ * When to come back for more, for wherever there's nothing left to reclaim.
+ * Empty once the last step is live, and until the status has loaded.
+ */
+export function checkBackNote(status: RentStatus | null) {
+  const next = status ? nextDrop(status) : { kind: "none" as const };
+  switch (next.kind) {
+    case "none":
+      return "";
+    case "scheduled":
+      return `Rent drops again around ${formatDay(next.at)}, so check back then.`;
+    case "unscheduled":
+      return "Rent is set to drop again, but the next step isn't scheduled yet. Check back later.";
+    case "unknown":
+      return "Rent is set to drop again, so check back later.";
+  }
+}
+
 export {
   ACCOUNTS_PER_TRANSACTION,
   FEE_PER_TRANSACTION,
@@ -59,6 +129,19 @@ export {
 
 export function minimumBalance(dataLength: number, lamportsPerByte: number) {
   return (ACCOUNT_STORAGE_OVERHEAD + dataLength) * lamportsPerByte;
+}
+
+/** What a token account paid for at the original rate still holds. */
+export const TOKEN_ACCOUNT_DEPOSIT = minimumBalance(
+  TOKEN_ACCOUNT_SIZE,
+  ORIGINAL_LAMPORTS_PER_BYTE,
+);
+
+/** How much of that deposit is excess at a rate, in lamports. */
+export function tokenAccountExcess(lamportsPerByte: number) {
+  return (
+    TOKEN_ACCOUNT_DEPOSIT - minimumBalance(TOKEN_ACCOUNT_SIZE, lamportsPerByte)
+  );
 }
 
 export function formatSol(

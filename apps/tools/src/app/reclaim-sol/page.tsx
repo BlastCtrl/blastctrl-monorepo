@@ -1,3 +1,4 @@
+import { RentStatusBoundary } from "@/app/spl-token-tools/reclaim-rent/_components/rent-status-boundary";
 import type { Metadata } from "next";
 import { Landing } from "./_components/landing";
 import { OneClickReclaim } from "./_components/one-click-reclaim";
@@ -23,10 +24,15 @@ export const metadata: Metadata = {
   },
 };
 
+// How often the server reads the rent status again; see RentStatusBoundary.
+export const revalidate = 300;
+
 export default function ReclaimSolPage() {
   return (
-    <Landing>
-      <OneClickReclaim />
-    </Landing>
+    <RentStatusBoundary>
+      <Landing>
+        <OneClickReclaim />
+      </Landing>
+    </RentStatusBoundary>
   );
 }

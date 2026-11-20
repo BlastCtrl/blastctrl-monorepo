@@ -11,14 +11,9 @@ import { XMarkIcon } from "@heroicons/react/20/solid";
 import { useCluster } from "@solana/connector/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import {
-  ORIGINAL_LAMPORTS_PER_BYTE,
-  TOKEN_ACCOUNT_SIZE,
-  formatSol,
-  minimumBalance,
-} from "./rent";
+import { formatSol, tokenAccountExcess } from "./rent";
 import { buildTestAccountInstructions, demoMintsFor } from "./test-accounts";
-import { useRentRate } from "@/state/queries/use-rent";
+import { useRentStatus } from "@/state/queries/use-rent";
 
 const message = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
@@ -34,13 +29,13 @@ export function TestAccountsPanel() {
   const { client } = useKitClient();
   const { type: cluster } = useCluster();
   const queryClient = useQueryClient();
-  const { lamportsPerByte } = useRentRate();
+  const rentStatus = useRentStatus();
   const [hidden, setHidden] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const excess =
-    minimumBalance(TOKEN_ACCOUNT_SIZE, ORIGINAL_LAMPORTS_PER_BYTE) -
-    minimumBalance(TOKEN_ACCOUNT_SIZE, lamportsPerByte);
+  // Null until the cluster's rent is known: there's no telling how much
+  // excess to add before that.
+  const excess = rentStatus && tokenAccountExcess(rentStatus.lamportsPerByte);
   const mints = demoMintsFor(cluster);
 
   if (hidden) return null;
@@ -48,6 +43,15 @@ export function TestAccountsPanel() {
   const create = async () => {
     if (!client) {
       notify({ type: "error", title: "Connect a wallet first" });
+      return;
+    }
+    if (excess === null) {
+      notify({
+        type: "error",
+        title: "Couldn't create test accounts",
+        description:
+          "This network's rent hasn't loaded yet. Try again in a moment.",
+      });
       return;
     }
     if (!mints) {
@@ -140,11 +144,15 @@ export function TestAccountsPanel() {
           </div>
           <p className="mt-1.5 max-w-prose text-sm text-pretty text-zinc-500">
             {mints
-              ? `Opens an empty token account for each of the ${mints.length} demo mints and adds ${formatSol(excess)} SOL of excess to each. Accounts that already exist only get the excess.`
+              ? `Opens an empty token account for each of the ${mints.length} demo mints and adds ${excess === null ? "the" : `${formatSol(excess)} SOL of`} excess of an account opened at the original rent to each. Accounts that already exist only get the excess.`
               : "There are no demo mints on this network. Switch to mainnet or devnet."}
           </p>
         </div>
-        <Button outline disabled={busy || !mints} onClick={() => void create()}>
+        <Button
+          outline
+          disabled={busy || !mints || excess === null}
+          onClick={() => void create()}
+        >
           {busy && <SpinnerIcon className="size-4 animate-spin" />}
           {busy ? "Creating…" : "Create test accounts"}
         </Button>

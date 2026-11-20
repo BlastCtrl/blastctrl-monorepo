@@ -1,8 +1,13 @@
 "use client";
 
-import { remainingSteps } from "@/app/spl-token-tools/reclaim-rent/_components/rent";
+import type { RentStatus } from "@/app/spl-token-tools/reclaim-rent/_components/rent";
+import {
+  formatDay,
+  nextDrop,
+  remainingSteps,
+} from "@/app/spl-token-tools/reclaim-rent/_components/rent";
 import { RentScheduleChart } from "@/app/spl-token-tools/reclaim-rent/_components/rent-schedule-chart";
-import { useRentRate } from "@/state/queries/use-rent";
+import { useRentStatus } from "@/state/queries/use-rent";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { SiteFooter } from "./site-footer";
@@ -22,8 +27,8 @@ const LINK =
  * `children` (the band the reclaim happens on), then what to expect.
  */
 export function Landing({ children }: { children: ReactNode }) {
-  const { lamportsPerByte } = useRentRate();
-  const chart = <RentScheduleChart lamportsPerByte={lamportsPerByte} />;
+  const rentStatus = useRentStatus();
+  const chart = <RentScheduleChart status={rentStatus} />;
 
   return (
     <div className="flex grow flex-col bg-white">
@@ -51,20 +56,42 @@ export function Landing({ children }: { children: ReactNode }) {
 
         {children}
 
-        <GoodToKnow chart={chart} stepsLeft={remainingSteps(lamportsPerByte)} />
+        <GoodToKnow chart={chart} rentStatus={rentStatus} />
       </main>
       <SiteFooter />
     </div>
   );
 }
 
+/**
+ * What's still to come, from the chain: the day of the next reduction when
+ * one is scheduled, otherwise how many are left. Null once the last step is
+ * live.
+ */
+function moreComing(status: RentStatus) {
+  const stepsLeft = remainingSteps(status.lamportsPerByte);
+  if (stepsLeft === 0) return null;
+  const next = nextDrop(status);
+  if (next.kind === "scheduled") {
+    return `The next reduction in rent is expected around ${formatDay(next.at)}. Come back then to reclaim more SOL.`;
+  }
+  const one = stepsLeft === 1;
+  const left = one
+    ? "There is one more reduction in rent to come"
+    : `There are ${stepsLeft} more reductions in rent to come`;
+  return next.kind === "unscheduled"
+    ? `${left}, but ${one ? "it" : "the next one"} isn't scheduled yet. Come back later to reclaim more SOL.`
+    : `${left}. Come back later to reclaim more SOL.`;
+}
+
 function GoodToKnow({
   chart,
-  stepsLeft,
+  rentStatus,
 }: {
   chart: ReactNode;
-  stepsLeft: number;
+  rentStatus: RentStatus | null;
 }) {
+  const more = rentStatus && moreComing(rentStatus);
   return (
     <section
       aria-labelledby="good-to-know-heading"
@@ -111,12 +138,7 @@ function GoodToKnow({
               fees.
             </Fact>
           )}*/}
-          {stepsLeft > 0 && (
-            <Fact term="There's more coming.">
-              The next reduction in rent size will be happening in November.
-              Come back then to reclaim more SOL.
-            </Fact>
-          )}
+          {more && <Fact term="There's more coming.">{more}</Fact>}
         </dl>
       </div>
     </section>
