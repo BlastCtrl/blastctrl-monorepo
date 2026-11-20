@@ -1,3 +1,4 @@
+import { track } from "@vercel/analytics/server";
 import { createRpcScan } from "./analysis";
 import { publicHosts, readConfig } from "./config";
 import { createRpcDelegationScan } from "./delegations";
@@ -14,6 +15,23 @@ const server = createHttpServer({
   serviceFeeBasisPoints: config.RECLAIM_RENT_FEE_BPS,
   publicOrigin: config.PUBLIC_ORIGIN,
   publicHosts: publicHosts(config),
+  // Vercel Web Analytics custom event, from the production deployment only.
+  // The plan allows two properties, and the address is never one of them.
+  // The two headers are what the event endpoint takes from a server.
+  onToolCall:
+    config.VERCEL_ENV === "production"
+      ? (tool, outcome, headers) =>
+          void track(
+            "mcp_tool_call",
+            { tool, outcome },
+            {
+              headers: {
+                "user-agent": headers["user-agent"],
+                "x-forwarded-for": headers["x-forwarded-for"],
+              },
+            },
+          ).catch(() => {})
+      : undefined,
 });
 // On Vercel the runtime takes the server from this call and routes requests
 // to it itself, so HOST and PORT only matter when running it directly.
