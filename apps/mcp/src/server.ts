@@ -11,11 +11,17 @@ import {
   summarizeNested,
   type NestedScan,
 } from "./nested";
+import {
+  describeRentStatus,
+  summarizeRentStatus,
+  type RentStatusScan,
+} from "./rent-status";
 
 export type Scans = {
   rent: Scan;
   delegations: DelegationScan;
   nested: NestedScan;
+  rentStatus: RentStatusScan;
 };
 
 const lamports = z.string().regex(/^-?\d+$/);
@@ -264,6 +270,76 @@ export function createMcpServer({
           };
         },
         "No result was returned.",
+      ),
+  );
+
+  server.registerTool(
+    "check_rent_reduction_status",
+    {
+      title: "Check Solana rent reduction status",
+      description:
+        "Check which steps of Solana's SIMD-0437 rent reduction are live on mainnet by reading their feature gate accounts, with each step's activation slot and date, the current rent-exempt cost of a token account, and the excess rent an account opened before the cuts now holds. Use it to tell whether more rent reduction has landed since a previous check. When steps are still pending, it suggests checking again after the earliest activation date. Read-only; takes no address.",
+      outputSchema: {
+        network: z.literal("mainnet-beta"),
+        checkedAt: z.string(),
+        slot: z.string(),
+        epoch: z.string(),
+        latestActiveStep: z.number().int(),
+        moreReductionPending: z.boolean(),
+        current: z.object({
+          lamportsPerByte: z.number().int(),
+          reductionPercent: z.number().int(),
+          tokenAccountRentLamports: lamports,
+          tokenAccountRentSol: z.string(),
+        }),
+        steps: z.array(
+          z.object({
+            step: z.number().int(),
+            simd: z.string(),
+            featureId: z.string(),
+            status: z.enum(["active", "scheduled", "not-scheduled"]),
+            lamportsPerByte: z.number().int(),
+            reductionPercent: z.number().int(),
+            tokenAccountRentLamports: lamports,
+            activationSlot: z.string().optional(),
+            activatedAt: z.string().optional(),
+            expectedActivationAt: z.string().optional(),
+          }),
+        ),
+        legacyTokenAccount: z.object({
+          depositLamports: lamports,
+          excessNowLamports: lamports,
+          excessNowSol: z.string(),
+          excessAfterAllStepsLamports: lamports,
+          excessAfterAllStepsSol: z.string(),
+        }),
+        nextStep: z
+          .object({
+            step: z.number().int(),
+            status: z.enum(["scheduled", "not-scheduled"]),
+            earliestActivationDate: z.string(),
+            expectedActivationAt: z.string().optional(),
+          })
+          .optional(),
+        reclaimUrl: z.string(),
+        suggestion: z.string(),
+        notes: z.array(z.string()),
+      },
+      ...readOnly,
+    },
+    async (extra) =>
+      runScan(
+        extra.signal,
+        timeoutMs,
+        (signal) => scans.rentStatus(signal),
+        (scan) => {
+          const result = summarizeRentStatus(scan);
+          return {
+            structuredContent: result,
+            content: [{ type: "text", text: describeRentStatus(result) }],
+          };
+        },
+        "No status was returned.",
       ),
   );
   return server;

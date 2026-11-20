@@ -1,6 +1,7 @@
 # BlastCtrl MCP
 
-This server lets ChatGPT check a Solana address with three read-only tools:
+This server lets ChatGPT check a Solana address with three read-only tools,
+plus one that checks the network rather than an address:
 
 - `analyze_rent_reclaim`: reclaimable rent, with the same account scan as
   the BlastCtrl reclaim page, from `packages/rent-reclaimer`.
@@ -12,6 +13,12 @@ This server lets ChatGPT check a Solana address with three read-only tools:
   associated token accounts, with the automatic search of the BlastCtrl
   recover nested tool, from `packages/token-scans`. Links to
   https://tools.blastctrl.com/spl-token-tools/recover-nested.
+- `check_rent_reduction_status`: which of the five SIMD-0437 rent reduction
+  steps are live on mainnet, when each activated, the current rent of a token
+  account, and the excess an account opened before the cuts now holds. Links
+  to https://reclaim.blastctrl.com and, while steps are pending, suggests
+  checking again after 2026-11-09, the earliest date Agave v4.4 resumes
+  mainnet feature activation.
 
 It reads the chain with `@solana/kit`. None of the tools revokes, recovers or
 reclaims anything; each reports what it found and links to the web tool,
@@ -94,7 +101,7 @@ Call `analyze_rent_reclaim` with:
 ```
 
 `check_token_delegations` and `check_nested_token_accounts` take the same
-input.
+input. `check_rent_reduction_status` takes no input.
 
 Inspector's browser origins on port 6274 are allowed. Requests from other
 browser origins are rejected unless the origin matches `PUBLIC_ORIGIN`.
@@ -174,6 +181,22 @@ For the delegation and nested account checks:
   past 500 ATAs.
 - All three tools share the 25-second deadline and the per-process scan
   budget above.
+
+For the rent reduction status:
+
+- Each step's feature gate account, owned by the Feature program, holds its
+  activation slot once the runtime has activated it. A missing account means
+  the step isn't scheduled; an account without a slot means it activates at
+  the next epoch boundary. The activation date is that slot's block time, so
+  the tool needs no database to say when a step went live.
+- The current rent is the RPC's live rent-exempt minimum for 165 bytes. The
+  reclaim tool also reads live minimums, so its excess figures rise on their
+  own once a step activates.
+- The status is the same for every caller, so each instance caches it for a
+  minute and shares one RPC read between concurrent calls, outside the scan
+  budget. Activation block times are cached for the life of the process.
+- The server can't notify anyone. The suggestion to check again is for the
+  client (a ChatGPT or Claude scheduled task, for example) to act on.
 
 The HTTP endpoint is intentionally unauthenticated. The limits above are a
 small test deployment budget, not per-user quotas.

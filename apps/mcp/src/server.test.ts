@@ -35,6 +35,9 @@ const emptyScans: Scans = {
   rent: async () => [],
   delegations: async () => ({ accounts: [], mintDecimals: {} }),
   nested: async () => ({ parentCount: 0, pairs: [], mintDecimals: {} }),
+  rentStatus: async () => {
+    throw new Error("not used");
+  },
 };
 
 async function connect(scans: Scan | Partial<Scans>, hosts: string[] = []) {
@@ -73,6 +76,7 @@ describe("MCP over real local HTTP", () => {
       "analyze_rent_reclaim",
       "check_token_delegations",
       "check_nested_token_accounts",
+      "check_rent_reduction_status",
     ]);
     for (const tool of tools) {
       expect(tool).toMatchObject({

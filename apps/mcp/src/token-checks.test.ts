@@ -70,6 +70,9 @@ async function connect(scans: Partial<Scans>) {
       rent: async () => [],
       delegations: async () => ({ accounts: [], mintDecimals: {} }),
       nested: async () => ({ parentCount: 0, pairs: [], mintDecimals: {} }),
+      rentStatus: async () => {
+        throw new Error("not used");
+      },
       ...scans,
     },
   });
