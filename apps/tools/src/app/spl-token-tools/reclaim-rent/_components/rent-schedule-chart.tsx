@@ -4,7 +4,6 @@ import {
   TOKEN_ACCOUNT_DEPOSIT,
   TOKEN_ACCOUNT_SIZE,
   currentStepIndex,
-  formatDay,
   formatSol,
   isScheduled,
   minimumBalance,
@@ -37,35 +36,26 @@ const lastExcess = tokenAccountExcess(RENT_STEPS[LAST]!.lamportsPerByte);
 
 /**
  * The notes under the steps still to come, from what their feature gates
- * say: a day under each step that goes live when the epoch ends, and one
- * note under the rest. Without the gates, one note under all of them.
+ * say: "Next epoch" under each step that goes live when this epoch ends,
+ * and one note under the rest. Without the gates, one note under all of
+ * them.
  */
 function upcomingNotes(status: RentStatus, currentIndex: number) {
   const upcoming = RENT_STEPS.map((_, i) => i).filter((i) => i > currentIndex);
-  const { nextEpochAt } = status;
-  const scheduled =
-    nextEpochAt === null ? [] : upcoming.filter((i) => isScheduled(status, i));
+  const scheduled = upcoming.filter((i) => isScheduled(status, i));
   const rest = upcoming.filter((i) => !scheduled.includes(i));
 
-  const notes: { x: number; anchor: "middle" | "end"; text: string }[] =
-    scheduled.map((i) => ({
-      x: center(i),
-      anchor: "middle",
-      text: `~${formatDay(nextEpochAt!)}`,
-    }));
+  const notes = scheduled.map((i) => ({ x: center(i), text: "Next epoch" }));
   if (rest.length > 0) {
     const first = rest[0]!;
     const last = rest.at(-1)!;
-    // The note is wider than a column, so under the last column alone it
-    // ends at the chart's edge instead of running off it.
-    const atEdge = first === LAST;
     notes.push({
-      x: atEdge ? WIDTH - 2 : (center(first) + center(last)) / 2,
-      anchor: atEdge ? "end" : "middle",
+      x: (center(first) + center(last)) / 2,
       text: !status.gates
         ? "Still to come"
-        : first === last
-          ? "Not scheduled"
+        : // Under a single column the note has to be narrower than it.
+          first === last
+          ? "Not yet"
           : "Not scheduled yet",
     });
   }
@@ -267,7 +257,7 @@ export function RentScheduleChart({ status }: { status: RentStatus | null }) {
             key={note.x}
             x={note.x}
             y={BOTTOM + 30}
-            textAnchor={note.anchor}
+            textAnchor="middle"
             className="fill-zinc-400"
           >
             {note.text}

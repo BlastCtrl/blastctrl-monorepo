@@ -12,8 +12,7 @@ import { rentStatusKey, type RentStatus } from "./rent";
 
 /**
  * How long a read of the rent status is reused, in seconds. The status only
- * changes at an epoch boundary, about every two days, and only five times in
- * all. Pages that render {@link RentStatusBoundary} export the same number
+ * changes at an epoch boundary, and only five times in all. Pages that render {@link RentStatusBoundary} export the same number
  * as `revalidate`, where Next.js needs a literal.
  */
 const REVALIDATE_SECONDS = 300;

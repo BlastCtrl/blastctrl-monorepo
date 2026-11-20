@@ -16,7 +16,6 @@ import {
   ACCOUNTS_PER_TRANSACTION,
   FEE_PER_TRANSACTION,
   formatSol,
-  formatDay,
   nextDrop,
   remainingSteps,
   type RentStatus,
@@ -372,9 +371,9 @@ function Review({
 
 /** What the reclaim does to the accounts, before the numbers. */
 /**
- * After a reclaim: how many more times rent drops, when the next drop is
- * due if the chain says, and that there'll be more to reclaim then. Empty
- * once the last step is live.
+ * After a reclaim: how many more times rent drops, whether the next drop
+ * is scheduled if the chain says, and that there'll be more to reclaim
+ * then. Empty once the last step is live.
  */
 function moreToCome(status: RentStatus, closedSome: boolean) {
   const stepsLeft = remainingSteps(status.lamportsPerByte);
@@ -382,9 +381,9 @@ function moreToCome(status: RentStatus, closedSome: boolean) {
   const next = nextDrop(status);
   const once = stepsLeft === 1;
   const when =
-    next.kind === "scheduled"
-      ? `, ${once ? "" : "next "}around ${formatDay(next.at)}`
-      : next.kind === "unscheduled"
+    next === "scheduled"
+      ? `, ${once ? "" : "starting "}at the next epoch`
+      : next === "unscheduled"
         ? `, though ${once ? "that" : "the next drop"} isn't scheduled yet`
         : "";
   return ` Rent drops ${once ? "once more" : `${stepsLeft} more times`}${when}. After each drop, ${closedSome ? "the accounts still open" : "the same accounts"} will have more to reclaim.`;

@@ -11,9 +11,6 @@ import {
   type RentStatus,
 } from "./rent";
 
-// 2026-11-22T06:00Z, a day and a bit after the read.
-const NEXT_EPOCH = Date.UTC(2026, 10, 22, 6);
-
 /** Mainnet in late November 2026: steps 1 and 2 live, nothing scheduled. */
 const twoLive: RentStatus = {
   readAt: Date.UTC(2026, 10, 20, 8),
@@ -25,13 +22,12 @@ const twoLive: RentStatus = {
     "not-scheduled",
     "not-scheduled",
   ],
-  nextEpochAt: NEXT_EPOCH,
 };
 const stepThreeScheduled: RentStatus = {
   ...twoLive,
   gates: ["active", "active", "scheduled", "not-scheduled", "not-scheduled"],
 };
-const gatesUnread: RentStatus = { ...twoLive, gates: null, nextEpochAt: null };
+const gatesUnread: RentStatus = { ...twoLive, gates: null };
 const allLive: RentStatus = {
   ...twoLive,
   lamportsPerByte: 696,
@@ -98,40 +94,35 @@ describe("isScheduled", () => {
 });
 
 describe("nextDrop", () => {
-  it("has the epoch boundary when a remaining step is scheduled", () => {
-    expect(nextDrop(stepThreeScheduled)).toEqual({
-      kind: "scheduled",
-      at: NEXT_EPOCH,
-    });
+  it("is scheduled when a remaining step's gate is", () => {
+    expect(nextDrop(stepThreeScheduled)).toBe("scheduled");
   });
 
   it("says so when no remaining step is scheduled", () => {
-    expect(nextDrop(twoLive)).toEqual({ kind: "unscheduled" });
+    expect(nextDrop(twoLive)).toBe("unscheduled");
   });
 
   it("doesn't guess when the gates couldn't be read", () => {
-    expect(nextDrop(gatesUnread)).toEqual({ kind: "unknown" });
+    expect(nextDrop(gatesUnread)).toBe("unknown");
   });
 
   it("goes by the live rate, not by gates that lag behind it", () => {
     // The rate already says step 3; its gate still reads as scheduled.
-    expect(nextDrop({ ...stepThreeScheduled, lamportsPerByte: 2575 })).toEqual({
-      kind: "unscheduled",
-    });
+    expect(nextDrop({ ...stepThreeScheduled, lamportsPerByte: 2575 })).toBe(
+      "unscheduled",
+    );
   });
 
   it("is over once the last step is live", () => {
-    expect(nextDrop(allLive)).toEqual({ kind: "none" });
-    expect(nextDrop({ ...gatesUnread, lamportsPerByte: 696 })).toEqual({
-      kind: "none",
-    });
+    expect(nextDrop(allLive)).toBe("none");
+    expect(nextDrop({ ...gatesUnread, lamportsPerByte: 696 })).toBe("none");
   });
 });
 
 describe("checkBackNote", () => {
-  it("names the day when the next step is scheduled", () => {
+  it("points to the next epoch when the next step is scheduled", () => {
     expect(checkBackNote(stepThreeScheduled)).toBe(
-      "Rent drops again around Nov 22, so check back then.",
+      "Rent drops again at the next epoch, so check back soon.",
     );
   });
 

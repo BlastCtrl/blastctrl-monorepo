@@ -2,7 +2,6 @@ import {
   address,
   fetchEncodedAccounts,
   type Address,
-  type GetEpochInfoApi,
   type GetMinimumBalanceForRentExemptionApi,
   type GetMultipleAccountsApi,
   type Rpc,
@@ -15,8 +14,6 @@ export const FEATURE_PROGRAM_ADDRESS = address(
 export const ORIGINAL_LAMPORTS_PER_BYTE = 6960;
 /** Every account pays for 128 bytes of metadata on top of its data. */
 export const ACCOUNT_STORAGE_OVERHEAD = 128;
-/** Mainnet's target slot time, for estimating when the epoch ends. */
-const SLOT_MS = 400;
 
 /**
  * SIMD-0437's five steps. Each has its own feature gate and sets lamports
@@ -80,17 +77,10 @@ export type RentReductionStatus = {
    * live, only not what is scheduled next.
    */
   gates: RentGateStatus[] | null;
-  /**
-   * Roughly when the next epoch starts, in Unix milliseconds: the moment a
-   * scheduled step goes live. Null along with `gates`.
-   */
-  nextEpochAt: number | null;
 };
 
 export type RentReductionRpc = Rpc<
-  GetEpochInfoApi &
-    GetMinimumBalanceForRentExemptionApi &
-    GetMultipleAccountsApi
+  GetMinimumBalanceForRentExemptionApi & GetMultipleAccountsApi
 >;
 
 /**
@@ -133,11 +123,14 @@ export async function readRentGates(
 }
 
 /**
- * The cluster's rent reduction status in three parallel requests. The rate
+ * The cluster's rent reduction status in two parallel requests. The rate
  * comes from the rent-exempt minimum of a zero-byte account, which is
- * exactly the storage overhead times lamports per byte. The gates and the
- * epoch only say what is scheduled next, so if they fail the rate is still
- * returned, with `gates` and `nextEpochAt` null.
+ * exactly the storage overhead times lamports per byte. The gates only say
+ * what is scheduled next, so if they fail the rate is still returned, with
+ * `gates` null.
+ *
+ * A scheduled step goes live at the next epoch boundary. When that is isn't
+ * estimated here: it would take a slot time, and that isn't a constant.
  */
 export async function readRentReductionStatus(
   rpc: RentReductionRpc,
@@ -146,20 +139,13 @@ export async function readRentReductionStatus(
     now = Date.now,
   }: { abortSignal?: AbortSignal; now?: () => number } = {},
 ): Promise<RentReductionStatus> {
-  const [minimum, schedule] = await Promise.all([
+  const [minimum, gates] = await Promise.all([
     rpc.getMinimumBalanceForRentExemption(0n).send({ abortSignal }),
-    Promise.all([
-      readRentGates(rpc, abortSignal),
-      rpc.getEpochInfo().send({ abortSignal }),
-    ]).catch(() => null),
+    readRentGates(rpc, abortSignal).catch(() => null),
   ]);
-  const readAt = now();
-  const [gates, epoch] = schedule ?? [null, null];
   return {
-    readAt,
+    readAt: now(),
     lamportsPerByte: Number(minimum) / ACCOUNT_STORAGE_OVERHEAD,
     gates: gates && gates.map((gate) => gate.status),
-    nextEpochAt:
-      epoch && readAt + Number(epoch.slotsInEpoch - epoch.slotIndex) * SLOT_MS,
   };
 }

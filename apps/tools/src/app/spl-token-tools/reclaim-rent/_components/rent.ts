@@ -70,38 +70,21 @@ export function isScheduled(status: RentStatus, index: number) {
 }
 
 /**
- * When rent drops next. "scheduled" has the estimated time the next epoch
- * starts. "unscheduled" means the gates were read and none of the remaining
- * steps is set to go live. "unknown" means the gates couldn't be read.
+ * When rent drops next. "scheduled" means a remaining step goes live at the
+ * next epoch boundary; no date is put on that, since it would take guessing
+ * the slot time. "unscheduled" means the gates were read and none of the
+ * remaining steps is set to go live. "unknown" means the gates couldn't be
+ * read. "none" means the last step is live.
  */
-export type NextDrop =
-  | { kind: "none" }
-  | { kind: "scheduled"; at: number }
-  | { kind: "unscheduled" }
-  | { kind: "unknown" };
+export type NextDrop = "none" | "scheduled" | "unscheduled" | "unknown";
 
 export function nextDrop(status: RentStatus): NextDrop {
   const current = currentStepIndex(status.lamportsPerByte);
-  if (current === RENT_STEPS.length - 1) return { kind: "none" };
-  if (!status.gates || status.nextEpochAt === null) return { kind: "unknown" };
-  const scheduled = RENT_STEPS.some(
-    (_, i) => i > current && isScheduled(status, i),
-  );
-  return scheduled
-    ? { kind: "scheduled", at: status.nextEpochAt }
-    : { kind: "unscheduled" };
-}
-
-// In UTC, so the server and every browser write the same day.
-const DAY = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  timeZone: "UTC",
-});
-
-/** A day like "Nov 22". */
-export function formatDay(time: number) {
-  return DAY.format(time);
+  if (current === RENT_STEPS.length - 1) return "none";
+  if (!status.gates) return "unknown";
+  return RENT_STEPS.some((_, i) => i > current && isScheduled(status, i))
+    ? "scheduled"
+    : "unscheduled";
 }
 
 /**
@@ -109,12 +92,11 @@ export function formatDay(time: number) {
  * Empty once the last step is live, and until the status has loaded.
  */
 export function checkBackNote(status: RentStatus | null) {
-  const next = status ? nextDrop(status) : { kind: "none" as const };
-  switch (next.kind) {
+  switch (status ? nextDrop(status) : "none") {
     case "none":
       return "";
     case "scheduled":
-      return `Rent drops again around ${formatDay(next.at)}, so check back then.`;
+      return "Rent drops again at the next epoch, so check back soon.";
     case "unscheduled":
       return "Rent is set to drop again, but the next step isn't scheduled yet. Check back later.";
     case "unknown":

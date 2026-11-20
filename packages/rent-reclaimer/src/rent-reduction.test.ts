@@ -64,13 +64,6 @@ function fixture({
         "getMinimumBalanceForRentExemption",
         () => (size + 128n) * lamportsPerByte,
       ),
-    getEpochInfo: () =>
-      request("getEpochInfo", () => ({
-        absoluteSlot: 471_666_935n,
-        epoch: 1091n,
-        slotIndex: 354_935n,
-        slotsInEpoch: 432_000n,
-      })),
   } as unknown as RentReductionRpc;
   return { rpc, requested };
 }
@@ -135,7 +128,7 @@ describe("readRentGates", () => {
 });
 
 describe("readRentReductionStatus", () => {
-  it("returns the live rate, each gate and when the epoch ends", async () => {
+  it("returns the live rate and each gate", async () => {
     const { rpc } = fixture();
     const status = await readRentReductionStatus(rpc, { now: () => 1_000 });
     expect(status).toEqual({
@@ -148,22 +141,21 @@ describe("readRentReductionStatus", () => {
         "not-scheduled",
         "not-scheduled",
       ],
-      nextEpochAt: 1_000 + (432_000 - 354_935) * 400,
     });
     // It crosses from a server to the browser as JSON.
     expect(JSON.parse(JSON.stringify(status))).toEqual(status);
   });
 
   it("still returns the rate when the gates can't be read", async () => {
-    for (const method of ["getMultipleAccounts", "getEpochInfo"]) {
-      const { rpc } = fixture({ failing: [method], lamportsPerByte: 2575n });
-      expect(await readRentReductionStatus(rpc, { now: () => 5 })).toEqual({
-        readAt: 5,
-        lamportsPerByte: 2575,
-        gates: null,
-        nextEpochAt: null,
-      });
-    }
+    const { rpc } = fixture({
+      failing: ["getMultipleAccounts"],
+      lamportsPerByte: 2575n,
+    });
+    expect(await readRentReductionStatus(rpc, { now: () => 5 })).toEqual({
+      readAt: 5,
+      lamportsPerByte: 2575,
+      gates: null,
+    });
   });
 
   it("fails when the rate can't be read", async () => {
